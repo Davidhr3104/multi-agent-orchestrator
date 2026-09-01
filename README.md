@@ -1,18 +1,25 @@
-# Portafolio de Proyectos — David Herrera
+# David Herrera — workspace de portafolio
 
-Documento interno de referencia: proyectos actuales, proyectos futuros priorizados según ofertas de alto valor, y consejos clave de posicionamiento.
+## Helix Orchestrator (proyecto #1)
 
-## Archivo principal
-
-- **[Portafolio-Proyectos-David-Herrera.pdf](./Portafolio-Proyectos-David-Herrera.pdf)** — versión lista para leer o imprimir
-- `portafolio.html` — fuente del PDF
-- `generate_pdf.py` — regenera el PDF
-
-## Regenerar el PDF
+Sistema multi-agente de análisis de contenido.
 
 ```bash
-pip install weasyprint
-python3 generate_pdf.py
+cd multi-agent-orchestrator
+npm install
+npm run dev
 ```
 
-Última actualización: 1 de septiembre de 2026.
+Demo en [http://127.0.0.1:43147](http://127.0.0.1:43147). Detalle: `multi-agent-orchestrator/README.md`.
+
+## MCP PDF server
+
+```bash
+cd mcp-pdf-server
+npm install
+node index.js
+```
+
+## Documento interno
+
+- [Portafolio-Proyectos-David-Herrera.pdf](./Portafolio-Proyectos-David-Herrera.pdf)
