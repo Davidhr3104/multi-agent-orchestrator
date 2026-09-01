@@ -5,6 +5,7 @@ export const AGENT_CATALOG: {
   name: string;
   short: string;
   role: string;
+  detail: string;
   accent: string;
   icon: string;
 }[] = [
@@ -13,6 +14,8 @@ export const AGENT_CATALOG: {
     name: "Orquestador",
     short: "ORCH",
     role: "Clasifica el input, arma el flujo y consolida el resultado.",
+    detail:
+      "Clasifica el input como url, article o copy, decide si autoriza el fetch de una URL, ordena el grafo (extractor → SEO ∥ verificación → revisor → recomendador → revisor → consolidar) y calcula la confianza global al final de la corrida.",
     accent: "cyan",
     icon: "memory",
   },
@@ -21,6 +24,8 @@ export const AGENT_CATALOG: {
     name: "Extractor",
     short: "EXT",
     role: "Campos con evidencia y confidence score.",
+    detail:
+      "Estructura título, audiencia, keywords, tono y extensión a partir del texto normalizado. Cada campo trae su propio confidence score y una cita textual como evidencia.",
     accent: "sky",
     icon: "save_as",
   },
@@ -29,6 +34,8 @@ export const AGENT_CATALOG: {
     name: "Calidad / SEO",
     short: "SEO",
     role: "Legibilidad, keywords y huecos de contenido.",
+    detail:
+      "Corre en paralelo con Verificación. Calcula legibilidad, densidad de palabras y si la keyword principal aparece en el lead; devuelve además una meta description sugerida.",
     accent: "violet",
     icon: "search_insights",
   },
@@ -37,6 +44,8 @@ export const AGENT_CATALOG: {
     name: "Verificación",
     short: "FACT",
     role: "Claims soportadas o sin fuente. No inventa.",
+    detail:
+      "Separa oraciones con cifras o afirmaciones fuertes y las marca como supported (citan fuente), unverified (sin fuente) o conflicted. Nunca inventa una fuente que no existe en el texto.",
     accent: "amber",
     icon: "fact_check",
   },
@@ -45,6 +54,8 @@ export const AGENT_CATALOG: {
     name: "Recomendaciones",
     short: "REC",
     role: "Acciones priorizadas sobre métricas reales.",
+    detail:
+      "Lee los outputs de extractor, SEO y verificación —nunca calcula sus propios números— y prioriza hasta 5 acciones accionables en alta, media o baja prioridad.",
     accent: "emerald",
     icon: "recommend",
   },
@@ -53,6 +64,8 @@ export const AGENT_CATALOG: {
     name: "Revisor cruzado",
     short: "REV",
     role: "Un agente revisa a otro: aprueba, corrige o bloquea.",
+    detail:
+      "Corre dos veces: primero sobre extractor, SEO y verificación; luego sobre el recomendador. Emite approve, revise o block por cada agente que evalúa (agent-reviewing-agent).",
     accent: "rose",
     icon: "rule",
   },

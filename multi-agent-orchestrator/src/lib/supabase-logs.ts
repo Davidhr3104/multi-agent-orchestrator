@@ -50,3 +50,51 @@ export async function persistPipelineLog(
   }
   return { stored: "supabase" };
 }
+
+export type RunSummary = {
+  runId: string;
+  lastTs: string;
+  count: number;
+};
+
+export async function listRecentRuns(limit = 15): Promise<RunSummary[]> {
+  const db = getSupabase();
+  if (!db) return [];
+
+  const { data, error } = await db
+    .from("pipeline_logs")
+    .select("run_id, ts")
+    .order("ts", { ascending: false })
+    .limit(2000);
+
+  if (error || !data) return [];
+
+  const byRun = new Map<string, RunSummary>();
+  for (const row of data as { run_id: string; ts: string }[]) {
+    const existing = byRun.get(row.run_id);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byRun.set(row.run_id, { runId: row.run_id, lastTs: row.ts, count: 1 });
+    }
+  }
+
+  return [...byRun.values()]
+    .sort((a, b) => (a.lastTs < b.lastTs ? 1 : -1))
+    .slice(0, limit);
+}
+
+export async function listLogsForRun(runId: string): Promise<PipelineLog[]> {
+  const db = getSupabase();
+  if (!db) return [];
+
+  const { data, error } = await db
+    .from("pipeline_logs")
+    .select("id, ts, agent, level, message, field, confidence, evidence")
+    .eq("run_id", runId)
+    .order("ts", { ascending: true })
+    .limit(500);
+
+  if (error || !data) return [];
+  return data as PipelineLog[];
+}

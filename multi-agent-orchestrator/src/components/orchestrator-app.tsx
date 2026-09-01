@@ -6,7 +6,9 @@ import { ControlPanel } from "@/components/control-panel";
 import { ExportButtons } from "@/components/result-dashboard";
 import { Icon } from "@/components/icon";
 import { LogStream } from "@/components/log-stream";
+import { PageFooter } from "@/components/page-footer";
 import { ResultPanel } from "@/components/result-panel";
+import { TopNav } from "@/components/top-nav";
 import {
   Sheet,
   SheetContent,
@@ -122,55 +124,11 @@ export function OrchestratorApp() {
 
   return (
     <div className="text-on-surface font-body-md flex min-h-full flex-col">
-      {/* Top Nav */}
-      <nav className="border-outline-variant/30 bg-surface/80 fixed top-0 z-50 w-full border-b shadow-sm backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <span className="text-primary flex items-center text-[24px] font-bold leading-8 drop-shadow-[0_0_8px_rgba(76,215,246,0.15)]">
-              <Icon name="hub" filled className="mr-2 text-[24px]" />
-              HX
-            </span>
-            <div className="bg-outline-variant mx-2 h-4 w-px" />
-            <span className="text-on-surface text-[16px] font-medium">
-              Helix Orchestrator
-            </span>
-            <span className="relative ml-2 flex h-2 w-2">
-              <span
-                className={cn(
-                  "absolute inline-flex h-full w-full rounded-full opacity-75",
-                  running ? "animate-ping bg-primary" : "bg-tertiary"
-                )}
-              />
-              <span
-                className={cn(
-                  "relative inline-flex h-2 w-2 rounded-full",
-                  running ? "bg-primary" : "bg-tertiary"
-                )}
-              />
-            </span>
-          </div>
-
-          <div className="hidden items-center gap-6 md:flex">
-            <span className="text-primary border-primary font-label-sm border-b-2 pb-1 text-[12px] uppercase tracking-wider">
-              Dashboard
-            </span>
-            <span className="text-on-surface-variant font-label-sm text-[12px] uppercase tracking-wider">
-              Workflows
-            </span>
-            <span className="text-on-surface-variant font-label-sm text-[12px] uppercase tracking-wider">
-              Agents
-            </span>
-            <span className="text-on-surface-variant font-label-sm text-[12px] uppercase tracking-wider">
-              Logs
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Icon
-              name="notifications"
-              className="text-on-surface-variant hidden text-[20px] sm:inline"
-            />
-            <div className="bg-outline-variant mx-1 hidden h-6 w-px sm:block" />
+      <TopNav
+        active="dashboard"
+        pulse={running ? "busy" : "ok"}
+        actions={
+          <>
             <Sheet>
               <SheetTrigger className="border-outline-variant bg-surface-container-low text-on-surface hover:border-primary hover:text-primary font-label-sm rounded border px-3 py-1.5 text-[12px] transition-colors">
                 <span className="flex items-center gap-1.5">
@@ -210,9 +168,9 @@ export function OrchestratorApp() {
               <Icon name="play_arrow" filled className="text-[16px]" />
               {running ? "Orquestando…" : "Correr Pipeline"}
             </button>
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col gap-8 px-4 py-8 pt-24 sm:px-6">
         {/* Hero */}
@@ -366,24 +324,7 @@ export function OrchestratorApp() {
         </section>
       </main>
 
-      <footer className="border-outline-variant/20 bg-surface-dim mt-8 w-full border-t py-4">
-        <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
-          <p className="text-on-surface-variant font-label-sm text-[12px]">
-            Helix Orchestrator v2.4.0
-          </p>
-          <div className="flex gap-4">
-            <span className="text-on-surface-variant hover:text-tertiary text-[13px] underline">
-              Documentation
-            </span>
-            <span className="text-on-surface-variant hover:text-tertiary text-[13px] underline">
-              Support
-            </span>
-            <span className="text-on-surface-variant hover:text-tertiary text-[13px] underline">
-              System Status
-            </span>
-          </div>
-        </div>
-      </footer>
+      <PageFooter />
     </div>
   );
 }
