@@ -2,10 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import {
-  AGENT_CATALOG,
-  PERMISSION_LABELS,
-} from "@/lib/permissions";
+import { AGENT_CATALOG, PERMISSION_LABELS } from "@/lib/permissions";
 import type { AgentId, PermissionKey, PermissionMap } from "@/lib/types";
 
 const KEYS = Object.keys(PERMISSION_LABELS) as PermissionKey[];
@@ -25,13 +22,13 @@ export function PermissionMatrix({
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="bg-muted/60">
-          <tr>
+    <div className="overflow-x-auto rounded-xl border border-white/8 bg-black/20">
+      <table className="w-full min-w-[640px] text-left text-xs">
+        <thead>
+          <tr className="border-b border-white/8 text-white/60">
             <th className="px-3 py-2 font-medium">Agente</th>
             {KEYS.map((key) => (
-              <th key={key} className="px-2 py-2 text-xs font-medium">
+              <th key={key} className="px-2 py-2 font-medium">
                 {PERMISSION_LABELS[key]}
               </th>
             ))}
@@ -39,14 +36,14 @@ export function PermissionMatrix({
         </thead>
         <tbody>
           {AGENT_CATALOG.map((agent) => (
-            <tr key={agent.id} className="border-t">
-              <td className="px-3 py-2 font-medium">{agent.name}</td>
+            <tr key={agent.id} className="border-t border-white/6">
+              <td className="px-3 py-2.5 font-medium">{agent.name}</td>
               {KEYS.map((key) => {
                 const checked = value[agent.id]?.includes(key) ?? false;
                 const id = `${agent.id}-${key}`;
                 return (
-                  <td key={key} className="px-2 py-2">
-                    <div className="flex items-center gap-2">
+                  <td key={key} className="px-2 py-2.5">
+                    <div className="flex items-center">
                       <Checkbox
                         id={id}
                         checked={checked}

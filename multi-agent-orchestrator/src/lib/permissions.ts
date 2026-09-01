@@ -3,37 +3,51 @@ import type { AgentId, PermissionKey, PermissionMap } from "./types";
 export const AGENT_CATALOG: {
   id: AgentId;
   name: string;
+  short: string;
   role: string;
+  accent: string;
 }[] = [
   {
     id: "orchestrator",
     name: "Orquestador",
-    role: "Clasifica el input, arma el flujo y consolida el resultado final.",
+    short: "ORCH",
+    role: "Clasifica el input, arma el flujo y consolida el resultado.",
+    accent: "cyan",
   },
   {
     id: "extractor",
     name: "Extractor",
-    role: "Estructura campos con evidencia y confidence score (mismo patrón que el Extraction Agent).",
+    short: "EXT",
+    role: "Campos con evidencia y confidence score.",
+    accent: "sky",
   },
   {
     id: "seo",
     name: "Calidad / SEO",
-    role: "Evalúa legibilidad, keywords y huecos de contenido.",
+    short: "SEO",
+    role: "Legibilidad, keywords y huecos de contenido.",
+    accent: "violet",
   },
   {
     id: "factcheck",
     name: "Verificación",
-    role: "Separa afirmaciones y las marca como soportadas o sin fuente (estilo RAG: no inventa).",
+    short: "FACT",
+    role: "Claims soportadas o sin fuente. No inventa.",
+    accent: "amber",
   },
   {
     id: "recommender",
     name: "Recomendaciones",
-    role: "Propone acciones priorizadas a partir de los otros agentes (estilo Hermes).",
+    short: "REC",
+    role: "Acciones priorizadas sobre métricas reales.",
+    accent: "emerald",
   },
   {
     id: "reviewer",
     name: "Revisor cruzado",
-    role: "Un agente revisa a otro: aprueba, pide corrección o bloquea.",
+    short: "REV",
+    role: "Un agente revisa a otro: aprueba, corrige o bloquea.",
+    accent: "rose",
   },
 ];
 
