@@ -31,6 +31,15 @@ npm run dev
 
 Abre [http://127.0.0.1:43147](http://127.0.0.1:43147).
 
+## Deploy (Vercel)
+
+La app vive en este directorio. Al importar el repo en Vercel, pon **Root Directory** = `multi-agent-orchestrator`.
+
+```bash
+cd multi-agent-orchestrator
+npx vercel --prod
+```
+
 Opcional (`.env.local`):
 
 - `ANTHROPIC_API_KEY` — narración Claude al consolidar
