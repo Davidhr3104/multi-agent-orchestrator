@@ -1,0 +1,17 @@
+{
+  "name": "mcp-pdf-server",
+  "version": "1.0.0",
+  "description": "Local MCP server that generates A4 PDFs from HTML or URLs using Puppeteer",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "puppeteer": "^24.31.0"
+  }
+}
