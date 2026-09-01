@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Portafolio de Proyectos — David Herrera</title>
+  <style>
+    @page {
+      size: Letter;
+      margin: 0.7in 0.75in 0.85in 0.75in;
+      @bottom-left {
+        content: "Uso interno / referencia personal";
+        font-size: 8.5pt;
+        color: #64748b;
+        font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+      }
+      @bottom-right {
+        content: "Pág. " counter(page);
+        font-size: 8.5pt;
+        color: #64748b;
+        font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+      }
+    }
+    @page :first {
+      margin: 0;
+      @bottom-left { content: none; }
+      @bottom-right { content: none; }
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      font-size: 10.5pt;
+      line-height: 1.45;
+    }
+
+    .cover {
+      min-height: 11in;
+      background: linear-gradient(165deg, #0b1220 0%, #15233d 55%, #1e3a5f 100%);
+      color: #f8fafc;
+      padding: 1.4in 0.95in 0.9in;
+      page-break-after: always;
+    }
+    .cover-kicker {
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      font-size: 9pt;
+      color: #93c5fd;
+      margin-bottom: 18px;
+    }
+    .cover h1 {
+      font-size: 32pt;
+      line-height: 1.15;
+      margin: 0 0 10px;
+      font-weight: 700;
+    }
+    .cover .subtitle {
+      font-size: 13pt;
+      color: #cbd5e1;
+      margin: 0 0 36px;
+    }
+    .cover-meta {
+      display: table;
+      width: 100%;
+      margin-top: 28px;
+      border-top: 1px solid rgba(148,163,184,0.35);
+      padding-top: 22px;
+    }
+    .cover-meta .col {
+      display: table-cell;
+      width: 33%;
+      vertical-align: top;
+      padding-right: 16px;
+    }
+    .cover-meta .label {
+      font-size: 8pt;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #93c5fd;
+      margin-bottom: 4px;
+    }
+    .cover-meta .value { font-size: 11pt; color: #e2e8f0; }
+    .cover-box {
+      margin-top: 42px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .cover-box h2 {
+      margin: 0 0 8px;
+      font-size: 11pt;
+      color: #93c5fd;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .cover-box p { margin: 0; color: #cbd5e1; font-size: 10.5pt; }
+    .stars { color: #fbbf24; letter-spacing: 1px; }
+
+    h2.section {
+      font-size: 16pt;
+      color: #0f172a;
+      border-bottom: 2.5px solid #1d4ed8;
+      padding-bottom: 6px;
+      margin: 0 0 14px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12pt;
+      margin: 16px 0 6px;
+      color: #1e3a8a;
+      page-break-after: avoid;
+    }
+    h4 {
+      font-size: 10.5pt;
+      margin: 10px 0 4px;
+      color: #0f172a;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 8px; }
+    ul { margin: 4px 0 10px 18px; padding: 0; }
+    li { margin-bottom: 3px; }
+
+    .intro {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px 8px;
+      margin-bottom: 11px;
+      page-break-inside: avoid;
+      background: #fff;
+    }
+    .card .num {
+      display: inline-block;
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 8.5pt;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .card h3 { display: inline; margin: 0; color: #0f172a; font-size: 11.5pt; }
+    .meta { color: #475569; font-size: 9.5pt; margin: 6px 0 4px; }
+    .tag {
+      display: inline-block;
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 8pt;
+      padding: 1px 7px;
+      border-radius: 99px;
+      margin-right: 4px;
+    }
+    .tag.crit { background: #fee2e2; color: #991b1b; }
+    .tag.alta { background: #ffedd5; color: #9a3412; }
+    .tag.media { background: #fef9c3; color: #854d0e; }
+    .tag.ok { background: #dcfce7; color: #166534; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      font-size: 9.5pt;
+    }
+    th {
+      background: #1e3a8a;
+      color: #fff;
+      text-align: left;
+      padding: 6px 8px;
+      font-weight: 600;
+    }
+    td {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    .grid-2 { display: table; width: 100%; margin-bottom: 10px; }
+    .grid-2 .col { display: table-cell; width: 50%; vertical-align: top; padding-right: 12px; }
+    .box {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      page-break-inside: avoid;
+      margin-bottom: 10px;
+    }
+    .never { border-left: 4px solid #dc2626; }
+    .always { border-left: 4px solid #16a34a; }
+    .warn { background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px; padding: 10px 12px; margin: 8px 0 12px; page-break-inside: avoid; }
+
+    .week {
+      page-break-inside: avoid;
+      margin-bottom: 8px;
+    }
+    .week strong { color: #1e3a8a; }
+
+    .footer-note {
+      margin-top: 18px;
+      font-size: 8.5pt;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <section class="cover">
+    <div class="cover-kicker">Documento interno · Septiembre 2026</div>
+    <h1>Portafolio de Proyectos</h1>
+    <p class="subtitle">David Herrera · AI Systems Architect | Claude Automation Specialist</p>
+    <div class="cover-box">
+      <h2>Qué contiene este documento</h2>
+      <p>Inventario de 12 proyectos actuales, 7 proyectos futuros priorizados según ofertas de alto valor, plan de acción semanal, consejos clave de posicionamiento, reglas de oro al aplicar, seguridad, tarifa y checklist operativo.</p>
+    </div>
+    <div class="cover-meta">
+      <div class="col">
+        <div class="label">Posicionamiento</div>
+        <div class="value">Full-Stack + Claude Automation</div>
+      </div>
+      <div class="col">
+        <div class="label">Tarifa ancla</div>
+        <div class="value">$15–20/hr · piso $11/hr</div>
+      </div>
+      <div class="col">
+        <div class="label">Disponibilidad</div>
+        <div class="value">Lun–Sáb · 40–42 hrs · no domingos</div>
+      </div>
+    </div>
+    <div class="cover-box" style="margin-top:28px;">
+      <h2>Uso</h2>
+      <p>Referencia personal para priorizar portafolio público, demos y propuestas. Basado en el Sistema Evaluador actualizado y la experiencia completa de David Herrera. Última actualización: 1 de septiembre de 2026.</p>
+    </div>
+  </section>
+
+  <h2 class="section">1. Proyectos actuales del portafolio</h2>
+  <div class="intro">
+    Estos son los sistemas ya construidos. Prioridad inmediata: hacer públicos los repositorios (hoy GitHub aparece vacío) y documentar README + demo en cada uno.
+  </div>
+
+  <div class="card">
+    <span class="num">01</span>
+    <h3>Confidence-Scored Extraction Agent</h3>
+    <p>Sistema que extrae campos estructurados de documentos no estructurados (facturas, contratos, CVs), asigna un puntaje de confianza a cada campo y cita la evidencia exacta de origen.</p>
+    <p class="meta"><span class="tag">Next.js</span><span class="tag">TypeScript</span><span class="tag">Claude API</span><span class="tag">JSON Schema</span></p>
+    <p><strong>Valor demostrado:</strong> auditabilidad, human-in-the-loop, precisión verificable.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">02</span>
+    <h3>Internal Knowledge Assistant (RAG)</h3>
+    <p>Generación aumentada por recuperación: cada respuesta se fundamenta en chunks recuperados y cita su fuente exacta. Reporta “no encontrado” en lugar de adivinar.</p>
+    <p class="meta"><span class="tag">Claude API</span><span class="tag">Voyage AI (voyage-3)</span><span class="tag">Supabase + pgvector</span><span class="tag">cosine similarity</span></p>
+    <p><strong>Valor demostrado:</strong> RAG production-ready, grounding en fuentes, cero alucinaciones.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">03</span>
+    <h3>Multi-System Sync &amp; Drift Dashboard</h3>
+    <p>Reconcilia datos entre CRM, facturación y tracker de operaciones (spreadsheet), campo por campo. Marca duplicados y valores inconsistentes antes de que corrompan reportes.</p>
+    <p class="meta"><span class="tag">Next.js</span><span class="tag">Supabase</span></p>
+    <p><strong>Valor demostrado:</strong> integridad de datos, validación de sync, revisión humana obligatoria.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">04</span>
+    <h3>AI Lead Scoring System</h3>
+    <p>Califica y enruta leads entrantes, filtra alto valor con logic gates y auto-borradoriza emails de seguimiento personalizados.</p>
+    <p><strong>Impacto:</strong> corta el tiempo de triaje manual ~90%. <strong>Valor:</strong> lead qualification a escala.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">05</span>
+    <h3>Real-Time Lead Pipeline</h3>
+    <p>Pipeline disparado por webhook: captura leads al instante, popula master database y envía follow-up personalizado automático.</p>
+    <p><strong>Impacto:</strong> respuesta &lt;1 segundo, conversión ~+25%. <strong>Valor:</strong> automatización en tiempo real.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">06</span>
+    <h3>AI Email System / CEO Inbox Automation</h3>
+    <p>Clasifica mensajes por urgencia, borra sugerencias de respuesta contextual y enruta lo que necesita atención humana.</p>
+    <p><strong>Impacto:</strong> recupera ~$800/mes en tiempo de triaje. <strong>Valor:</strong> tiempo ejecutivo recuperado.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">07</span>
+    <h3>Hermes Mini — AI Executive Reporting Agent</h3>
+    <p>Reportes semanales: código determinístico computa métricas reales (revenue, conversión, pipeline) y Claude narra, prioriza y recomienda sobre números que nunca se le pide calcular.</p>
+    <p class="meta"><span class="tag">Next.js</span><span class="tag">Supabase</span><span class="tag">Claude API</span></p>
+    <p><strong>Valor demostrado:</strong> AI + código determinístico, reporting ejecutivo automatizado.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">08</span>
+    <h3>Research Automation Pipeline</h3>
+    <p>Obtiene contenido de una lista de URLs, extrae texto legible server-side, resume cada fuente con Claude y sintetiza un digest cross-source exportable a Markdown o webhook.</p>
+    <p><strong>Valor demostrado:</strong> síntesis multi-fuente, investigación automatizada.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">09</span>
+    <h3>AI Scheduling Agent</h3>
+    <p>Lee mensajes, verifica disponibilidad de calendario vía Claude, crea eventos y envía confirmaciones. Propone slots alternos si no hay disponibilidad.</p>
+    <p class="meta"><span class="tag">n8n</span><span class="tag">Claude API</span></p>
+    <p><strong>Valor demostrado:</strong> calendar automation, coordinación inteligente.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">10</span>
+    <h3>MCP-Connected AI Assistant</h3>
+    <p>Claude conectado a un servidor MCP local: responde en lenguaje natural llamando herramientas reales (búsqueda, archivos). Cada tool call (nombre, argumentos, resultado) se muestra en la UI.</p>
+    <p><strong>Valor demostrado:</strong> arquitectura MCP, tool calling transparente, agent transparency.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">11</span>
+    <h3>AI FAQ Chatbot</h3>
+    <p>Las empresas suben documentos una vez; los clientes reciben respuestas instantáneas, con carga automática de documentos e historial por sesión.</p>
+    <p><strong>Valor demostrado:</strong> customer support automation, RAG aplicado a FAQ.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">12</span>
+    <h3>Personal Portfolio Website (davidherrera.dev)</h3>
+    <p>Sitio de portafolio (Next.js, TypeScript) con case studies, widget de actividad GitHub, contacto, modo oscuro/claro y accesibilidad WCAG-conscious. Deploy en Vercel. Claude Code como herramienta principal de desarrollo.</p>
+    <p><strong>Valor demostrado:</strong> full-stack, showcase público del resto del portafolio.</p>
+  </div>
+
+  <h2 class="section">2. Proyectos futuros priorizados</h2>
+  <p>Ordenados por impacto frente a ofertas de alto valor (Arzurus, AI Agent roles, healthcare, advisory, RFP/bid).</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Proyecto</th>
+        <th>Prioridad</th>
+        <th>Esfuerzo</th>
+        <th>Demo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Multi-Agent Orchestration System</td><td>Crítica</td><td>2–3 sem</td><td>Video + logs transparentes</td></tr>
+      <tr><td>2</td><td>Custom MCP Server Builder</td><td>Alta</td><td>1–2 sem</td><td>Repo público + README técnico</td></tr>
+      <tr><td>3</td><td>RFP / Opportunity Intelligence Platform</td><td>Alta</td><td>2–3 sem</td><td>Sitio con datos reales</td></tr>
+      <tr><td>4</td><td>Automated Content Production Pipeline</td><td>Media-Alta</td><td>2 sem</td><td>Video Loom del pipeline</td></tr>
+      <tr><td>5</td><td>Claude Code Development Showcase</td><td>Media</td><td>1 sem</td><td>Case study + repo</td></tr>
+      <tr><td>6</td><td>Healthcare CRM Automation Suite</td><td>Alta</td><td>2 sem</td><td>Antes/después + dashboard</td></tr>
+      <tr><td>7</td><td>Executive Operations Dashboard</td><td>Alta</td><td>2–3 sem</td><td>Dashboard público + walkthrough</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card">
+    <span class="num">F1</span>
+    <h3>Multi-Agent Orchestration System</h3>
+    <p><span class="tag crit">Prioridad crítica</span> <span class="stars">★★★★★</span></p>
+    <p><strong>Por qué:</strong> lo piden las ofertas de mayor valor (Arzurus, AI Agent roles). Demuestra que vas más allá de un solo agente y te diferencia de “zap builders”.</p>
+    <h4>Qué construir</h4>
+    <ul>
+      <li><strong>Agente 1:</strong> extrae y estructura datos de fuentes diversas.</li>
+      <li><strong>Agente 2:</strong> analiza calidad / SEO / patrones.</li>
+      <li><strong>Agente 3:</strong> verifica hechos contra fuentes externas.</li>
+      <li><strong>Agente 4:</strong> genera recomendaciones accionables.</li>
+      <li><strong>Orquestador:</strong> distribuye según tipo de input, consolida, maneja conflictos.</li>
+    </ul>
+    <h4>Características clave</h4>
+    <ul>
+      <li>Agentes que se revisan entre sí (agent reviewing agent).</li>
+      <li>Permisos granulares por agente.</li>
+      <li>Logs transparentes de cada decisión del orquestador.</li>
+      <li>Confidence scoring por agente y por output final.</li>
+      <li>Human-in-the-loop en resultados de baja confianza.</li>
+    </ul>
+    <p class="meta">Stack: Claude API, Next.js, Supabase, MCP (opcional pero ideal) · 2–3 semanas · Demo: video 3–5 min con flujo completo y logs.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">F2</span>
+    <h3>Custom MCP Server Builder</h3>
+    <p><span class="tag alta">Prioridad alta</span> <span class="stars">★★★★★</span></p>
+    <p><strong>Por qué:</strong> ofertas técnicas lo piden explícitamente. Demuestra que construyes infraestructura, no solo usas herramientas. Skill escaso.</p>
+    <h4>Qué construir — 2 a 3 MCP servers</h4>
+    <ul>
+      <li><strong>Server 1 — Google Workspace:</strong> Calendar (lectura/escritura controlada), Gmail (búsqueda/análisis), creación de eventos con validación, permisos por operación.</li>
+      <li><strong>Server 2 — Database Query Engine:</strong> Supabase/PostgreSQL, queries en lenguaje natural, validación previa, logging de operaciones.</li>
+      <li><strong>Server 3 — Public API Gateway:</strong> clima / datos económicos, normalización, cache inteligente, rate limiting.</li>
+    </ul>
+    <p>Cada tool call auditado y logged. Documentación técnica, ejemplos en README, código limpio.</p>
+    <p class="meta">Stack: TypeScript, MCP SDK, Node.js · 1–2 semanas · Demo: GitHub público + README técnico.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">F3</span>
+    <h3>AI-Powered RFP / Opportunity Intelligence Platform</h3>
+    <p><span class="tag alta">Prioridad alta</span> <span class="stars">★★★★★</span></p>
+    <p><strong>Por qué:</strong> ya construiste uno similar para cliente (AI Bid/No-Bid). Versión pública demuestra dominio del dominio. Lo buscan Custom Capital y advisory firms.</p>
+    <h4>Qué construir — versión lite genérica</h4>
+    <ul>
+      <li>Scrapea oportunidades públicas (grants.gov, USAC, etc.).</li>
+      <li>Parsea PDFs; extrae deadlines, requisitos, montos, categorías, métodos (BEAR/SPI).</li>
+      <li>Scoring con criterios configurables; dashboard filtrable y buscable.</li>
+      <li><strong>Diferenciador:</strong> confidence scoring por campo + evidence tagging (cita del PDF) + alertas de alto match.</li>
+    </ul>
+    <p class="meta">Stack: Next.js, Supabase, Claude API, Puppeteer/Playwright · 2–3 semanas · Demo: sitio con datos reales + walkthrough.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">F4</span>
+    <h3>Automated Content Production Pipeline</h3>
+    <p><span class="tag media">Prioridad media-alta</span> <span class="stars">★★★★</span></p>
+    <p><strong>Por qué:</strong> varias ofertas pedían automatización de contenido/video (Hermes agents, YouTube). End-to-end visual, fácil de entender para no técnicos.</p>
+    <ul>
+      <li>Monitorea tendencias (RSS, APIs de redes); extrae temas emergentes.</li>
+      <li>Analiza hooks exitosos; genera guiones estructurados.</li>
+      <li>Thumbnails con IA (DALL-E o similar); programación (simulada o YouTube API).</li>
+      <li>Dashboard de revisión humana; alertas Slack/WhatsApp con aprobación “do it”.</li>
+    </ul>
+    <p class="meta">Stack: n8n/Make, Claude API, Next.js, YouTube API (opcional), DALL-E · 2 semanas · Demo: Loom 3–4 min.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">F5</span>
+    <h3>Claude Code Development Showcase</h3>
+    <p><span class="tag media">Prioridad media</span> <span class="stars">★★</span></p>
+    <p><strong>Por qué:</strong> demuestra que usas Claude Code como herramienta de desarrollo, no solo prompts. Case study educativo para clientes técnicos.</p>
+    <p>Reconstruye UNA app existente 100% con Claude Code. Documenta prompts iniciales, iteración, bugs resueltos con IA, tiempo ahorrado vs tradicional, decisiones de arquitectura y refactoring.</p>
+    <p><strong>Entregables:</strong> blog/case study en portafolio, repo público, video del proceso, comparativa de tiempo.</p>
+    <p class="meta">Stack: Claude Code, Next.js, Supabase · 1 semana (ya hay base) · Demo: post + repo.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">F6</span>
+    <h3>Healthcare CRM Automation Suite</h3>
+    <p><span class="tag alta">Prioridad alta</span> <span class="stars">★★★★</span></p>
+    <p><strong>Por qué:</strong> múltiples ofertas en healthcare. Muestra pensamiento HIPAA-compliant y manejo de datos sensibles.</p>
+    <ul>
+      <li>Limpieza y deduplicación de registros de doctores.</li>
+      <li>Clasificación por especialidad/ubicación; follow-up para partnerships.</li>
+      <li>Integración Ashby, Day AI, Slack; dashboard de engagement; reportes de actividad.</li>
+    </ul>
+    <p class="meta">Stack: GoHighLevel, HubSpot, Make, Claude API, Next.js · 2 semanas · Demo: antes/después de limpieza + dashboard.</p>
+  </div>
+
+  <div class="card">
+    <span class="num">F7</span>
+    <h3>Executive Operations Dashboard</h3>
+    <p><span class="tag alta">Prioridad alta</span> <span class="stars">★★★★</span></p>
+    <p><strong>Por qué:</strong> ofertas de EA/Ops piden dashboards. Consolida fuentes; alto impacto visual para founders.</p>
+    <ul>
+      <li>CRM, billing y project management; métricas en tiempo real; alertas de anomalías.</li>
+      <li>Reportes semanales estilo Hermes; drill-down; export PDF/CSV; mobile-responsive.</li>
+    </ul>
+    <p class="meta">Stack: Next.js, Supabase, Claude API (narración de insights), Klipfolio opcional · 2–3 semanas · Demo: dashboard de ejemplo + video.</p>
+  </div>
+
+  <h2 class="section">3. Plan de acción recomendado</h2>
+
+  <div class="week box"><strong>Semana 1–2 (urgente):</strong> hacer públicos los repos actuales hoy mismo. Proyecto #2 MCP Servers (rápido, alto impacto técnico). Proyecto #5 Claude Code Showcase (documenta el proceso actual). Prioridad de visibilidad: Portfolio, Extraction Agent, MCP Assistant.</div>
+  <div class="week box"><strong>Semana 3–4:</strong> Proyecto #1 Multi-Agent System (diferenciador principal). Proyecto #6 Healthcare CRM si hay ofertas activas en ese dominio.</div>
+  <div class="week box"><strong>Semana 5–6:</strong> Proyecto #3 RFP Platform (dominio real). Proyecto #7 Executive Dashboard (alto valor visual).</div>
+  <div class="week box"><strong>Semana 7–8:</strong> Proyecto #4 Content Pipeline si hay demanda sostenida en ofertas.</div>
+
+  <div class="warn">
+    <strong>Acción de 5 minutos — GitHub vacío mata credibilidad.</strong> github.com/Davidhr3104 aparece sin repos públicos. En cada repo: Settings → Danger Zone → Change visibility → Public. Verificar que no hay credenciales, API keys, .env ni datos de clientes.
+  </div>
+
+  <h2 class="section">4. Consejos clave para destacar</h2>
+
+  <h3>4.1 Cada proyecto debe tener siempre</h3>
+  <ul>
+    <li><strong>README técnico:</strong> arquitectura (diagrama), stack, install local, env vars, decisiones clave.</li>
+    <li><strong>Video demo 2–3 min:</strong> sistema funcionando, problema que resuelve, features clave; hablar natural, no leer guion.</li>
+    <li><strong>Código limpio:</strong> comentarios en lo complejo, nombres descriptivos, carpetas lógicas, sin código muerto.</li>
+    <li><strong>Live demo si es posible:</strong> Vercel/Netlify, datos de ejemplo, instrucciones claras.</li>
+  </ul>
+
+  <h3>4.2 Enfócate en mostrar tu diferenciador</h3>
+  <div class="grid-2">
+    <div class="col">
+      <div class="box">
+        <h4>Arquitectura, no solo código</h4>
+        <p>Flujos de datos, comunicación entre componentes, decisiones de diseño.</p>
+      </div>
+      <div class="box">
+        <h4>Confidence scoring</h4>
+        <p>El sistema sabe cuándo no sabe. Evidence tagging. Checkpoints humanos.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="box">
+        <h4>Auditabilidad</h4>
+        <p>Logs transparentes. Cada decisión trazable. Debugging fácil.</p>
+      </div>
+      <div class="box">
+        <h4>Human-in-the-loop</h4>
+        <p>Cuándo pide ayuda. Cómo escala de AI a humano. No es automatización ciega.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>4.3 No construyas todo desde cero</h3>
+  <ul>
+    <li>AI Bid/No-Bid → RFP Tracking Platform.</li>
+    <li>Confidence-Scored Extraction → extracción de datos healthcare.</li>
+    <li>Hermes Mini → Executive Reporting para otros dominios.</li>
+    <li>Ahorro estimado: 40–60% menos tiempo por proyecto.</li>
+  </ul>
+
+  <h3>4.4 Reglas de oro al aplicar a ofertas</h3>
+  <div class="grid-2">
+    <div class="col">
+      <div class="box never">
+        <h4>Nunca</h4>
+        <ul>
+          <li>Nombrar clientes (usa descripciones genéricas).</li>
+          <li>Fabricar testimonios o experiencia.</li>
+          <li>Sonar débil sobre herramientas que puedes aprender.</li>
+          <li>Usar guiones largos (—) en covers (señal de IA).</li>
+          <li>Decir “I'd love to be considered”.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="box always">
+        <h4>Siempre</h4>
+        <ul>
+          <li>Abrir con hook de resultados concretos.</li>
+          <li>Métricas verificables (90%, 91%, $800/mes).</li>
+          <li>Historia de origen (call center → AI) cuando aplique.</li>
+          <li>Detalle técnico específico; frases exactas del cliente.</li>
+          <li>Anclar tarifa ($15–18/hr) desde el inicio.</li>
+          <li>Manejar brechas con criterio, no disculpas.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3>4.5 Seguridad — líneas rojas</h3>
+  <ul>
+    <li><strong>Nunca:</strong> prefijo NEXT_PUBLIC_ para secretos; hardcodear API keys; commitear credenciales; pagos fuera de Upwork (viola ToS).</li>
+    <li><strong>Siempre:</strong> env vars con scope; keys por entorno (dev/staging/prod); least-privilege; pagos dentro de Upwork.</li>
+  </ul>
+
+  <h3>4.6 Disponibilidad y tarifa</h3>
+  <p><strong>Horario:</strong> lunes a sábado, máximo 40–42 hrs/semana. Nunca domingos (innegociable). Overlap con US Eastern/Central (UTC-5).</p>
+  <p><strong>Tarifa:</strong> propuesta estándar $15–20/hr. Piso de descarte: $11/hr como máximo del rango. Complejos: $18/hr es el sweet spot. Ancla la tarifa en la primera propuesta.</p>
+
+  <h3>4.7 Scripts de video — sonar natural</h3>
+  <div class="grid-2">
+    <div class="col">
+      <div class="box always">
+        <h4>Haz esto</h4>
+        <ul>
+          <li>Frases cortas con pausas.</li>
+          <li>Muletillas ocasionales (“like”, “so yeah”).</li>
+          <li>Lenguaje simple; explica la idea, no memorices.</li>
+          <li>Una toma, sin sobre-editar.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="box never">
+        <h4>Evita esto</h4>
+        <ul>
+          <li>Sonar memorizado o robótico.</li>
+          <li>Jerga técnica encadenada difícil de decir.</li>
+          <li>Leer el guion palabra por palabra.</li>
+          <li>Sobre-producir el video.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section">5. Resumen rápido del perfil</h2>
+  <p><strong>Posicionamiento:</strong> AI Systems Architect | Full-Stack Dev + Claude Automation.</p>
+  <p><strong>Idiomas:</strong> español nativo (ventaja competitiva), inglés fluente.</p>
+  <p><strong>Certificaciones:</strong> HubSpot Sales Hub Software; Asana Foundations; HTML, CSS &amp; JavaScript Fundamentals (Platzi).</p>
+
+  <div class="grid-2">
+    <div class="col">
+      <div class="box always">
+        <h4>Fuerte en</h4>
+        <ul>
+          <li>Claude API, Claude Code, Claude Cowork</li>
+          <li>n8n, Make, Zapier</li>
+          <li>GoHighLevel (básico-intermedio), HubSpot</li>
+          <li>Next.js, TypeScript, Supabase, Vercel</li>
+          <li>REST APIs, Webhooks</li>
+          <li>RAG, vector search (Voyage AI, pgvector)</li>
+          <li>Confidence scoring, human-in-the-loop</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="box never">
+        <h4>Débil / sin experiencia</h4>
+        <ul>
+          <li>Voice AI</li>
+          <li>LangChain/LangGraph como framework principal</li>
+          <li>DevOps / infraestructura compleja</li>
+          <li>WhatsApp Business API</li>
+          <li>Codex</li>
+          <li>&lt;2 años de experiencia específica en IA/automatización</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section">6. Checklist operativo</h2>
+  <h4>Cada lunes</h4>
+  <ul>
+    <li>Revisar ofertas de alto valor (score 8+/10).</li>
+    <li>Enviar máximo 2–3 propuestas (calidad &gt; cantidad).</li>
+    <li>Dar seguimiento a propuestas enviadas.</li>
+    <li>Trabajar 2–3 hrs en 1 proyecto de portafolio.</li>
+  </ul>
+  <h4>Cada mes</h4>
+  <ul>
+    <li>Agregar 1 proyecto nuevo al portafolio público.</li>
+    <li>Actualizar READMEs existentes.</li>
+    <li>Grabar 1 video demo nuevo.</li>
+    <li>Revisar y ajustar tarifa si corresponde.</li>
+  </ul>
+
+  <p class="footer-note">Documento generado: 1 de septiembre de 2026 · Basado en Sistema Evaluador actualizado + experiencia completa de David Herrera · Uso interno / referencia personal.</p>
+
+</body>
+</html>
