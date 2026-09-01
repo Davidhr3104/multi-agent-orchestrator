@@ -180,7 +180,7 @@ export function OrchestratorApp() {
             <p className="text-primary glow-text-primary mb-2 text-[12px] uppercase tracking-widest">
               {running ? t("dashboard.kickerRunning") : t("dashboard.kicker")}
             </p>
-            <h1 className="from-primary to-secondary bg-gradient-to-r bg-clip-text text-[32px] font-bold leading-10 text-transparent sm:text-[40px] sm:leading-[48px]">
+            <h1 className="bg-gradient-to-r from-[#9aefff] to-[#4cd7f6] bg-clip-text text-[32px] font-bold leading-10 text-transparent sm:text-[40px] sm:leading-[48px]">
               {t("dashboard.title1")}
               <br />
               {t("dashboard.title2")}
@@ -202,7 +202,9 @@ export function OrchestratorApp() {
                         "glow-primary border-primary bg-primary/20 text-primary border",
                       status === "done" &&
                         "border-tertiary bg-surface-container-high text-tertiary border",
-                      (status === "idle" || status === "skipped" || status === "blocked") &&
+                      status === "idle" &&
+                        "border-outline-variant bg-surface-container-high text-on-surface border",
+                      (status === "skipped" || status === "blocked") &&
                         "border-outline-variant bg-surface-container-high text-on-surface-variant border opacity-60"
                     )}
                   >
@@ -267,7 +269,7 @@ export function OrchestratorApp() {
             </div>
           </div>
 
-          <div className="lg:col-span-5">
+          <div className="h-full min-h-[400px] lg:col-span-5">
             <LogStream logs={logs} running={running} />
           </div>
         </section>

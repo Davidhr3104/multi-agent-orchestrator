@@ -37,7 +37,7 @@ export function LogStream({
   }, [logs.length]);
 
   return (
-    <div className="border-outline-variant/50 bg-surface-container-lowest relative flex h-[400px] flex-col rounded-lg border">
+    <div className="border-outline-variant/50 bg-surface-container-lowest relative flex h-full min-h-[400px] flex-col rounded-lg border">
       <div className="border-outline-variant/30 bg-surface-container-low flex items-center justify-between rounded-t-lg border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">

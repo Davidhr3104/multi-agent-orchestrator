@@ -231,7 +231,7 @@ export const dictionaries = {
     "dashboard.restoreSample": "Restore sample",
     "dashboard.urlLabel": "Source URL",
     "dashboard.urlPlaceholder": "https://example.com/tech-doc...",
-    "dashboard.contentLabel": "Document content",
+    "dashboard.contentLabel": "Document Content",
     "dashboard.contentPlaceholder":
       "Paste raw content or structured JSON here...",
     "dashboard.consoleTitle": "Live console",

@@ -31,7 +31,7 @@ function interpolate(
   );
 }
 
-const DEFAULT_LANG: Lang = "es";
+const DEFAULT_LANG: Lang = "en";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // Always start with the server-rendered default so the first client
