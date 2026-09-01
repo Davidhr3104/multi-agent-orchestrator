@@ -536,6 +536,12 @@ export async function runPipeline(
     if (extra) {
       reviews = [...reviews.filter((r) => r.targetAgent !== "recommender"), extra];
       log("reviewer", "decision", extra.comment);
+      setAgent({
+        agent: "reviewer",
+        status: "done",
+        summary: reviews.map((r) => `${r.targetAgent}:${r.verdict}`).join(" · "),
+        confidence: 0.82,
+      });
     }
   }
 
