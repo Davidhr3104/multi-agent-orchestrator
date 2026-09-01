@@ -23,6 +23,7 @@ import {
   DEFAULT_HITL_THRESHOLD,
   DEFAULT_MIN_CONFIDENCE,
 } from "@/lib/config";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import { AGENT_CATALOG, DEFAULT_PERMISSIONS } from "@/lib/permissions";
 import { SAMPLE_ARTICLE } from "@/lib/sample";
 import { looksLikeUrl } from "@/lib/text";
@@ -37,6 +38,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 export function OrchestratorApp() {
+  const { t } = useLanguage();
   const [text, setText] = useState(SAMPLE_ARTICLE);
   const [url, setUrl] = useState("");
   const [permissions] = useState<PermissionMap>(DEFAULT_PERMISSIONS);
@@ -133,7 +135,7 @@ export function OrchestratorApp() {
               <SheetTrigger className="border-outline-variant bg-surface-container-low text-on-surface hover:border-primary hover:text-primary font-label-sm rounded border px-3 py-1.5 text-[12px] transition-colors">
                 <span className="flex items-center gap-1.5">
                   <Icon name="tune" className="text-[16px]" />
-                  Permisos
+                  {t("nav.permissions")}
                 </span>
               </SheetTrigger>
               <SheetContent
@@ -141,10 +143,9 @@ export function OrchestratorApp() {
                 className="w-full overflow-y-auto data-[side=right]:sm:max-w-md"
               >
                 <SheetHeader>
-                  <SheetTitle>Permisos y umbrales</SheetTitle>
+                  <SheetTitle>{t("dashboard.sheetTitle")}</SheetTitle>
                   <SheetDescription>
-                    Activa o apaga cada agente. Confianza mínima 0.70 y HITL
-                    0.85 por defecto.
+                    {t("dashboard.sheetDesc")}
                   </SheetDescription>
                 </SheetHeader>
                 <div className="px-4 pb-6">
@@ -166,7 +167,7 @@ export function OrchestratorApp() {
               className="bg-primary text-on-primary hover:glow-primary font-label-sm flex items-center gap-2 rounded px-3 py-1.5 text-[12px] font-bold transition-all disabled:opacity-50"
             >
               <Icon name="play_arrow" filled className="text-[16px]" />
-              {running ? "Orquestando…" : "Correr Pipeline"}
+              {running ? t("nav.running") : t("nav.run")}
             </button>
           </>
         }
@@ -177,14 +178,12 @@ export function OrchestratorApp() {
         <section className="flex flex-col gap-4">
           <div>
             <p className="text-primary glow-text-primary mb-2 text-[12px] uppercase tracking-widest">
-              {running
-                ? "Iniciando secuencia de análisis"
-                : "Proyecto #1 · análisis de contenido"}
+              {running ? t("dashboard.kickerRunning") : t("dashboard.kicker")}
             </p>
             <h1 className="from-primary to-secondary bg-gradient-to-r bg-clip-text text-[32px] font-bold leading-10 text-transparent sm:text-[40px] sm:leading-[48px]">
-              Seis agentes, un orquestador,
+              {t("dashboard.title1")}
               <br />
-              cero cajas negras.
+              {t("dashboard.title2")}
             </h1>
           </div>
 
@@ -230,23 +229,23 @@ export function OrchestratorApp() {
             <div className="via-primary/30 absolute top-0 right-0 left-0 h-[1px] bg-gradient-to-r from-transparent to-transparent" />
             <label className="text-on-surface-variant font-label-sm flex items-center gap-2 text-[12px]">
               <Icon name="link" className="text-[16px]" />
-              URL de Origen
+              {t("dashboard.urlLabel")}
             </label>
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://ejemplo.com/doc-tecnico..."
+              placeholder={t("dashboard.urlPlaceholder")}
               type="text"
               className="border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-primary font-code-md rounded border px-3 py-2 text-[14px] transition-all focus:outline-none focus:ring-1"
             />
             <label className="text-on-surface-variant font-label-sm mt-2 flex items-center gap-2 text-[12px]">
               <Icon name="description" className="text-[16px]" />
-              Contexto del Documento
+              {t("dashboard.contentLabel")}
             </label>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Pegue el contenido raw o el JSON estructurado aquí..."
+              placeholder={t("dashboard.contentPlaceholder")}
               className="border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-primary font-code-md min-h-[220px] flex-1 resize-none rounded border px-3 py-2.5 text-[14px] transition-all focus:outline-none focus:ring-1"
             />
             <div className="flex items-center justify-between">
@@ -258,7 +257,7 @@ export function OrchestratorApp() {
                 }}
                 className="text-on-surface-variant hover:text-primary font-label-sm text-[11px] underline"
               >
-                Restaurar ejemplo
+                {t("dashboard.restoreSample")}
               </button>
               {error ? (
                 <p className="text-error text-[12px]" role="alert">
@@ -277,7 +276,7 @@ export function OrchestratorApp() {
         <section className="flex flex-col gap-3">
           <h2 className="text-on-surface flex items-center gap-2 text-[24px] font-semibold">
             <Icon name="group_work" className="text-primary text-[24px]" />
-            Malla de Agentes
+            {t("dashboard.agentMeshTitle")}
           </h2>
           <AgentBoard runs={runs} />
         </section>
@@ -287,8 +286,12 @@ export function OrchestratorApp() {
           <Tabs value={tab} onValueChange={setTab}>
             <div className="border-outline-variant/30 bg-surface/50 flex items-center border-b">
               <TabsList className="bg-transparent p-0">
-                <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                <TabsTrigger value="result">Resultado</TabsTrigger>
+                <TabsTrigger value="timeline">
+                  {t("dashboard.tabTimeline")}
+                </TabsTrigger>
+                <TabsTrigger value="result">
+                  {t("dashboard.tabResult")}
+                </TabsTrigger>
               </TabsList>
               <div className="flex-1" />
               {result ? (
@@ -304,8 +307,8 @@ export function OrchestratorApp() {
                   <LogStream logs={logs} running={running} />
                 ) : (
                   <EmptyState
-                    title="Todavía no hay corrida"
-                    description="Pulsa Correr Pipeline para ver extracción, SEO, verificación y el checkpoint humano con confidence por campo."
+                    title={t("dashboard.emptyTimelineTitle")}
+                    description={t("dashboard.emptyTimelineDesc")}
                   />
                 )}
               </TabsContent>
@@ -314,8 +317,8 @@ export function OrchestratorApp() {
                   <ResultPanel result={result} />
                 ) : (
                   <EmptyState
-                    title="Sin paquete consolidado"
-                    description="El orquestador llena esta vista cuando termina: campos, claims, reviews y firma humana."
+                    title={t("dashboard.emptyResultTitle")}
+                    description={t("dashboard.emptyResultDesc")}
                   />
                 )}
               </TabsContent>

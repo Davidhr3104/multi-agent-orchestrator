@@ -1,6 +1,14 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { AGENT_CATALOG } from "@/lib/permissions";
-import type { PipelineResult } from "@/lib/types";
+import type { AgentId, PipelineResult } from "@/lib/types";
+
+const AGENT_NAMES: Record<AgentId, string> = {
+  orchestrator: "Orchestrator",
+  extractor: "Extractor",
+  seo: "SEO",
+  factcheck: "Fact-check",
+  recommender: "Recommender",
+  reviewer: "Reviewer",
+};
 
 function pdfSafe(text: string): string {
   return text
@@ -56,7 +64,7 @@ export async function POST(req: Request) {
   y -= 6;
   line("Decisiones por agente", 12, true);
   for (const run of result.agents) {
-    const name = AGENT_CATALOG.find((a) => a.id === run.agent)?.name ?? run.agent;
+    const name = AGENT_NAMES[run.agent] ?? run.agent;
     line(`${name}: ${run.decision ?? run.status} · conf ${run.confidence.toFixed(2)} · ${run.summary}`);
   }
   y -= 6;

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/icon";
 import { ResultDashboard } from "@/components/result-dashboard";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import type { PipelineResult, ScoredField } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ function FieldRow({
   approved: boolean;
   onToggle: (key: string, next: boolean) => void;
 }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(field.needsHuman);
 
   return (
@@ -70,7 +72,7 @@ function FieldRow({
             &quot;{field.value}&quot;
           </span>
           <p className="text-on-surface-variant text-xs leading-5">
-            Evidencia: {field.evidence}
+            {t("resultPanel.evidence")}: {field.evidence}
           </p>
           {field.needsHuman ? (
             <label className="mt-1 flex items-center gap-2 text-xs">
@@ -81,7 +83,7 @@ function FieldRow({
                 className="text-[#d97706] focus:ring-0 border-outline-variant bg-surface rounded"
               />
               <span className="text-on-surface-variant font-label-sm">
-                Aprobar este valor manualmente
+                {t("resultPanel.approve")}
               </span>
             </label>
           ) : null}
@@ -92,6 +94,7 @@ function FieldRow({
 }
 
 export function ResultPanel({ result }: { result: PipelineResult }) {
+  const { t } = useLanguage();
   const humanFields = useMemo(
     () => result.fields.filter((f) => f.needsHuman),
     [result.fields]
@@ -101,13 +104,14 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
 
   const allApproved =
     humanFields.length === 0 || humanFields.every((f) => approved[f.key]);
+  const missingCount = humanFields.filter((f) => !approved[f.key]).length;
 
   return (
     <div className="space-y-6">
       <ResultDashboard result={result} />
       {result.sourceUrl ? (
         <p className="text-on-surface-variant text-xs break-all">
-          Fuente: {result.sourceUrl}
+          {t("resultPanel.source")}: {result.sourceUrl}
         </p>
       ) : null}
 
@@ -117,11 +121,10 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
           <Icon name="warning" className="text-[24px] text-[#d97706]" />
           <div className="flex-1">
             <h4 className="text-[16px] font-bold text-[#fcd34d]">
-              Intervención Humana Requerida (HITL)
+              {t("resultPanel.hitlTitle")}
             </h4>
             <p className="text-on-surface-variant mb-3 mt-1 text-[14px]">
-              {humanFields.length} campo(s) por debajo del umbral. Confirma
-              antes de tratar este paquete como publicable.
+              {t("resultPanel.hitlDesc", { count: humanFields.length })}
             </p>
             <button
               type="button"
@@ -136,10 +139,10 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
             >
               <Icon name="draw" className="text-[16px]" />
               {signedOff
-                ? "Paquete firmado"
+                ? t("resultPanel.signed")
                 : allApproved
-                  ? "Firmar paquete"
-                  : `Faltan ${humanFields.filter((f) => !approved[f.key]).length} confirmaciones`}
+                  ? t("resultPanel.sign")
+                  : t("resultPanel.missingConfirmations", { count: missingCount })}
             </button>
           </div>
         </div>
@@ -148,7 +151,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div className="flex flex-col gap-3">
           <h3 className="border-outline-variant/30 text-primary border-b pb-2 text-[12px] uppercase tracking-widest">
-            Campos Extraídos
+            {t("resultPanel.fieldsTitle")}
           </h3>
           <div className="flex flex-col gap-2">
             {result.fields.map((field) => (
@@ -166,7 +169,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
 
         <div className="flex flex-col gap-3">
           <h3 className="border-outline-variant/30 text-primary border-b pb-2 text-[12px] uppercase tracking-widest">
-            Claims &amp; Notas
+            {t("resultPanel.claimsTitle")}
           </h3>
           <div className="flex flex-col gap-2">
             {result.claims.map((claim, i) => (
@@ -196,14 +199,15 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
                         : "text-error/80"
                     )}
                   >
-                    {claim.note} · confianza {Math.round(claim.confidence * 100)}%
+                    {claim.note} · {t("resultPanel.confidenceLabel")}{" "}
+                    {Math.round(claim.confidence * 100)}%
                   </p>
                 </div>
               </div>
             ))}
             {!result.claims.length ? (
               <p className="text-on-surface-variant text-xs">
-                Sin claims: verificación deshabilitada o sin permisos.
+                {t("resultPanel.noClaims")}
               </p>
             ) : null}
           </div>
@@ -211,7 +215,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
           {result.recommendations.length ? (
             <div className="mt-4 flex flex-col gap-2">
               <h4 className="text-on-surface-variant font-label-sm text-[11px] uppercase">
-                Recomendaciones del Agente
+                {t("resultPanel.recommendationsTitle")}
               </h4>
               <ol className="text-on-surface-variant list-inside list-decimal space-y-1 text-[13px]">
                 {result.recommendations.map((rec) => (
@@ -229,7 +233,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
           {result.reviews.length ? (
             <div className="mt-4 flex flex-col gap-2">
               <h4 className="text-on-surface-variant font-label-sm text-[11px] uppercase">
-                Revisión entre agentes
+                {t("resultPanel.reviewsTitle")}
               </h4>
               <ul className="space-y-1.5">
                 {result.reviews.map((note, i) => (

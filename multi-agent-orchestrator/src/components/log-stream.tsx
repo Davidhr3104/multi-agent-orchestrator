@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Icon } from "@/components/icon";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import type { PipelineLog } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ export function LogStream({
   running?: boolean;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,7 +55,7 @@ export function LogStream({
             />
           </span>
           <h3 className="font-label-sm text-on-surface text-[12px] uppercase tracking-wide">
-            Consola en vivo
+            {t("logStream.title")}
           </h3>
         </div>
         <div className="flex gap-2 text-outline">
@@ -64,10 +66,11 @@ export function LogStream({
 
       {!logs.length ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-          <p className="text-on-surface text-sm font-medium">SSE en espera</p>
+          <p className="text-on-surface text-sm font-medium">
+            {t("logStream.waitingTitle")}
+          </p>
           <p className="text-on-surface-variant mt-1 max-w-sm text-xs leading-5">
-            Cada acción llega por Server-Sent Events: timestamp, agente,
-            campo, confidence y evidencia.
+            {t("logStream.waitingDesc")}
           </p>
         </div>
       ) : (
@@ -97,12 +100,12 @@ export function LogStream({
                 </span>
                 {log.field ? (
                   <span className="font-code-md text-outline text-[10px]">
-                    campo:{log.field}
+                    {t("logStream.field")}:{log.field}
                   </span>
                 ) : null}
                 {typeof log.confidence === "number" ? (
                   <span className="font-code-md text-outline text-[10px]">
-                    conf {log.confidence.toFixed(2)}
+                    {t("logStream.conf")} {log.confidence.toFixed(2)}
                   </span>
                 ) : null}
               </div>

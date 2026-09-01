@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/icon";
-import { AGENT_CATALOG } from "@/lib/permissions";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import type { AgentDecision, PipelineResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,12 @@ const decisionTone: Record<AgentDecision, string> = {
   aprobado: "bg-tertiary/15 text-tertiary border-tertiary/30",
   "requiere revisión": "bg-amber-400/15 text-amber-200 border-amber-400/30",
   bloqueado: "bg-error/15 text-error border-error/30",
+};
+
+const decisionKey: Record<AgentDecision, `decision.${AgentDecision}`> = {
+  aprobado: "decision.aprobado",
+  "requiere revisión": "decision.requiere revisión",
+  bloqueado: "decision.bloqueado",
 };
 
 function downloadJson(result: PipelineResult) {
@@ -46,6 +52,8 @@ export function ExportButtons({
   result: PipelineResult;
   onPdfError?: (message: string) => void;
 }) {
+  const { t } = useLanguage();
+
   return (
     <div className="flex gap-2">
       <button
@@ -53,7 +61,8 @@ export function ExportButtons({
         onClick={() => downloadJson(result)}
         className="font-label-sm text-on-surface-variant hover:text-on-surface bg-surface-container border-outline-variant/30 flex items-center gap-2 rounded border px-2 py-1 text-[12px] transition-colors"
       >
-        <Icon name="data_object" className="text-[14px]" /> JSON
+        <Icon name="data_object" className="text-[14px]" />{" "}
+        {t("resultDashboard.exportJson")}
       </button>
       <button
         type="button"
@@ -64,13 +73,15 @@ export function ExportButtons({
         }}
         className="font-label-sm text-on-surface-variant hover:text-on-surface bg-surface-container border-outline-variant/30 flex items-center gap-2 rounded border px-2 py-1 text-[12px] transition-colors"
       >
-        <Icon name="picture_as_pdf" className="text-[14px]" /> PDF
+        <Icon name="picture_as_pdf" className="text-[14px]" />{" "}
+        {t("resultDashboard.exportPdf")}
       </button>
     </div>
   );
 }
 
 export function ResultDashboard({ result }: { result: PipelineResult }) {
+  const { t } = useLanguage();
   const seconds = (result.durationMs / 1000).toFixed(1);
   const totalSteps = result.agents.length;
   const doneSteps = result.agents.filter((a) => a.status === "done").length;
@@ -78,14 +89,17 @@ export function ResultDashboard({ result }: { result: PipelineResult }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Tiempo Total" value={`${seconds}s`} />
-        <StatCard label="Agentes Activos" value={String(result.activeAgents)} />
+        <StatCard label={t("resultDashboard.timeTotal")} value={`${seconds}s`} />
         <StatCard
-          label="Pasos Completados"
+          label={t("resultDashboard.activeAgents")}
+          value={String(result.activeAgents)}
+        />
+        <StatCard
+          label={t("resultDashboard.stepsCompleted")}
           value={`${doneSteps} / ${totalSteps}`}
         />
         <StatCard
-          label="Confianza (Avg)"
+          label={t("resultDashboard.avgConfidence")}
           value={`${Math.round(result.overallConfidence * 100)}%`}
           highlight
         />
@@ -97,16 +111,23 @@ export function ResultDashboard({ result }: { result: PipelineResult }) {
         <table className="w-full text-left text-sm">
           <thead className="bg-surface-container-low text-on-surface-variant text-[11px] tracking-wide uppercase">
             <tr>
-              <th className="px-3 py-2 font-medium">Agente</th>
-              <th className="px-3 py-2 font-medium">Decisión</th>
-              <th className="px-3 py-2 font-medium">Conf.</th>
-              <th className="px-3 py-2 font-medium">Resumen</th>
+              <th className="px-3 py-2 font-medium">
+                {t("resultDashboard.tableAgent")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {t("resultDashboard.tableDecision")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {t("resultDashboard.tableConf")}
+              </th>
+              <th className="px-3 py-2 font-medium">
+                {t("resultDashboard.tableSummary")}
+              </th>
             </tr>
           </thead>
           <tbody>
             {result.agents.map((run) => {
-              const name =
-                AGENT_CATALOG.find((a) => a.id === run.agent)?.name ?? run.agent;
+              const name = t(`agent.${run.agent}.name` as const);
               const decision = run.decision ?? "requiere revisión";
               return (
                 <tr key={run.agent} className="border-outline-variant/20 border-t">
@@ -120,7 +141,7 @@ export function ResultDashboard({ result }: { result: PipelineResult }) {
                         decisionTone[decision]
                       )}
                     >
-                      {decision}
+                      {t(decisionKey[decision])}
                     </span>
                   </td>
                   <td className="font-code-md px-3 py-2.5 text-xs">
@@ -137,8 +158,12 @@ export function ResultDashboard({ result }: { result: PipelineResult }) {
       </div>
 
       <div className="flex flex-wrap gap-2 text-[11px] text-on-surface-variant">
-        <Chip>min {result.thresholds.minConfidence.toFixed(2)}</Chip>
-        <Chip>HITL {result.thresholds.hitlThreshold.toFixed(2)}</Chip>
+        <Chip>
+          {t("resultDashboard.chipMin")} {result.thresholds.minConfidence.toFixed(2)}
+        </Chip>
+        <Chip>
+          {t("resultDashboard.chipHitl")} {result.thresholds.hitlThreshold.toFixed(2)}
+        </Chip>
         <Chip>Claude {result.claudeEnabled ? "on" : "off"}</Chip>
         <Chip>Supabase {result.supabaseEnabled ? "on" : "off"}</Chip>
       </div>

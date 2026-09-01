@@ -3,6 +3,7 @@
 import { Icon } from "@/components/icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import { AGENT_CATALOG } from "@/lib/permissions";
 import type { AgentEnabledMap, AgentId } from "@/lib/types";
 
@@ -21,6 +22,8 @@ export function ControlPanel({
   onMinConfidence: (n: number) => void;
   onHitlThreshold: (n: number) => void;
 }) {
+  const { t } = useLanguage();
+
   const toggle = (id: AgentId, value: boolean) => {
     onEnabled({ ...enabled, [id]: value });
   };
@@ -28,10 +31,11 @@ export function ControlPanel({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-on-surface text-sm font-medium">Agentes</p>
+        <p className="text-on-surface text-sm font-medium">
+          {t("controlPanel.agentsTitle")}
+        </p>
         <p className="text-on-surface-variant mb-3 text-xs">
-          Apaga un agente para saltarlo. Extractor y orquestador son
-          requeridos para una corrida completa.
+          {t("controlPanel.agentsDesc")}
         </p>
         <ul className="space-y-3">
           {AGENT_CATALOG.map((agent) => (
@@ -46,10 +50,10 @@ export function ControlPanel({
                 />
                 <div>
                   <p className="text-on-surface text-sm font-medium">
-                    {agent.name}
+                    {t(`agent.${agent.id}.name` as const)}
                   </p>
                   <p className="text-on-surface-variant text-xs">
-                    {agent.role}
+                    {t(`agent.${agent.id}.role` as const)}
                   </p>
                 </div>
               </div>
@@ -65,7 +69,7 @@ export function ControlPanel({
       <div className="border-outline-variant/30 bg-surface-container-low space-y-4 rounded-lg border p-4">
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <Label htmlFor="min-conf">Confianza mínima</Label>
+            <Label htmlFor="min-conf">{t("controlPanel.minConfidence")}</Label>
             <span className="text-primary font-code-md text-xs">
               {minConfidence.toFixed(2)}
             </span>
@@ -81,12 +85,12 @@ export function ControlPanel({
             className="accent-primary w-full"
           />
           <p className="text-on-surface-variant text-[11px]">
-            Por debajo: el agente queda bloqueado.
+            {t("controlPanel.minConfidenceHint")}
           </p>
         </div>
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <Label htmlFor="hitl">Umbral HITL</Label>
+            <Label htmlFor="hitl">{t("controlPanel.hitl")}</Label>
             <span className="font-code-md text-[#fcd34d] text-xs">
               {hitlThreshold.toFixed(2)}
             </span>
@@ -102,7 +106,7 @@ export function ControlPanel({
             className="w-full accent-[#d97706]"
           />
           <p className="text-on-surface-variant text-[11px]">
-            Por debajo: requiere revisión humana. Default 0.85.
+            {t("controlPanel.hitlHint")}
           </p>
         </div>
       </div>

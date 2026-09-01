@@ -1,14 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { Icon } from "@/components/icon";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import { cn } from "@/lib/utils";
 
 export type NavKey = "dashboard" | "workflows" | "agents" | "logs";
 
-const NAV_ITEMS: { href: string; label: string; key: NavKey }[] = [
-  { href: "/", label: "Dashboard", key: "dashboard" },
-  { href: "/workflows", label: "Workflows", key: "workflows" },
-  { href: "/agents", label: "Agents", key: "agents" },
-  { href: "/logs", label: "Logs", key: "logs" },
+const NAV_ITEMS: { href: string; key: NavKey; labelKey: "nav.dashboard" | "nav.workflows" | "nav.agents" | "nav.logs" }[] = [
+  { href: "/", key: "dashboard", labelKey: "nav.dashboard" },
+  { href: "/workflows", key: "workflows", labelKey: "nav.workflows" },
+  { href: "/agents", key: "agents", labelKey: "nav.agents" },
+  { href: "/logs", key: "logs", labelKey: "nav.logs" },
 ];
 
 export function TopNav({
@@ -20,6 +24,8 @@ export function TopNav({
   pulse?: "busy" | "ok";
   actions?: React.ReactNode;
 }) {
+  const { t } = useLanguage();
+
   return (
     <nav className="border-outline-variant/30 bg-surface/80 fixed top-0 z-50 w-full border-b shadow-sm backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 sm:px-6">
@@ -60,12 +66,13 @@ export function TopNav({
                   : "text-on-surface-variant hover:text-primary border-transparent"
               )}
             >
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           ))}
         </div>
 
         <div className="flex items-center gap-3">
+          <LanguageToggle />
           <Icon
             name="notifications"
             className="text-on-surface-variant hidden text-[20px] sm:inline"

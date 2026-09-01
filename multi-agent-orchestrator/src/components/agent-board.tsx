@@ -1,17 +1,10 @@
 "use client";
 
 import { Icon } from "@/components/icon";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import { AGENT_CATALOG } from "@/lib/permissions";
 import type { AgentRun } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const statusLabel: Record<AgentRun["status"], string> = {
-  idle: "En cola",
-  running: "En ejecución",
-  done: "Completado",
-  skipped: "Omitido (bypass)",
-  blocked: "Bloqueado",
-};
 
 const statusIcon: Record<AgentRun["status"], string> = {
   idle: "hourglass_empty",
@@ -21,13 +14,25 @@ const statusIcon: Record<AgentRun["status"], string> = {
   blocked: "block",
 };
 
+const statusKey: Record<AgentRun["status"], `agentBoard.status.${AgentRun["status"]}`> = {
+  idle: "agentBoard.status.idle",
+  running: "agentBoard.status.running",
+  done: "agentBoard.status.done",
+  skipped: "agentBoard.status.skipped",
+  blocked: "agentBoard.status.blocked",
+};
+
 export function AgentBoard({ runs }: { runs: AgentRun[] }) {
+  const { t } = useLanguage();
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {AGENT_CATALOG.map((agent) => {
         const run = runs.find((r) => r.agent === agent.id);
         const status = run?.status ?? "idle";
         const confidence = Math.round((run?.confidence ?? 0) * 100);
+        const name = t(`agent.${agent.id}.name` as const);
+        const role = t(`agent.${agent.id}.role` as const);
 
         const isRunning = status === "running";
         const isDone = status === "done";
@@ -80,7 +85,7 @@ export function AgentBoard({ runs }: { runs: AgentRun[] }) {
                     isSkipped ? "text-outline line-through" : "text-on-surface"
                   )}
                 >
-                  {agent.name}
+                  {name}
                 </h4>
               </div>
               {isRunning ? (
@@ -107,7 +112,7 @@ export function AgentBoard({ runs }: { runs: AgentRun[] }) {
                 isSkipped ? "text-outline line-through" : "text-on-surface-variant"
               )}
             >
-              {agent.role}
+              {role}
             </p>
 
             <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-surface-container-highest">
@@ -130,7 +135,7 @@ export function AgentBoard({ runs }: { runs: AgentRun[] }) {
                   isDone && "text-tertiary"
                 )}
               >
-                {run?.summary || statusLabel[status]}
+                {run?.summary || t(statusKey[status])}
               </span>
               <span>{run ? `${confidence}%` : "--"}</span>
             </div>

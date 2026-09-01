@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { LogStream } from "@/components/log-stream";
+import { useLanguage } from "@/lib/i18n/language-provider";
 import type { PipelineLog } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ async function fetchLogsForRun(runId: string): Promise<PipelineLog[]> {
 }
 
 export function LogsClient() {
+  const { t } = useLanguage();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -65,26 +67,21 @@ export function LogsClient() {
   }, []);
 
   if (configured === null) {
-    return <p className="text-on-surface-variant text-sm">Cargando…</p>;
+    return (
+      <p className="text-on-surface-variant text-sm">
+        {t("logsClient.loading")}
+      </p>
+    );
   }
 
   if (!configured) {
     return (
       <div className="border-outline-variant/30 rounded-lg border border-dashed px-6 py-16 text-center">
         <p className="text-on-surface text-base font-medium">
-          Persistencia deshabilitada
+          {t("logsClient.disabledTitle")}
         </p>
         <p className="text-on-surface-variant mx-auto mt-2 max-w-md text-sm leading-6">
-          Configura{" "}
-          <code className="font-code-md text-primary">
-            NEXT_PUBLIC_SUPABASE_URL
-          </code>{" "}
-          y{" "}
-          <code className="font-code-md text-primary">
-            SUPABASE_SERVICE_ROLE_KEY
-          </code>{" "}
-          para guardar cada corrida. Mientras tanto, la consola en vivo del
-          Dashboard sigue funcionando por SSE durante una corrida activa.
+          {t("logsClient.disabledDesc")}
         </p>
       </div>
     );
@@ -94,11 +91,10 @@ export function LogsClient() {
     return (
       <div className="border-outline-variant/30 rounded-lg border border-dashed px-6 py-16 text-center">
         <p className="text-on-surface text-base font-medium">
-          Sin corridas registradas
+          {t("logsClient.noRunsTitle")}
         </p>
         <p className="text-on-surface-variant mx-auto mt-2 max-w-md text-sm leading-6">
-          Corre el pipeline en el Dashboard; cada log queda persistido aquí
-          automáticamente por run_id.
+          {t("logsClient.noRunsDesc")}
         </p>
       </div>
     );
@@ -130,7 +126,7 @@ export function LogsClient() {
           disabled={loading}
           className="font-label-sm text-on-surface-variant hover:text-primary text-[12px] underline disabled:opacity-50"
         >
-          Actualizar
+          {t("logsClient.refresh")}
         </button>
       </div>
       <LogStream logs={logs} running={false} />
