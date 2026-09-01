@@ -1,16 +1,14 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/icon";
 import { AGENT_CATALOG } from "@/lib/permissions";
 import type { AgentDecision, PipelineResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Download, FileJson } from "lucide-react";
 
 const decisionTone: Record<AgentDecision, string> = {
-  aprobado: "bg-emerald-400/15 text-emerald-200 border-emerald-400/30",
-  "requiere revisión": "bg-amber-400/15 text-amber-100 border-amber-400/30",
-  bloqueado: "bg-red-400/15 text-red-200 border-red-400/30",
+  aprobado: "bg-tertiary/15 text-tertiary border-tertiary/30",
+  "requiere revisión": "bg-amber-400/15 text-amber-200 border-amber-400/30",
+  bloqueado: "bg-error/15 text-error border-error/30",
 };
 
 function downloadJson(result: PipelineResult) {
@@ -41,60 +39,63 @@ async function downloadPdf(result: PipelineResult) {
   URL.revokeObjectURL(url);
 }
 
-export function ResultDashboard({
+export function ExportButtons({
   result,
   onPdfError,
 }: {
   result: PipelineResult;
   onPdfError?: (message: string) => void;
 }) {
-  const seconds = (result.durationMs / 1000).toFixed(2);
+  return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => downloadJson(result)}
+        className="font-label-sm text-on-surface-variant hover:text-on-surface bg-surface-container border-outline-variant/30 flex items-center gap-2 rounded border px-2 py-1 text-[12px] transition-colors"
+      >
+        <Icon name="data_object" className="text-[14px]" /> JSON
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          downloadPdf(result).catch((err) =>
+            onPdfError?.(err instanceof Error ? err.message : String(err))
+          );
+        }}
+        className="font-label-sm text-on-surface-variant hover:text-on-surface bg-surface-container border-outline-variant/30 flex items-center gap-2 rounded border px-2 py-1 text-[12px] transition-colors"
+      >
+        <Icon name="picture_as_pdf" className="text-[14px]" /> PDF
+      </button>
+    </div>
+  );
+}
+
+export function ResultDashboard({ result }: { result: PipelineResult }) {
+  const seconds = (result.durationMs / 1000).toFixed(1);
+  const totalSteps = result.agents.length;
+  const doneSteps = result.agents.filter((a) => a.status === "done").length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium">Dashboard de corrida</p>
-          <p className="text-muted-foreground font-mono text-[11px]">
-            {result.runId}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => downloadJson(result)}>
-            <FileJson data-icon="inline-start" />
-            JSON
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              downloadPdf(result).catch((err) =>
-                onPdfError?.(err instanceof Error ? err.message : String(err))
-              );
-            }}
-          >
-            <Download data-icon="inline-start" />
-            PDF
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Tiempo total" value={`${seconds}s`} />
-        <Stat label="Agentes activos" value={String(result.activeAgents)} />
-        <Stat
-          label="Confidence promedio"
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard label="Tiempo Total" value={`${seconds}s`} />
+        <StatCard label="Agentes Activos" value={String(result.activeAgents)} />
+        <StatCard
+          label="Pasos Completados"
+          value={`${doneSteps} / ${totalSteps}`}
+        />
+        <StatCard
+          label="Confianza (Avg)"
           value={`${Math.round(result.overallConfidence * 100)}%`}
-        />
-        <Stat
-          label="Checkpoint"
-          value={result.humanRequired ? "HITL" : "sin HITL"}
+          highlight
         />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-white/8">
+      <div className="bg-outline-variant/20 h-px w-full" />
+
+      <div className="overflow-hidden rounded-lg border border-outline-variant/30">
         <table className="w-full text-left text-sm">
-          <thead className="bg-black/30 text-[11px] tracking-wide text-white/55 uppercase">
+          <thead className="bg-surface-container-low text-on-surface-variant text-[11px] tracking-wide uppercase">
             <tr>
               <th className="px-3 py-2 font-medium">Agente</th>
               <th className="px-3 py-2 font-medium">Decisión</th>
@@ -108,8 +109,10 @@ export function ResultDashboard({
                 AGENT_CATALOG.find((a) => a.id === run.agent)?.name ?? run.agent;
               const decision = run.decision ?? "requiere revisión";
               return (
-                <tr key={run.agent} className="border-t border-white/8">
-                  <td className="px-3 py-2.5 font-medium">{name}</td>
+                <tr key={run.agent} className="border-outline-variant/20 border-t">
+                  <td className="text-on-surface px-3 py-2.5 font-medium">
+                    {name}
+                  </td>
                   <td className="px-3 py-2.5">
                     <span
                       className={cn(
@@ -120,10 +123,10 @@ export function ResultDashboard({
                       {decision}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-xs">
+                  <td className="font-code-md px-3 py-2.5 text-xs">
                     {run.confidence.toFixed(2)}
                   </td>
-                  <td className="text-muted-foreground px-3 py-2.5 text-xs">
+                  <td className="text-on-surface-variant px-3 py-2.5 text-xs">
                     {run.summary}
                   </td>
                 </tr>
@@ -133,31 +136,59 @@ export function ResultDashboard({
         </table>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-[11px] text-white/55">
-        <Badge variant="outline">
-          min {result.thresholds.minConfidence.toFixed(2)}
-        </Badge>
-        <Badge variant="outline">
-          HITL {result.thresholds.hitlThreshold.toFixed(2)}
-        </Badge>
-        <Badge variant="outline">
-          Claude {result.claudeEnabled ? "on" : "off"}
-        </Badge>
-        <Badge variant="outline">
-          Supabase {result.supabaseEnabled ? "on" : "off"}
-        </Badge>
+      <div className="flex flex-wrap gap-2 text-[11px] text-on-surface-variant">
+        <Chip>min {result.thresholds.minConfidence.toFixed(2)}</Chip>
+        <Chip>HITL {result.thresholds.hitlThreshold.toFixed(2)}</Chip>
+        <Chip>Claude {result.claudeEnabled ? "on" : "off"}</Chip>
+        <Chip>Supabase {result.supabaseEnabled ? "on" : "off"}</Chip>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-3">
-      <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
+    <div
+      className={cn(
+        "relative flex flex-col overflow-hidden rounded border p-3",
+        highlight
+          ? "border-tertiary/30 bg-surface-container"
+          : "border-outline-variant/20 bg-surface-container"
+      )}
+    >
+      {highlight ? <div className="bg-tertiary/5 absolute inset-0" /> : null}
+      <span
+        className={cn(
+          "font-label-sm relative z-10 text-[10px] uppercase tracking-wider",
+          highlight ? "text-tertiary" : "text-outline"
+        )}
+      >
         {label}
-      </p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+      </span>
+      <span
+        className={cn(
+          "font-code-md relative z-10 mt-1 text-[20px]",
+          highlight ? "text-tertiary font-bold" : "text-on-surface"
+        )}
+      >
+        {value}
+      </span>
     </div>
+  );
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="border-outline-variant/30 rounded-full border px-2 py-0.5">
+      {children}
+    </span>
   );
 }

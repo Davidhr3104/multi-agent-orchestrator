@@ -6,6 +6,7 @@ export const AGENT_CATALOG: {
   short: string;
   role: string;
   accent: string;
+  icon: string;
 }[] = [
   {
     id: "orchestrator",
@@ -13,6 +14,7 @@ export const AGENT_CATALOG: {
     short: "ORCH",
     role: "Clasifica el input, arma el flujo y consolida el resultado.",
     accent: "cyan",
+    icon: "memory",
   },
   {
     id: "extractor",
@@ -20,6 +22,7 @@ export const AGENT_CATALOG: {
     short: "EXT",
     role: "Campos con evidencia y confidence score.",
     accent: "sky",
+    icon: "save_as",
   },
   {
     id: "seo",
@@ -27,6 +30,7 @@ export const AGENT_CATALOG: {
     short: "SEO",
     role: "Legibilidad, keywords y huecos de contenido.",
     accent: "violet",
+    icon: "search_insights",
   },
   {
     id: "factcheck",
@@ -34,6 +38,7 @@ export const AGENT_CATALOG: {
     short: "FACT",
     role: "Claims soportadas o sin fuente. No inventa.",
     accent: "amber",
+    icon: "fact_check",
   },
   {
     id: "recommender",
@@ -41,6 +46,7 @@ export const AGENT_CATALOG: {
     short: "REC",
     role: "Acciones priorizadas sobre métricas reales.",
     accent: "emerald",
+    icon: "recommend",
   },
   {
     id: "reviewer",
@@ -48,6 +54,7 @@ export const AGENT_CATALOG: {
     short: "REV",
     role: "Un agente revisa a otro: aprueba, corrige o bloquea.",
     accent: "rose",
+    icon: "rule",
   },
 ];
 

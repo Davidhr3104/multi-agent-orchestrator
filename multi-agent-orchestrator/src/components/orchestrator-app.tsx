@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { AgentBoard } from "@/components/agent-board";
 import { ControlPanel } from "@/components/control-panel";
+import { ExportButtons } from "@/components/result-dashboard";
+import { Icon } from "@/components/icon";
 import { LogStream } from "@/components/log-stream";
 import { ResultPanel } from "@/components/result-panel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -17,13 +16,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import {
   DEFAULT_ENABLED_AGENTS,
   DEFAULT_HITL_THRESHOLD,
   DEFAULT_MIN_CONFIDENCE,
 } from "@/lib/config";
-import { DEFAULT_PERMISSIONS } from "@/lib/permissions";
+import { AGENT_CATALOG, DEFAULT_PERMISSIONS } from "@/lib/permissions";
 import { SAMPLE_ARTICLE } from "@/lib/sample";
 import { looksLikeUrl } from "@/lib/text";
 import type {
@@ -34,7 +32,7 @@ import type {
   PipelineResult,
   StreamEvent,
 } from "@/lib/types";
-import { Shield, Sparkles, TerminalSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function OrchestratorApp() {
   const [text, setText] = useState(SAMPLE_ARTICLE);
@@ -49,7 +47,7 @@ export function OrchestratorApp() {
   const [result, setResult] = useState<PipelineResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
-  const [tab, setTab] = useState("console");
+  const [tab, setTab] = useState("timeline");
 
   async function analyze() {
     setRunning(true);
@@ -57,7 +55,7 @@ export function OrchestratorApp() {
     setLogs([]);
     setRuns([]);
     setResult(null);
-    setTab("console");
+    setTab("timeline");
 
     const trimmedUrl = url.trim() || (looksLikeUrl(text) ? text.trim() : "");
     const payload = {
@@ -120,38 +118,69 @@ export function OrchestratorApp() {
     }
   }
 
+  const runFor = (id: string) => runs.find((r) => r.agent === id);
+
   return (
-    <div className="helix-grid min-h-full">
-      <header className="sticky top-0 z-20 border-b border-white/8 bg-[#10192c]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-cyan-400/15 font-mono text-xs font-bold text-cyan-200 ring-1 ring-cyan-300/30">
+    <div className="text-on-surface font-body-md flex min-h-full flex-col">
+      {/* Top Nav */}
+      <nav className="border-outline-variant/30 bg-surface/80 fixed top-0 z-50 w-full border-b shadow-sm backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2">
+            <span className="text-primary flex items-center text-[24px] font-bold leading-8 drop-shadow-[0_0_8px_rgba(76,215,246,0.15)]">
+              <Icon name="hub" filled className="mr-2 text-[24px]" />
               HX
             </span>
-            <div>
-              <p className="text-sm font-semibold tracking-tight">Helix Orchestrator</p>
-              <p className="text-muted-foreground text-[11px]">
-                Multi-agent · audit log · HITL
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/70 sm:flex">
-              <span
-                className={`size-1.5 rounded-full ${running ? "helix-scan bg-cyan-300" : "bg-emerald-400"}`}
-              />
-              {running ? "pipeline activo" : "listo"}
+            <div className="bg-outline-variant mx-2 h-4 w-px" />
+            <span className="text-on-surface text-[16px] font-medium">
+              Helix Orchestrator
             </span>
+            <span className="relative ml-2 flex h-2 w-2">
+              <span
+                className={cn(
+                  "absolute inline-flex h-full w-full rounded-full opacity-75",
+                  running ? "animate-ping bg-primary" : "bg-tertiary"
+                )}
+              />
+              <span
+                className={cn(
+                  "relative inline-flex h-2 w-2 rounded-full",
+                  running ? "bg-primary" : "bg-tertiary"
+                )}
+              />
+            </span>
+          </div>
+
+          <div className="hidden items-center gap-6 md:flex">
+            <span className="text-primary border-primary font-label-sm border-b-2 pb-1 text-[12px] uppercase tracking-wider">
+              Dashboard
+            </span>
+            <span className="text-on-surface-variant font-label-sm text-[12px] uppercase tracking-wider">
+              Workflows
+            </span>
+            <span className="text-on-surface-variant font-label-sm text-[12px] uppercase tracking-wider">
+              Agents
+            </span>
+            <span className="text-on-surface-variant font-label-sm text-[12px] uppercase tracking-wider">
+              Logs
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Icon
+              name="notifications"
+              className="text-on-surface-variant hidden text-[20px] sm:inline"
+            />
+            <div className="bg-outline-variant mx-1 hidden h-6 w-px sm:block" />
             <Sheet>
-              <SheetTrigger
-                render={<Button variant="outline" size="sm" />}
-              >
-                <Shield data-icon="inline-start" />
-                Permisos
+              <SheetTrigger className="border-outline-variant bg-surface-container-low text-on-surface hover:border-primary hover:text-primary font-label-sm rounded border px-3 py-1.5 text-[12px] transition-colors">
+                <span className="flex items-center gap-1.5">
+                  <Icon name="tune" className="text-[16px]" />
+                  Permisos
+                </span>
               </SheetTrigger>
               <SheetContent
                 side="right"
-                className="w-full overflow-y-auto data-[side=right]:sm:max-w-3xl"
+                className="w-full overflow-y-auto data-[side=right]:sm:max-w-md"
               >
                 <SheetHeader>
                   <SheetTitle>Permisos y umbrales</SheetTitle>
@@ -172,151 +201,206 @@ export function OrchestratorApp() {
                 </div>
               </SheetContent>
             </Sheet>
-            <Button size="sm" onClick={analyze} disabled={running}>
-              <Sparkles data-icon="inline-start" />
-              {running ? "Orquestando…" : "Correr pipeline"}
-            </Button>
+            <button
+              type="button"
+              onClick={analyze}
+              disabled={running}
+              className="bg-primary text-on-primary hover:glow-primary font-label-sm flex items-center gap-2 rounded px-3 py-1.5 text-[12px] font-bold transition-all disabled:opacity-50"
+            >
+              <Icon name="play_arrow" filled className="text-[16px]" />
+              {running ? "Orquestando…" : "Correr Pipeline"}
+            </button>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#15233d]/70 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.25)] sm:p-7">
-          <p className="text-[11px] font-medium tracking-[0.22em] text-cyan-200/80 uppercase">
-            Proyecto #1 · análisis de contenido
-          </p>
-          <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Seis agentes, un orquestador, cero cajas negras.
-          </h1>
-          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6 sm:text-base">
-            Extrae con evidencia, puntúa SEO, verifica claims sin inventar
-            fuentes y recomienda acciones. El revisor audita a sus pares. Si
-            la confianza baja, entra un humano.
-          </p>
-          <ol className="mt-5 flex flex-wrap gap-2 text-[11px] text-white/70">
-            {[
-              "1. Input",
-              "2. Extractor",
-              "3. SEO ∥ Facts",
-              "4. Reviewer",
-              "5. Recs",
-              "6. HITL",
-            ].map((step) => (
-              <li
-                key={step}
-                className="rounded-full border border-white/10 bg-white/4 px-3 py-1"
-              >
-                {step}
-              </li>
-            ))}
-          </ol>
+      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col gap-8 px-4 py-8 pt-24 sm:px-6">
+        {/* Hero */}
+        <section className="flex flex-col gap-4">
+          <div>
+            <p className="text-primary glow-text-primary mb-2 text-[12px] uppercase tracking-widest">
+              {running
+                ? "Iniciando secuencia de análisis"
+                : "Proyecto #1 · análisis de contenido"}
+            </p>
+            <h1 className="from-primary to-secondary bg-gradient-to-r bg-clip-text text-[32px] font-bold leading-10 text-transparent sm:text-[40px] sm:leading-[48px]">
+              Seis agentes, un orquestador,
+              <br />
+              cero cajas negras.
+            </h1>
+          </div>
+
+          {/* Stepper */}
+          <div className="mt-2 flex w-full items-center gap-1 overflow-x-auto py-2">
+            {AGENT_CATALOG.map((agent, i) => {
+              const run = runFor(agent.id);
+              const status = run?.status ?? "idle";
+              const isActive = status === "running" || status === "done";
+              return (
+                <div key={agent.id} className="flex items-center">
+                  <div
+                    className={cn(
+                      "relative z-10 flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px]",
+                      status === "running" &&
+                        "glow-primary border-primary bg-primary/20 text-primary border",
+                      status === "done" &&
+                        "border-tertiary bg-surface-container-high text-tertiary border",
+                      (status === "idle" || status === "skipped" || status === "blocked") &&
+                        "border-outline-variant bg-surface-container-high text-on-surface-variant border opacity-60"
+                    )}
+                  >
+                    <Icon name={agent.icon} className="text-[14px]" />
+                    {agent.short}
+                  </div>
+                  {i < AGENT_CATALOG.length - 1 ? (
+                    <div
+                      className={cn(
+                        "-ml-1 h-px w-8",
+                        isActive ? "bg-primary/60" : "bg-outline-variant/40"
+                      )}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <section className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <Label htmlFor="content" className="text-sm">
-                Brief o artículo
-              </Label>
-              <Button
+        {/* Input + Console */}
+        <section className="grid h-auto grid-cols-1 gap-6 lg:h-[480px] lg:grid-cols-12">
+          <div className="border-surface-bright bg-surface-container relative flex flex-col gap-2 overflow-hidden rounded-lg border p-4 lg:col-span-7">
+            <div className="via-primary/30 absolute top-0 right-0 left-0 h-[1px] bg-gradient-to-r from-transparent to-transparent" />
+            <label className="text-on-surface-variant font-label-sm flex items-center gap-2 text-[12px]">
+              <Icon name="link" className="text-[16px]" />
+              URL de Origen
+            </label>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://ejemplo.com/doc-tecnico..."
+              type="text"
+              className="border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-primary font-code-md rounded border px-3 py-2 text-[14px] transition-all focus:outline-none focus:ring-1"
+            />
+            <label className="text-on-surface-variant font-label-sm mt-2 flex items-center gap-2 text-[12px]">
+              <Icon name="description" className="text-[16px]" />
+              Contexto del Documento
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Pegue el contenido raw o el JSON estructurado aquí..."
+              className="border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-primary font-code-md min-h-[220px] flex-1 resize-none rounded border px-3 py-2.5 text-[14px] transition-all focus:outline-none focus:ring-1"
+            />
+            <div className="flex items-center justify-between">
+              <button
                 type="button"
-                variant="ghost"
-                size="xs"
                 onClick={() => {
                   setText(SAMPLE_ARTICLE);
                   setUrl("");
                 }}
+                className="text-on-surface-variant hover:text-primary font-label-sm text-[11px] underline"
               >
                 Restaurar ejemplo
-              </Button>
+              </button>
+              {error ? (
+                <p className="text-error text-[12px]" role="alert">
+                  {error}
+                </p>
+              ) : null}
             </div>
-            <Textarea
-              id="content"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="min-h-[240px] bg-black/30 font-mono text-[13px] leading-6"
-            />
-            <div className="mt-3 space-y-2">
-              <Label htmlFor="url">URL pública (opcional, reemplaza el texto)</Label>
-              <Input
-                id="url"
-                placeholder="https://…"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="bg-black/30"
-              />
-            </div>
-            {error ? (
-              <p className="text-destructive mt-3 text-sm" role="alert">
-                {error}
-              </p>
-            ) : null}
-          </section>
+          </div>
 
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <TerminalSquare className="size-4 text-cyan-300" />
-              <h2 className="text-sm font-medium">Consola en vivo</h2>
-            </div>
-            <LogStream logs={logs} />
-            <p className="text-muted-foreground text-xs">
-              Tip: en Permisos apaga Verificación y sube el umbral HITL. El
-              log SSE debe mostrar skip + campos con evidencia.
-            </p>
-          </section>
-        </div>
-
-        <section className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
-          <h2 className="mb-3 text-sm font-medium">Panel de permisos</h2>
-          <ControlPanel
-            enabled={enabledAgents}
-            onEnabled={setEnabledAgents}
-            minConfidence={minConfidence}
-            hitlThreshold={hitlThreshold}
-            onMinConfidence={setMinConfidence}
-            onHitlThreshold={setHitlThreshold}
-          />
+          <div className="lg:col-span-5">
+            <LogStream logs={logs} running={running} />
+          </div>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-medium">Grafo de agentes</h2>
+        {/* Agent Board */}
+        <section className="flex flex-col gap-3">
+          <h2 className="text-on-surface flex items-center gap-2 text-[24px] font-semibold">
+            <Icon name="group_work" className="text-primary text-[24px]" />
+            Malla de Agentes
+          </h2>
           <AgentBoard runs={runs} />
         </section>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="console">Timeline</TabsTrigger>
-            <TabsTrigger value="result">Resultado</TabsTrigger>
-          </TabsList>
-          <TabsContent value="console" className="pt-4">
-            {logs.length ? (
-              <LogStream logs={logs} />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-white/12 px-6 py-16 text-center">
-                <p className="text-base font-medium">Todavía no hay corrida</p>
-                <p className="text-muted-foreground mx-auto mt-2 max-w-md text-sm leading-6">
-                  Pulsa <span className="text-foreground">Correr pipeline</span>{" "}
-                  para ver extracción, SEO, verificación y el checkpoint
-                  humano con confidence por campo.
-                </p>
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="result" className="pt-4">
-            {result ? (
-              <ResultPanel result={result} />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-white/12 px-6 py-16 text-center">
-                <p className="text-base font-medium">Sin paquete consolidado</p>
-                <p className="text-muted-foreground mx-auto mt-2 max-w-md text-sm leading-6">
-                  El orquestador llena esta vista cuando termina: campos,
-                  claims, reviews y firma humana.
-                </p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
+        {/* Results */}
+        <section className="bg-surface-container-low border-outline-variant/30 mt-2 flex flex-col overflow-hidden rounded-xl border">
+          <Tabs value={tab} onValueChange={setTab}>
+            <div className="border-outline-variant/30 bg-surface/50 flex items-center border-b">
+              <TabsList className="bg-transparent p-0">
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="result">Resultado</TabsTrigger>
+              </TabsList>
+              <div className="flex-1" />
+              {result ? (
+                <div className="px-4">
+                  <ExportButtons result={result} onPdfError={setError} />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="p-4 sm:p-6">
+              <TabsContent value="timeline">
+                {logs.length ? (
+                  <LogStream logs={logs} running={running} />
+                ) : (
+                  <EmptyState
+                    title="Todavía no hay corrida"
+                    description="Pulsa Correr Pipeline para ver extracción, SEO, verificación y el checkpoint humano con confidence por campo."
+                  />
+                )}
+              </TabsContent>
+              <TabsContent value="result">
+                {result ? (
+                  <ResultPanel result={result} />
+                ) : (
+                  <EmptyState
+                    title="Sin paquete consolidado"
+                    description="El orquestador llena esta vista cuando termina: campos, claims, reviews y firma humana."
+                  />
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
+        </section>
+      </main>
+
+      <footer className="border-outline-variant/20 bg-surface-dim mt-8 w-full border-t py-4">
+        <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
+          <p className="text-on-surface-variant font-label-sm text-[12px]">
+            Helix Orchestrator v2.4.0
+          </p>
+          <div className="flex gap-4">
+            <span className="text-on-surface-variant hover:text-tertiary text-[13px] underline">
+              Documentation
+            </span>
+            <span className="text-on-surface-variant hover:text-tertiary text-[13px] underline">
+              Support
+            </span>
+            <span className="text-on-surface-variant hover:text-tertiary text-[13px] underline">
+              System Status
+            </span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="border-outline-variant/30 rounded-lg border border-dashed px-6 py-16 text-center">
+      <p className="text-on-surface text-base font-medium">{title}</p>
+      <p className="text-on-surface-variant mx-auto mt-2 max-w-md text-sm leading-6">
+        {description}
+      </p>
     </div>
   );
 }

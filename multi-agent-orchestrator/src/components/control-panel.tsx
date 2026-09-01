@@ -1,7 +1,8 @@
 "use client";
 
-import { Switch } from "@/components/ui/switch";
+import { Icon } from "@/components/icon";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { AGENT_CATALOG } from "@/lib/permissions";
 import type { AgentEnabledMap, AgentId } from "@/lib/types";
 
@@ -27,20 +28,30 @@ export function ControlPanel({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium">Agentes</p>
-        <p className="text-muted-foreground mb-3 text-xs">
-          Apaga un agente para saltarlo. El extractor y el orquestador son
+        <p className="text-on-surface text-sm font-medium">Agentes</p>
+        <p className="text-on-surface-variant mb-3 text-xs">
+          Apaga un agente para saltarlo. Extractor y orquestador son
           requeridos para una corrida completa.
         </p>
         <ul className="space-y-3">
           {AGENT_CATALOG.map((agent) => (
             <li
               key={agent.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2.5"
+              className="border-outline-variant/30 bg-surface-container flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
             >
-              <div>
-                <p className="text-sm font-medium">{agent.name}</p>
-                <p className="text-muted-foreground text-xs">{agent.role}</p>
+              <div className="flex items-center gap-2">
+                <Icon
+                  name={agent.icon}
+                  className="text-primary text-[18px]"
+                />
+                <div>
+                  <p className="text-on-surface text-sm font-medium">
+                    {agent.name}
+                  </p>
+                  <p className="text-on-surface-variant text-xs">
+                    {agent.role}
+                  </p>
+                </div>
               </div>
               <Switch
                 checked={enabled[agent.id]}
@@ -51,11 +62,11 @@ export function ControlPanel({
         </ul>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-white/8 bg-black/20 p-4">
+      <div className="border-outline-variant/30 bg-surface-container-low space-y-4 rounded-lg border p-4">
         <div>
           <div className="mb-1 flex items-center justify-between">
             <Label htmlFor="min-conf">Confianza mínima</Label>
-            <span className="font-mono text-xs text-cyan-200">
+            <span className="text-primary font-code-md text-xs">
               {minConfidence.toFixed(2)}
             </span>
           </div>
@@ -67,16 +78,16 @@ export function ControlPanel({
             step={0.01}
             value={minConfidence}
             onChange={(e) => onMinConfidence(Number(e.target.value))}
-            className="w-full accent-cyan-400"
+            className="accent-primary w-full"
           />
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-on-surface-variant text-[11px]">
             Por debajo: el agente queda bloqueado.
           </p>
         </div>
         <div>
           <div className="mb-1 flex items-center justify-between">
             <Label htmlFor="hitl">Umbral HITL</Label>
-            <span className="font-mono text-xs text-amber-200">
+            <span className="font-code-md text-[#fcd34d] text-xs">
               {hitlThreshold.toFixed(2)}
             </span>
           </div>
@@ -88,9 +99,9 @@ export function ControlPanel({
             step={0.01}
             value={hitlThreshold}
             onChange={(e) => onHitlThreshold(Number(e.target.value))}
-            className="w-full accent-amber-400"
+            className="w-full accent-[#d97706]"
           />
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-on-surface-variant text-[11px]">
             Por debajo: requiere revisión humana. Default 0.85.
           </p>
         </div>
