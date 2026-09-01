@@ -20,6 +20,8 @@ export type PermissionKey =
 
 export type PermissionMap = Record<AgentId, PermissionKey[]>;
 
+export type AgentEnabledMap = Record<AgentId, boolean>;
+
 export type LogLevel = "info" | "decision" | "warn" | "error" | "success";
 
 export type PipelineLog = {
@@ -28,6 +30,9 @@ export type PipelineLog = {
   agent: AgentId;
   level: LogLevel;
   message: string;
+  field?: string;
+  confidence?: number;
+  evidence?: string;
 };
 
 export type ScoredField = {
@@ -59,14 +64,26 @@ export type ReviewNote = {
   comment: string;
 };
 
+export type AgentDecision = "aprobado" | "requiere revisión" | "bloqueado";
+
 export type AgentRun = {
   agent: AgentId;
   status: "idle" | "running" | "done" | "skipped" | "blocked";
   summary: string;
   confidence: number;
+  decision?: AgentDecision;
+};
+
+export type PipelineThresholds = {
+  minConfidence: number;
+  hitlThreshold: number;
 };
 
 export type PipelineResult = {
+  runId: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
   inputKind: InputKind;
   sourceText: string;
   sourceUrl?: string;
@@ -75,14 +92,22 @@ export type PipelineResult = {
   recommendations: Recommendation[];
   reviews: ReviewNote[];
   agents: AgentRun[];
+  logs: PipelineLog[];
   overallConfidence: number;
   humanRequired: boolean;
+  activeAgents: number;
+  thresholds: PipelineThresholds;
+  claudeEnabled: boolean;
+  supabaseEnabled: boolean;
 };
 
 export type AnalyzeRequest = {
   text?: string;
   url?: string;
   permissions: PermissionMap;
+  enabledAgents: AgentEnabledMap;
+  minConfidence: number;
+  hitlThreshold: number;
 };
 
 export type StreamEvent =

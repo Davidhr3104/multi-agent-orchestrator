@@ -22,28 +22,39 @@ export function LogStream({ logs }: { logs: PipelineLog[] }) {
 
   if (!logs.length) {
     return (
-      <div className="flex h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-black/20 px-6 text-center">
-        <p className="text-sm font-medium">Sala de control vacía</p>
+      <div className="flex h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-black/20 px-6 text-center">
+        <p className="text-sm font-medium">SSE en espera</p>
         <p className="text-muted-foreground mt-1 max-w-sm text-xs leading-5">
-          Cuando corras el pipeline, cada decisión del orquestador, permiso
-          denegado y revisión cruzada aparece aquí con timestamp.
+          Cada acción llega por Server-Sent Events: timestamp, agente, campo,
+          confidence y evidencia.
         </p>
       </div>
     );
   }
 
   return (
-    <ScrollArea className="h-[320px] rounded-xl border border-white/8 bg-black/35">
-      <ol className="space-y-1.5 p-3 font-mono text-[11px] leading-5">
+    <ScrollArea className="h-[360px] rounded-xl border border-white/8 bg-black/35">
+      <ol className="space-y-2 p-3">
         {logs.map((log) => (
-          <li key={log.id} className={cn("flex gap-2", tone[log.level])}>
-            <span className="text-white/35 shrink-0">
-              {new Date(log.ts).toLocaleTimeString()}
-            </span>
-            <span className="w-16 shrink-0 uppercase tracking-wide text-white/50">
-              {log.agent}
-            </span>
-            <span className="min-w-0">{log.message}</span>
+          <li
+            key={log.id}
+            className={cn(
+              "rounded-lg border border-white/6 bg-white/3 px-2.5 py-2 font-mono text-[11px] leading-5",
+              tone[log.level]
+            )}
+          >
+            <div className="flex flex-wrap gap-x-2 text-white/45">
+              <span>{new Date(log.ts).toLocaleTimeString()}</span>
+              <span className="uppercase tracking-wide">{log.agent}</span>
+              {log.field ? <span>campo:{log.field}</span> : null}
+              {typeof log.confidence === "number" ? (
+                <span>conf {log.confidence.toFixed(2)}</span>
+              ) : null}
+            </div>
+            <p className="mt-0.5">{log.message}</p>
+            {log.evidence ? (
+              <p className="text-white/45 mt-0.5">evidencia: {log.evidence}</p>
+            ) : null}
           </li>
         ))}
         <li ref={endRef} />

@@ -1,28 +1,32 @@
 import { runPipeline } from "@/lib/agents";
-import { DEFAULT_PERMISSIONS } from "@/lib/permissions";
+import { withDefaultRequest } from "@/lib/config";
+import { persistPipelineLog } from "@/lib/supabase-logs";
 import type { AnalyzeRequest, StreamEvent } from "@/lib/types";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  let body: AnalyzeRequest;
+  let body: Partial<AnalyzeRequest>;
   try {
-    body = (await req.json()) as AnalyzeRequest;
+    body = (await req.json()) as Partial<AnalyzeRequest>;
   } catch {
     return Response.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const payload: AnalyzeRequest = {
-    text: body.text,
-    url: body.url,
-    permissions: body.permissions ?? DEFAULT_PERMISSIONS,
-  };
-
+  const payload = withDefaultRequest(body);
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let runId = "";
       const send = (event: StreamEvent) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        if (event.type === "log") {
+          if (!runId && event.log.field === "run_id" && event.log.evidence) {
+            runId = event.log.evidence;
+          }
+          void persistPipelineLog(runId || "pending", event.log);
+        }
+        if (event.type === "result") runId = event.result.runId;
       };
       try {
         await runPipeline(payload, send);

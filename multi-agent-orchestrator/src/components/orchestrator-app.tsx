@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { AgentBoard } from "@/components/agent-board";
+import { ControlPanel } from "@/components/control-panel";
 import { LogStream } from "@/components/log-stream";
-import { PermissionMatrix } from "@/components/permission-matrix";
 import { ResultPanel } from "@/components/result-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,10 +18,16 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DEFAULT_ENABLED_AGENTS,
+  DEFAULT_HITL_THRESHOLD,
+  DEFAULT_MIN_CONFIDENCE,
+} from "@/lib/config";
 import { DEFAULT_PERMISSIONS } from "@/lib/permissions";
 import { SAMPLE_ARTICLE } from "@/lib/sample";
 import { looksLikeUrl } from "@/lib/text";
 import type {
+  AgentEnabledMap,
   AgentRun,
   PermissionMap,
   PipelineLog,
@@ -33,8 +39,11 @@ import { Shield, Sparkles, TerminalSquare } from "lucide-react";
 export function OrchestratorApp() {
   const [text, setText] = useState(SAMPLE_ARTICLE);
   const [url, setUrl] = useState("");
-  const [permissions, setPermissions] =
-    useState<PermissionMap>(DEFAULT_PERMISSIONS);
+  const [permissions] = useState<PermissionMap>(DEFAULT_PERMISSIONS);
+  const [enabledAgents, setEnabledAgents] =
+    useState<AgentEnabledMap>(DEFAULT_ENABLED_AGENTS);
+  const [minConfidence, setMinConfidence] = useState(DEFAULT_MIN_CONFIDENCE);
+  const [hitlThreshold, setHitlThreshold] = useState(DEFAULT_HITL_THRESHOLD);
   const [logs, setLogs] = useState<PipelineLog[]>([]);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [result, setResult] = useState<PipelineResult | null>(null);
@@ -51,9 +60,15 @@ export function OrchestratorApp() {
     setTab("console");
 
     const trimmedUrl = url.trim() || (looksLikeUrl(text) ? text.trim() : "");
-    const payload = trimmedUrl
-      ? { text: "", url: trimmedUrl, permissions }
-      : { text, url: undefined, permissions };
+    const payload = {
+      ...(trimmedUrl
+        ? { text: "", url: trimmedUrl }
+        : { text, url: undefined }),
+      permissions,
+      enabledAgents,
+      minConfidence,
+      hitlThreshold,
+    };
 
     try {
       const res = await fetch("/api/analyze", {
@@ -139,14 +154,21 @@ export function OrchestratorApp() {
                 className="w-full overflow-y-auto data-[side=right]:sm:max-w-3xl"
               >
                 <SheetHeader>
-                  <SheetTitle>Permisos granulares</SheetTitle>
+                  <SheetTitle>Permisos y umbrales</SheetTitle>
                   <SheetDescription>
-                    Apaga un permiso y el orquestador salta o bloquea al agente.
-                    Nada se finge si no hay autorización.
+                    Activa o apaga cada agente. Confianza mínima 0.70 y HITL
+                    0.85 por defecto.
                   </SheetDescription>
                 </SheetHeader>
                 <div className="px-4 pb-6">
-                  <PermissionMatrix value={permissions} onChange={setPermissions} />
+                  <ControlPanel
+                    enabled={enabledAgents}
+                    onEnabled={setEnabledAgents}
+                    minConfidence={minConfidence}
+                    hitlThreshold={hitlThreshold}
+                    onMinConfidence={setMinConfidence}
+                    onHitlThreshold={setHitlThreshold}
+                  />
                 </div>
               </SheetContent>
             </Sheet>
@@ -164,7 +186,7 @@ export function OrchestratorApp() {
             Proyecto #1 · análisis de contenido
           </p>
           <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Cuatro agentes, un orquestador, cero cajas negras.
+            Seis agentes, un orquestador, cero cajas negras.
           </h1>
           <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6 sm:text-base">
             Extrae con evidencia, puntúa SEO, verifica claims sin inventar
@@ -238,11 +260,23 @@ export function OrchestratorApp() {
             </div>
             <LogStream logs={logs} />
             <p className="text-muted-foreground text-xs">
-              Tip: abre Permisos, quita “Verificar hechos” y vuelve a correr.
-              El fact-check debe quedar omitido, no “confirmado”.
+              Tip: en Permisos apaga Verificación y sube el umbral HITL. El
+              log SSE debe mostrar skip + campos con evidencia.
             </p>
           </section>
         </div>
+
+        <section className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
+          <h2 className="mb-3 text-sm font-medium">Panel de permisos</h2>
+          <ControlPanel
+            enabled={enabledAgents}
+            onEnabled={setEnabledAgents}
+            minConfidence={minConfidence}
+            hitlThreshold={hitlThreshold}
+            onMinConfidence={setMinConfidence}
+            onHitlThreshold={setHitlThreshold}
+          />
+        </section>
 
         <section>
           <h2 className="mb-3 text-sm font-medium">Grafo de agentes</h2>

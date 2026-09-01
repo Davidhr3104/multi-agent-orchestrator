@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ResultDashboard } from "@/components/result-dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -66,18 +67,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Tipo de input" value={result.inputKind} />
-        <Stat
-          label="Confianza global"
-          value={`${Math.round(result.overallConfidence * 100)}%`}
-          hint={confidenceTone(result.overallConfidence)}
-        />
-        <Stat
-          label="Checkpoint"
-          value={result.humanRequired ? "humano requerido" : "auto-publicado no"}
-        />
-      </div>
+      <ResultDashboard result={result} />
       <Progress value={Math.round(result.overallConfidence * 100)} />
       {result.sourceUrl ? (
         <p className="text-muted-foreground text-xs break-all">
@@ -212,21 +202,3 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
   );
 }
 
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-3">
-      <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
-        {label}
-      </p>
-      <p className={cn("mt-1 text-lg font-medium capitalize", hint)}>{value}</p>
-    </div>
-  );
-}

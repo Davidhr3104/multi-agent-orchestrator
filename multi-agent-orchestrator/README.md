@@ -31,7 +31,12 @@ npm run dev
 
 Abre [http://127.0.0.1:43147](http://127.0.0.1:43147).
 
-No hace falta API key: el pipeline demo usa heurísticas determinísticas (el mismo contrato que una capa Claude: campos, claims, reviews). Si más adelante agregas `ANTHROPIC_API_KEY`, el punto de extensión está en el orquestador / agentes.
+Opcional (`.env.local`):
+
+- `ANTHROPIC_API_KEY` — narración Claude al consolidar
+- `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — persistir logs SSE (schema en `supabase/schema.sql`)
+
+Sin keys el demo corre igual: logs en el stream, export JSON/PDF local.
 
 ## Demo
 
