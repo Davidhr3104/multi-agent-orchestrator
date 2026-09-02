@@ -1,0 +1,13 @@
+{
+  "name": "helix-monorepo",
+  "private": true,
+  "workspaces": [
+    "multi-agent-orchestrator",
+    "apps/lead-scoring",
+    "packages/helix-core"
+  ],
+  "scripts": {
+    "dev:core": "npm run dev --workspace=helix-orchestrator",
+    "dev:leads": "npm run dev --workspace=helix-lead-scoring"
+  }
+}

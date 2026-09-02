@@ -1,16 +1,20 @@
-# David Herrera — workspace de portafolio
+# Helix monorepo
+
+npm workspaces: Helix Orchestrator (content pipeline) + Helix for Lead Scoring + `@helix/core`.
+
+```bash
+npm install
+npm run dev:core    # http://127.0.0.1:43147
+npm run dev:leads   # http://127.0.0.1:43148
+```
 
 ## Helix Orchestrator (proyecto #1)
 
-Sistema multi-agente de análisis de contenido.
+Sistema multi-agente de análisis de contenido. Detalle: `multi-agent-orchestrator/README.md`.
 
-```bash
-cd multi-agent-orchestrator
-npm install
-npm run dev
-```
+## Helix for Lead Scoring
 
-Demo en [http://127.0.0.1:43147](http://127.0.0.1:43147). Detalle: `multi-agent-orchestrator/README.md`.
+Template vertical: classify/score inbound leads, HITL review, mock CRM. Detalle: `apps/lead-scoring/README.md`.
 
 ## MCP PDF server
 
