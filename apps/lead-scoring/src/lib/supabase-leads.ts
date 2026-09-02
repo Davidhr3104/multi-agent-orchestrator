@@ -65,6 +65,12 @@ function toRow(lead: StoredLead) {
     needs_review: lead.needsReview,
     crm_status: lead.crmStatus,
     engine: lead.engine,
+    enriched_industry: lead.enrichedIndustry ?? null,
+    enriched_size: lead.enrichedSize ?? null,
+    enriched_country: lead.enrichedCountry ?? null,
+    assigned_rep_id: lead.assignedRepId ?? null,
+    competitors: (lead.competitors ?? []).map((c) => c.name),
+    battle_card: lead.battleCard ?? null,
   };
 }
 
@@ -88,6 +94,14 @@ function fromRow(row: Record<string, unknown>): StoredLead {
     needsReview: Boolean(row.needs_review),
     crmStatus: (row.crm_status as StoredLead["crmStatus"]) ?? "not_sent",
     engine: row.engine === "claude" ? "claude" : "heuristic",
+    enrichedIndustry: row.enriched_industry != null ? String(row.enriched_industry) : null,
+    enrichedSize: row.enriched_size != null ? String(row.enriched_size) : null,
+    enrichedCountry: row.enriched_country != null ? String(row.enriched_country) : null,
+    assignedRepId: row.assigned_rep_id != null ? String(row.assigned_rep_id) : undefined,
+    competitors: Array.isArray(row.competitors)
+      ? (row.competitors as string[]).map((name) => ({ name, talkingPoints: [] }))
+      : undefined,
+    battleCard: row.battle_card != null ? String(row.battle_card) : undefined,
   };
 }
 

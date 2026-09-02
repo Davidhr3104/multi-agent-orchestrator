@@ -4,10 +4,13 @@
   "workspaces": [
     "multi-agent-orchestrator",
     "apps/lead-scoring",
+    "apps/legal",
     "packages/helix-core"
   ],
   "scripts": {
     "dev:core": "npm run dev --workspace=helix-orchestrator",
-    "dev:leads": "npm run dev --workspace=helix-lead-scoring"
+    "dev:leads": "npm run dev --workspace=helix-lead-scoring",
+    "dev:legal": "npm run dev --workspace=helix-legal",
+    "test": "npm test --workspace=@helix/core"
   }
 }

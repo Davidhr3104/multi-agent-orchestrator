@@ -1,16 +1,21 @@
 # Helix monorepo
 
-npm workspaces: Helix Orchestrator (content pipeline) + Helix for Lead Scoring + `@helix/core`.
+npm workspaces: Helix Orchestrator + Helix for Leads + Helix for Legal + `@helix/core`.
 
 ```bash
 npm install
 npm run dev:core    # http://127.0.0.1:43147
 npm run dev:leads   # http://127.0.0.1:43148
+npm run dev:legal   # http://127.0.0.1:43149
 ```
 
 ## Helix Orchestrator (proyecto #1)
 
 Sistema multi-agente de análisis de contenido. Detalle: `multi-agent-orchestrator/README.md`.
+
+## Helix for Legal
+
+Template vertical: RFP extract + FACT + match score, HITL, mock corpus. Detalle: `apps/legal/README.md`.
 
 ## Helix for Lead Scoring
 

@@ -1,8 +1,8 @@
 # Helix for Lead Scoring
 
-Reusable Helix vertical: ingest a contact, classify **lead / spam / info**, score 0–100 with confidence, queue mid-confidence rows for human review, mock CRM handoff.
+Reusable Helix vertical: ingest a contact, classify **lead / spam / info**, score 0–100 with confidence, queue mid-confidence rows for human review, send to GoHighLevel (`crm_status: sent`) when `GHL_API_KEY` + `GHL_LOCATION_ID` are set.
 
-Agents reused from Helix core: **EXT** (fields + confidence), **REC** (classification + score), **REV** (HITL). CRM connectors are intentionally out of this MVP.
+Agents reused from Helix core: **EXT** (fields + confidence), **REC** (classification + score), **REV** (HITL).
 
 ## Run locally
 
@@ -26,6 +26,8 @@ Copy `apps/lead-scoring/.env.example` to `.env.local`:
 | `ANTHROPIC_API_KEY` | no | Claude JSON scoring; else heuristic |
 | `NEXT_PUBLIC_SUPABASE_URL` | no | Persist into schema `lead_scoring` |
 | `SUPABASE_SERVICE_ROLE_KEY` | no | Server upsert (bypasses RLS) |
+| `GHL_API_KEY` | no | Private Integration / API token for LeadConnector |
+| `GHL_LOCATION_ID` | no | Location UUID; without both keys, Send to GHL stores `mocked` |
 
 SQL: `supabase/schemas/lead_scoring.sql`. Expose schema `lead_scoring` in the Supabase API settings.
 
@@ -39,7 +41,7 @@ flowchart LR
   REC --> REV[REV HITL]
   REV --> STORE[(memory / Supabase)]
   STORE --> UI[Dashboard]
-  UI --> CRM[Send to CRM mocked]
+  UI --> CRM[Send to GHL sent or mocked]
 ```
 
 ## Deploy (Vercel)

@@ -1,0 +1,72 @@
+{
+  "family": "Helix for [vertical]",
+  "lockup": "helix mark + small industry glyph + HELIX (bold) + FOR [VERTICAL] (regular)",
+  "source": "Premium Brand Family for SaaS Industry Verticals (8 variants)",
+  "note": "Export production PNGs without the mockup caption into this folder. Chat attachments are reference only.",
+  "verticals": [
+    {
+      "id": "leads",
+      "lockup": "HELIX FOR LEADS",
+      "markColor": "blue",
+      "glyph": "funnel",
+      "product": "apps/lead-scoring",
+      "status": "active"
+    },
+    {
+      "id": "inbox",
+      "lockup": "HELIX FOR INBOX",
+      "markColor": "royal-blue",
+      "glyph": "envelope",
+      "product": "Helix Ops — inbox triage / EA",
+      "status": "planned"
+    },
+    {
+      "id": "legal",
+      "lockup": "HELIX FOR LEGAL",
+      "markColor": "navy",
+      "glyph": "scales",
+      "product": "apps/legal",
+      "status": "active"
+    },
+    {
+      "id": "commerce",
+      "lockup": "HELIX FOR COMMERCE",
+      "markColor": "green",
+      "glyph": "shopping-bag",
+      "product": "Helix for E-commerce / Shopify",
+      "status": "planned"
+    },
+    {
+      "id": "marketing",
+      "lockup": "HELIX FOR MARKETING",
+      "markColor": "orange",
+      "glyph": "growth-chart",
+      "product": "Helix Ops / campaigns (later)",
+      "status": "backlog"
+    },
+    {
+      "id": "social",
+      "lockup": "HELIX FOR SOCIAL",
+      "markColor": "magenta",
+      "glyph": "heart",
+      "product": "unassigned",
+      "status": "backlog"
+    },
+    {
+      "id": "edit",
+      "lockup": "HELIX FOR EDIT",
+      "markColor": "violet",
+      "glyph": "scissors",
+      "product": "unassigned",
+      "status": "backlog"
+    },
+    {
+      "id": "video",
+      "lockup": "HELIX FOR VIDEO",
+      "markColor": "crimson",
+      "glyph": "play",
+      "product": "unassigned",
+      "status": "backlog"
+    }
+  ]
+}

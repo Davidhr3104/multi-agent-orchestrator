@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -9,6 +9,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer from "puppeteer";
+import { extractText, getDocumentProxy } from "unpdf";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.join(__dirname, "output");
@@ -64,6 +65,22 @@ const TOOLS = [
         },
       },
       required: ["url", "filename"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "extract_text_from_pdf",
+    description:
+      "Extracts plain text from a PDF previously saved in this server's output folder.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filename: {
+          type: "string",
+          description: "PDF file name inside the output folder.",
+        },
+      },
+      required: ["filename"],
       additionalProperties: false,
     },
   },
@@ -168,6 +185,20 @@ async function generatePdfFromUrl({ url, filename }) {
   return outputPath;
 }
 
+async function extractTextFromPdf({ filename }) {
+  const outputPath = resolveOutputPath(filename);
+  const bytes = new Uint8Array(await readFile(outputPath));
+  const pdf = await getDocumentProxy(bytes);
+  const extracted = await extractText(pdf, { mergePages: true });
+  const text = Array.isArray(extracted.text)
+    ? extracted.text.join("\n\n")
+    : String(extracted.text ?? "");
+  if (!text.trim()) {
+    throw new Error("No extractable text in this PDF.");
+  }
+  return text.trim();
+}
+
 const server = new Server(
   {
     name: "mcp-pdf-server",
@@ -201,6 +232,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return textResult(
         `PDF generated successfully from URL.\nSaved to: ${outputPath}`
       );
+    }
+
+    if (name === "extract_text_from_pdf") {
+      const text = await extractTextFromPdf(args);
+      return textResult(text);
     }
 
     return textResult(`Unknown tool: ${name}`, true);

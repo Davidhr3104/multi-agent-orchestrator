@@ -1,3 +1,4 @@
+import { citeSpan, missingCite } from "../fact";
 import type {
   LeadClassification,
   LeadIngestInput,
@@ -40,21 +41,26 @@ function field(
   label: string,
   value: string,
   confidence: number,
-  evidence: string,
-  hitl: number
+  hitl: number,
+  document: string,
+  needle: string | RegExp | null
 ): ScoredField {
+  const cite = needle == null ? missingCite("no span to cite") : citeSpan(document, needle);
   return {
     key,
     label,
     value,
     confidence: clamp01(confidence),
-    evidence,
-    needsHuman: confidence < hitl,
+    ...cite,
+    needsHuman: confidence < hitl || !cite.verified,
   };
 }
 
-export function scoreLeadHeuristic(input: LeadIngestInput): LeadScoreResult {
-  const hitl = 0.65;
+export function scoreLeadHeuristic(
+  input: LeadIngestInput,
+  opts?: { hitl?: number }
+): LeadScoreResult {
+  const hitl = opts?.hitl ?? 0.65;
   const message = (input.message ?? "").trim();
   const source = (input.source ?? "unknown").trim() || "unknown";
   const spamHint = SPAM_RE.test(message) || SPAM_RE.test(input.email);
@@ -89,46 +95,55 @@ export function scoreLeadHeuristic(input: LeadIngestInput): LeadScoreResult {
           : 0.64
   );
 
+  const doc = [input.name, input.email, source, message, input.budget, input.timeline]
+    .filter(Boolean)
+    .join("\n");
+
   const fields: ScoredField[] = [
     field(
       "contact_quality",
       "Contact quality",
       emailOk(input.email) ? "valid email" : "weak email",
       emailOk(input.email) ? 0.9 : 0.35,
-      input.email,
-      hitl
+      hitl,
+      doc,
+      input.email
     ),
     field(
       "intent",
       "Intent",
       classification,
       classification === "lead" ? 0.72 : 0.8,
-      message.slice(0, 140) || "(empty message)",
-      hitl
+      hitl,
+      doc,
+      message ? message.slice(0, 80) : null
     ),
     field(
       "budget_signal",
       "Budget",
       input.budget?.trim() || "unspecified",
       input.budget ? 0.7 : 0.4,
-      input.budget || "no budget field",
-      hitl
+      hitl,
+      doc,
+      input.budget?.trim() || null
     ),
     field(
       "timeline_signal",
       "Timeline",
       input.timeline?.trim() || "unspecified",
       input.timeline ? 0.7 : 0.4,
-      input.timeline || "no timeline field",
-      hitl
+      hitl,
+      doc,
+      input.timeline?.trim() || null
     ),
     field(
       "source_quality",
       "Source",
       source,
       /unknown/i.test(source) ? 0.45 : 0.75,
-      source,
-      hitl
+      hitl,
+      doc,
+      source === "unknown" ? null : source
     ),
   ];
 

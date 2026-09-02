@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "puppeteer": "^24.31.0"
+    "puppeteer": "^24.31.0",
+    "unpdf": "^1.4.0"
   }
 }

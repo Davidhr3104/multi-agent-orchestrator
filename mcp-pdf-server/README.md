@@ -6,6 +6,7 @@ Servidor MCP local (Node.js ESM) que genera PDFs A4 con Puppeteer.
 
 - `generate_pdf_from_html` — HTML string + filename
 - `generate_pdf_from_url` — URL + filename
+- `extract_text_from_pdf` — plain text from a PDF in `output/`
 
 Los archivos se guardan en `output/`.
 
