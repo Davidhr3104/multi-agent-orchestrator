@@ -1,0 +1,72 @@
+{
+  "provider": "omnivoice",
+  "instruct": "male, middle-aged, low pitch, american accent",
+  "style": "Legal partner scene-aligned 60s",
+  "sample_rate": 24000,
+  "voices": [
+    {
+      "id": "01",
+      "path": "assets/voice/01.wav",
+      "start": 0.0,
+      "duration_s": 3.83,
+      "max_s": 4.8,
+      "text": "Welcome to Hee-lix for Legal. Win more R.F.P.s. Spend less time writing."
+    },
+    {
+      "id": "02",
+      "path": "assets/voice/02.wav",
+      "start": 5.0,
+      "duration_s": 4.23,
+      "max_s": 6.7,
+      "text": "Upload any R.F.P. document. Drop it into the desk and Hee-lix starts the intake."
+    },
+    {
+      "id": "03",
+      "path": "assets/voice/03.wav",
+      "start": 12.0,
+      "duration_s": 5.27,
+      "max_s": 7.7,
+      "text": "The multi-agent pipeline runs. Extractor, fact-checker, recommender, and reviewer \u2014 in sequence."
+    },
+    {
+      "id": "04",
+      "path": "assets/voice/04.wav",
+      "start": 20.0,
+      "duration_s": 8.2,
+      "max_s": 9.7,
+      "text": "Instant compliance and fit. Compliance ninety-four percent. Match eighty-seven percent. Deadline: twenty twenty-six, September eighteenth."
+    },
+    {
+      "id": "05",
+      "path": "assets/voice/05.wav",
+      "start": 30.0,
+      "duration_s": 5.79,
+      "max_s": 9.7,
+      "text": "Generate a draft proposal in minutes. Executive summary, methodology, and pricing \u2014 ready for partner review."
+    },
+    {
+      "id": "06",
+      "path": "assets/voice/06.wav",
+      "start": 40.0,
+      "duration_s": 5.37,
+      "max_s": 7.7,
+      "text": "Automatic conflict detection. Plaintiff, defendant, and jurisdiction clear before you commit."
+    },
+    {
+      "id": "07",
+      "path": "assets/voice/07.wav",
+      "start": 48.0,
+      "duration_s": 6.09,
+      "max_s": 6.7,
+      "text": "Convert to a matter with one confirm. Matter number twenty twenty-six dash zero one four two \u2014 logged and ready."
+    },
+    {
+      "id": "08",
+      "path": "assets/voice/08.wav",
+      "start": 55.0,
+      "duration_s": 3.85,
+      "max_s": 4.7,
+      "text": "That is Hee-lix for Legal. R.F.P. intelligence for modern law firms."
+    }
+  ]
+}

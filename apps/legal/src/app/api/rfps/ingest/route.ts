@@ -1,5 +1,6 @@
 import { encodeSse, parseRfpIngest, runRfpPipeline, type RfpStreamEvent } from "@helix/core";
-import { getClientProfile, saveRfp } from "@/lib/store";
+import { getClientProfile, recordAudit, saveRfp, checkAndStoreConflict, checkAndStorePricing } from "@/lib/store";
+import { formatUsdNumber } from "@/lib/money";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,33 @@ export async function POST(req: Request) {
       try {
         const rfp = await runRfpPipeline(parsed, send);
         await saveRfp(rfp);
+        const coi = await checkAndStoreConflict(rfp);
+        send({
+          type: "log",
+          log: {
+            id: `coi-${rfp.id}`,
+            ts: new Date().toISOString(),
+            agent: "reviewer",
+            level: coi.verdict === "GO" ? "success" : "warn",
+            message: `Conflict check ${coi.verdict} (${coi.score}) · ${coi.why}`,
+          },
+        });
+        const quote = await checkAndStorePricing(rfp);
+        send({
+          type: "log",
+          log: {
+            id: `price-${rfp.id}`,
+            ts: new Date().toISOString(),
+            agent: "reviewer",
+            level: "success",
+            message: `Smart price ${quote.practiceArea} target ${formatUsdNumber(quote.target)} (${quote.estimatedHours}h)`,
+          },
+        });
+        await recordAudit(
+          "ops",
+          "ingest",
+          `${rfp.title} · ${rfp.method} · ${rfp.tier} · COI ${coi.verdict} · bid ${quote.target}`
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         send({ type: "error", message });

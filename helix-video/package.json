@@ -1,0 +1,43 @@
+{
+  "name": "helix-video",
+  "version": "1.0.0",
+  "description": "My Remotion video",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/captions": "4.0.520",
+    "@remotion/cli": "4.0.520",
+    "@remotion/media": "4.0.520",
+    "@remotion/tailwind-v4": "4.0.520",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.520",
+    "tailwindcss": "4.0.0"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.520",
+    "@types/node": "^26.4.1",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "tsx": "^4.23.13",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "generate-audio": "tsx scripts/generate-audio.ts",
+    "generate-subs": "tsx scripts/generate-subs.ts",
+    "generate-inbox-subs": "tsx scripts/generate-inbox-subs.ts",
+    "generate-commerce-subs": "tsx scripts/generate-commerce-subs.ts",
+    "generate-legal-subs": "tsx scripts/generate-legal-subs.ts",
+    "pull-plates": "tsx scripts/pull-hyperframes-plate.ts"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

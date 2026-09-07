@@ -152,6 +152,8 @@ export const HOW_TO_USE_LEGAL: HowToUseGuide = {
   title: "How to use",
   overview:
     "Turn messy RFPs into cited extracted fields, Go/No-Go, COI checks, pricing posture, and proposal packs with human oversight.",
+  videoSrc: "/help/helix-legal-howto.mp4",
+  videoTitle: "Product walkthrough (~60s)",
   steps: [
     {
       title: "1. Start on the Dashboard",
