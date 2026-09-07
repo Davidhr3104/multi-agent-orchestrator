@@ -17,8 +17,10 @@
       "lockup": "HELIX FOR INBOX",
       "markColor": "royal-blue",
       "glyph": "envelope",
-      "product": "Helix Ops — inbox triage / EA",
-      "status": "planned"
+      "product": "apps/inbox",
+      "status": "active",
+      "mark": "assets/logos/helix-for-inbox-mark.png",
+      "wordmark": "assets/logos/helix-for-inbox-wordmark.png"
     },
     {
       "id": "legal",
