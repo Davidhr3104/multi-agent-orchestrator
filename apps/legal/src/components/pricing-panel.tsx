@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { StoredRfp } from "@helix/core";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,31 +28,39 @@ function fitClass(fit: PricingQuote["vsBudget"]) {
   return "border-white/15 text-slate-400";
 }
 
-export function PricingPanel({ rfpId }: { rfpId: string }) {
-  const [quote, setQuote] = useState<PricingQuote | null>(null);
+export function PricingPanel({
+  rfpId,
+  rfp,
+  initialQuote,
+}: {
+  rfpId: string;
+  rfp?: StoredRfp;
+  initialQuote?: PricingQuote | null;
+}) {
+  const [quote, setQuote] = useState<PricingQuote | null>(initialQuote ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [practiceArea, setPracticeArea] = useState<string>("Healthcare");
-  const [complexity, setComplexity] = useState("6");
-  const [hours, setHours] = useState("120");
+  const [practiceArea, setPracticeArea] = useState<string>(initialQuote?.practiceArea ?? "Healthcare");
+  const [complexity, setComplexity] = useState(String(initialQuote?.complexityScore ?? 6));
+  const [hours, setHours] = useState(String(initialQuote?.estimatedHours ?? 120));
 
   async function load(refresh: boolean, useForm = false) {
     setBusy(true);
-    setError(null);
     try {
       const res = await fetch(`/api/rfps/${rfpId}/pricing`, {
         method: refresh ? "POST" : "GET",
         headers: refresh ? { "Content-Type": "application/json" } : undefined,
         body: refresh
-          ? JSON.stringify(
-              useForm
+          ? JSON.stringify({
+              rfp,
+              ...(useForm
                 ? {
                     practiceArea,
                     complexityScore: Number(complexity),
                     estimatedHours: Number(hours),
                   }
-                : {}
-            )
+                : {}),
+            })
           : undefined,
       });
       const data = (await res.json()) as { quote?: PricingQuote; error?: string };
@@ -60,7 +69,9 @@ export function PricingPanel({ rfpId }: { rfpId: string }) {
       setPracticeArea(data.quote.practiceArea);
       setComplexity(String(data.quote.complexityScore));
       setHours(String(data.quote.estimatedHours));
+      setError(null);
     } catch (err) {
+      if (!quote && initialQuote) setQuote(initialQuote);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
@@ -68,6 +79,8 @@ export function PricingPanel({ rfpId }: { rfpId: string }) {
   }
 
   useEffect(() => {
+    setQuote(initialQuote ?? null);
+    setError(null);
     void load(false).then(() => void load(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the open RFP changes
   }, [rfpId]);
@@ -77,8 +90,19 @@ export function PricingPanel({ rfpId }: { rfpId: string }) {
       <Alert className="border-amber-500/30">
         <AlertTitle className="text-amber-200">Pricing fallback</AlertTitle>
         <AlertDescription>Could not reach the calculator ({error}).</AlertDescription>
-        <Button size="sm" variant="outline" className="mt-3" onClick={() => void load(true, true)}>
-          Retry
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-3"
+          disabled={busy}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void load(true, true);
+          }}
+        >
+          {busy ? "Pricing…" : "Retry"}
         </Button>
       </Alert>
     );

@@ -132,6 +132,7 @@ export function LegalDashboard() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<StoredRfp | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<PipelineLog[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -176,14 +177,27 @@ export function LegalDashboard() {
     const rfp = rfps.find((r) => r.id === openId);
     if (!rfp) return;
     const tab = searchParams.get("tab") as SheetTab | null;
-    setSelected(rfp);
-    if (tab && ["overview", "deadlines", "compliance", "compete", "proposal", "compare", "team", "comms", "conflicts", "pricing"].includes(tab)) {
-      setSheetTab(tab);
-    } else {
-      setSheetTab("overview");
-    }
+    const nextTab =
+      tab &&
+      ["overview", "deadlines", "compliance", "compete", "proposal", "compare", "team", "comms", "conflicts", "pricing"].includes(
+        tab
+      )
+        ? tab
+        : "overview";
+    openRfp(rfp, nextTab);
     router.replace("/", { scroll: false });
   }, [mounted, rfps, searchParams, router]);
+
+  function openRfp(rfp: StoredRfp, tab: SheetTab = "overview") {
+    setSheetTab(tab);
+    setSelected(rfp);
+    setSheetOpen(true);
+  }
+
+  function closeRfp() {
+    setSheetOpen(false);
+    setSelected(null);
+  }
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -290,8 +304,7 @@ export function LegalDashboard() {
           if (event.type === "log") setLogs((prev) => [...prev, event.log]);
           if (event.type === "result") {
             setRfps((prev) => [event.rfp, ...prev.filter((r) => r.id !== event.rfp.id)]);
-            setSelected(event.rfp);
-            setSheetTab("conflicts");
+            openRfp(event.rfp, "conflicts");
           }
           if (event.type === "error") setError(event.message);
         }
@@ -574,8 +587,7 @@ export function LegalDashboard() {
               className="btn-tactile mt-3 flex h-[28px] w-full items-center justify-center gap-1 rounded-[4px] bg-[#F59E0B] px-3 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-[#D97706] disabled:opacity-40"
               onClick={() => {
                 if (!firstReview) return;
-                setSelected(firstReview);
-                setSheetTab("overview");
+                openRfp(firstReview, "overview");
               }}
             >
               <span>Review now</span>
@@ -687,10 +699,7 @@ export function LegalDashboard() {
                         <tr
                           key={rfp.id}
                           className="table-row-interactive group relative cursor-pointer border-b border-[#1F2937]"
-                          onClick={() => {
-                            setSelected(rfp);
-                            setSheetTab("overview");
-                          }}
+                          onClick={() => openRfp(rfp, "overview")}
                         >
                           <td className="relative max-w-[280px] min-w-0 px-3 py-2">
                             <div
@@ -734,9 +743,9 @@ export function LegalDashboard() {
                                     coiChipClass(coi.verdict)
                                   )}
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
-                                    setSelected(rfp);
-                                    setSheetTab("conflicts");
+                                    openRfp(rfp, "conflicts");
                                   }}
                                 >
                                   COI {coi.verdict}
@@ -747,9 +756,9 @@ export function LegalDashboard() {
                                   type="button"
                                   className="font-mono-numbers rounded-[3px] border border-[#374151] bg-[#1F2937] px-1.5 py-[2px] leading-none text-[#9CA3AF]"
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
-                                    setSelected(rfp);
-                                    setSheetTab("pricing");
+                                    openRfp(rfp, "pricing");
                                   }}
                                 >
                                   Bid {formatUsdNumber(quote.target)}
@@ -802,9 +811,10 @@ export function LegalDashboard() {
                                   type="button"
                                   className="btn-tactile rounded-[4px] p-1 hover:bg-[#1F2937] hover:text-[#F3F4F6]"
                                   title="View"
-                                  onClick={() => {
-                                    setSelected(rfp);
-                                    setSheetTab("overview");
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openRfp(rfp, "overview");
                                   }}
                                 >
                                   <Eye className="size-3" />
@@ -813,9 +823,10 @@ export function LegalDashboard() {
                                   type="button"
                                   className="btn-tactile rounded-[4px] p-1 hover:bg-[#1F2937] hover:text-[#F3F4F6]"
                                   title="Edit"
-                                  onClick={() => {
-                                    setSelected(rfp);
-                                    setSheetTab("overview");
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openRfp(rfp, "overview");
                                   }}
                                 >
                                   <Pencil className="size-3" />
@@ -824,7 +835,11 @@ export function LegalDashboard() {
                                   type="button"
                                   className="btn-tactile rounded-[4px] p-1 hover:bg-[#1F2937] hover:text-[#F3F4F6]"
                                   title="Download"
-                                  onClick={() => exportRfp(rfp)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    exportRfp(rfp);
+                                  }}
                                 >
                                   <Download className="size-3" />
                                 </button>
@@ -832,9 +847,10 @@ export function LegalDashboard() {
                               <button
                                 type="button"
                                 className="btn-tactile rounded-[3px] border border-[#F59E0B] px-2 py-[3px] text-[10px] leading-none font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0B0F19]"
-                                onClick={() => {
-                                  setSelected(rfp);
-                                  setSheetTab("overview");
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openRfp(rfp, "overview");
                                 }}
                               >
                                 Review
@@ -1196,9 +1212,9 @@ export function LegalDashboard() {
 
 
       <Sheet
-        open={Boolean(selected)}
+        open={sheetOpen && Boolean(selected)}
         onOpenChange={(open) => {
-          if (!open) setSelected(null);
+          if (!open) closeRfp();
         }}
       >
         <SheetContent className="w-full border-gold-500/20 bg-navy-850 sm:max-w-lg">
@@ -1640,8 +1656,12 @@ function RfpSheet({
             </p>
           </div>
         ) : null}
-        {tab === "conflicts" ? <ConflictPanel rfpId={selected.id} /> : null}
-        {tab === "pricing" ? <PricingPanel rfpId={selected.id} /> : null}
+        {tab === "conflicts" ? (
+          <ConflictPanel rfpId={selected.id} rfp={selected} initialReport={conflict ?? null} />
+        ) : null}
+        {tab === "pricing" ? (
+          <PricingPanel rfpId={selected.id} rfp={selected} initialQuote={quote ?? null} />
+        ) : null}
       </div>
       <SheetFooter>
         {selected.needsReview ? (

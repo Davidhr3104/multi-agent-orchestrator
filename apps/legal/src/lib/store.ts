@@ -22,6 +22,9 @@ import {
 
 export type { AuditEvent } from "@/lib/audit-types";
 
+export type CommKind = "email" | "call" | "meeting" | "note";
+export type CommEvent = { id: string; at: string; kind: CommKind; text: string };
+
 let clientProfile = DEFAULT_LEGAL_PROFILE;
 
 export function getClientProfile(): string {
@@ -36,17 +39,31 @@ export function setClientProfile(next: string): string | null {
   return clientProfile;
 }
 
-const memory = new Map<string, StoredRfp>();
-let seeded = false;
-let remoteBootstrapped = false;
+type LegalDesk = {
+  memory: Map<string, StoredRfp>;
+  seeded: boolean;
+  remoteBootstrapped: boolean;
+  comms: Map<string, CommEvent[]>;
+  audit: AuditEvent[];
+  conflicts: Map<string, ConflictReport>;
+  quotes: Map<string, PricingQuote>;
+};
 
-export type CommKind = "email" | "call" | "meeting" | "note";
-export type CommEvent = { id: string; at: string; kind: CommKind; text: string };
-
-const comms = new Map<string, CommEvent[]>();
-const audit: AuditEvent[] = [];
-const conflicts = new Map<string, ConflictReport>();
-const quotes = new Map<string, PricingQuote>();
+function desk(): LegalDesk {
+  const g = globalThis as typeof globalThis & { __helixLegalDesk?: LegalDesk };
+  if (!g.__helixLegalDesk) {
+    g.__helixLegalDesk = {
+      memory: new Map(),
+      seeded: false,
+      remoteBootstrapped: false,
+      comms: new Map(),
+      audit: [],
+      conflicts: new Map(),
+      quotes: new Map(),
+    };
+  }
+  return g.__helixLegalDesk;
+}
 
 const SAMPLES: RfpIngestInput[] = [
   {
@@ -72,8 +89,9 @@ const SAMPLES: RfpIngestInput[] = [
 ];
 
 function seedMemory() {
-  if (seeded) return;
-  seeded = true;
+  const d = desk();
+  if (d.seeded) return;
+  d.seeded = true;
   SAMPLES.forEach((sample, i) => {
     const scored = scoreRfpHeuristic(sample);
     const rfp: StoredRfp = {
@@ -87,9 +105,9 @@ function seedMemory() {
       clientProfile: sample.clientProfile ?? getClientProfile(),
       corpusStatus: "not_asked",
     };
-    memory.set(rfp.id, rfp);
+    d.memory.set(rfp.id, rfp);
   });
-  comms.set("seed-Medicalrecord", [
+  d.comms.set("seed-Medicalrecord", [
     {
       id: "c1",
       at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
@@ -116,6 +134,7 @@ function seedMemory() {
 }
 
 function pushAuditSync(actor: string, action: string, detail: string): AuditEvent {
+  const d = desk();
   const event: AuditEvent = {
     id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     at: new Date().toISOString(),
@@ -123,8 +142,8 @@ function pushAuditSync(actor: string, action: string, detail: string): AuditEven
     action,
     detail,
   };
-  audit.unshift(event);
-  if (audit.length > 400) audit.length = 400;
+  d.audit.unshift(event);
+  if (d.audit.length > 400) d.audit.length = 400;
   return event;
 }
 
@@ -136,58 +155,58 @@ async function pushAudit(actor: string, action: string, detail: string): Promise
 
 /** When Supabase is empty, push memory seed once so restarts keep the desk. */
 async function hydrateFromRemote(): Promise<void> {
-  if (remoteBootstrapped || !isSupabaseConfigured()) return;
+  const d = desk();
+  if (d.remoteBootstrapped || !isSupabaseConfigured()) return;
   seedMemory();
 
   const remoteRfps = await supabaseListRfps();
   if (remoteRfps === null) return; // schema missing / network — retry next call
 
-  remoteBootstrapped = true;
+  d.remoteBootstrapped = true;
 
   if (remoteRfps.length > 0) {
-    memory.clear();
-    for (const rfp of remoteRfps) memory.set(rfp.id, rfp);
+    d.memory.clear();
+    for (const rfp of remoteRfps) d.memory.set(rfp.id, rfp);
   } else {
-    await supabaseUpsertRfps([...memory.values()]);
+    await supabaseUpsertRfps([...d.memory.values()]);
   }
 
   const remoteAudit = await supabaseListAudit();
   if (remoteAudit === null) return;
 
   if (remoteAudit.length > 0) {
-    audit.length = 0;
-    audit.push(...remoteAudit);
-  } else if (audit.length > 0) {
-    await supabaseUpsertAudits([...audit]);
+    d.audit.length = 0;
+    d.audit.push(...remoteAudit);
+  } else if (d.audit.length > 0) {
+    await supabaseUpsertAudits([...d.audit]);
   }
 }
 
 export async function listRfps(): Promise<StoredRfp[]> {
+  const d = desk();
   seedMemory();
   await hydrateFromRemote();
-  const remote = await supabaseListRfps();
-  if (remote && remote.length > 0) {
-    for (const rfp of remote) memory.set(rfp.id, rfp);
-    return remote;
-  }
-  return [...memory.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Do not re-pull Supabase on every list — that can clobber in-memory desk state
+  // when upserts lag or fail on serverless isolates.
+  return [...d.memory.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function saveRfp(rfp: StoredRfp): Promise<StoredRfp> {
   seedMemory();
-  memory.set(rfp.id, rfp);
+  desk().memory.set(rfp.id, rfp);
   await supabaseUpsertRfp(rfp);
   return rfp;
 }
 
 export async function getRfp(id: string): Promise<StoredRfp | null> {
+  const d = desk();
   seedMemory();
-  if (memory.has(id)) return memory.get(id) ?? null;
+  if (d.memory.has(id)) return d.memory.get(id) ?? null;
   await hydrateFromRemote();
-  if (memory.has(id)) return memory.get(id) ?? null;
+  if (d.memory.has(id)) return d.memory.get(id) ?? null;
   const remote = await supabaseGetRfp(id);
   if (remote) {
-    memory.set(remote.id, remote);
+    d.memory.set(remote.id, remote);
     return remote;
   }
   return null;
@@ -206,7 +225,7 @@ export async function patchRfp(
 export async function listComms(id: string): Promise<CommEvent[]> {
   seedMemory();
   await hydrateFromRemote();
-  return [...(comms.get(id) ?? [])].sort((a, b) => b.at.localeCompare(a.at));
+  return [...(desk().comms.get(id) ?? [])].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 export async function addComm(id: string, kind: CommKind, text: string): Promise<CommEvent[] | null> {
@@ -218,21 +237,23 @@ export async function addComm(id: string, kind: CommKind, text: string): Promise
     kind,
     text: text.trim() || "Logged contact",
   };
-  comms.set(id, [event, ...(comms.get(id) ?? [])]);
+  const d = desk();
+  d.comms.set(id, [event, ...(d.comms.get(id) ?? [])]);
   await pushAudit("ops", "comms", `${kind} on ${rfp.title}`);
   return listComms(id);
 }
 
 export async function listAudit(): Promise<AuditEvent[]> {
+  const d = desk();
   seedMemory();
   await hydrateFromRemote();
   const remote = await supabaseListAudit();
   if (remote && remote.length > 0) {
-    audit.length = 0;
-    audit.push(...remote);
+    d.audit.length = 0;
+    d.audit.push(...remote);
     return remote;
   }
-  return [...audit];
+  return [...d.audit];
 }
 
 export async function recordAudit(actor: string, action: string, detail: string): Promise<AuditEvent> {
@@ -242,22 +263,23 @@ export async function recordAudit(actor: string, action: string, detail: string)
 }
 
 export function getCachedConflict(rfpId: string): ConflictReport | undefined {
-  return conflicts.get(rfpId);
+  return desk().conflicts.get(rfpId);
 }
 
 export async function cacheHeuristicConflict(rfp: StoredRfp): Promise<ConflictReport> {
   seedMemory();
-  const existing = conflicts.get(rfp.id);
+  const d = desk();
+  const existing = d.conflicts.get(rfp.id);
   if (existing) return existing;
   const report = await heuristicConflictReport(rfp);
-  conflicts.set(rfp.id, report);
+  d.conflicts.set(rfp.id, report);
   return report;
 }
 
 export async function checkAndStoreConflict(rfp: StoredRfp): Promise<ConflictReport> {
   seedMemory();
   const report = await runConflictCheck(rfp);
-  conflicts.set(rfp.id, report);
+  desk().conflicts.set(rfp.id, report);
   await pushAudit("ethics", "coi", `${rfp.title}: ${report.verdict} (${report.score}) via ${report.engine}`);
   return report;
 }
@@ -265,32 +287,34 @@ export async function checkAndStoreConflict(rfp: StoredRfp): Promise<ConflictRep
 export async function conflictSummaries(): Promise<Record<string, ConflictReport>> {
   seedMemory();
   await hydrateFromRemote();
+  const d = desk();
   const rfps = await listRfps();
   for (const rfp of rfps) {
-    if (!conflicts.has(rfp.id)) {
-      conflicts.set(rfp.id, await heuristicConflictReport(rfp));
+    if (!d.conflicts.has(rfp.id)) {
+      d.conflicts.set(rfp.id, await heuristicConflictReport(rfp));
     }
   }
-  return Object.fromEntries(conflicts);
+  return Object.fromEntries(d.conflicts);
 }
 
 export function getCachedPricing(rfpId: string): PricingQuote | undefined {
-  return quotes.get(rfpId);
+  return desk().quotes.get(rfpId);
 }
 
 export async function cacheHeuristicPricing(rfp: StoredRfp): Promise<PricingQuote> {
   seedMemory();
-  const existing = quotes.get(rfp.id);
+  const d = desk();
+  const existing = d.quotes.get(rfp.id);
   if (existing) return existing;
   const quote = await heuristicPricingQuote(rfp);
-  quotes.set(rfp.id, quote);
+  d.quotes.set(rfp.id, quote);
   return quote;
 }
 
 export async function checkAndStorePricing(rfp: StoredRfp, overrides?: PricingOverrides): Promise<PricingQuote> {
   seedMemory();
   const quote = await runPricingQuote(rfp, overrides);
-  quotes.set(rfp.id, quote);
+  desk().quotes.set(rfp.id, quote);
   await pushAudit("pricing", "quote", `${rfp.title}: ${quote.target} ${quote.practiceArea} via ${quote.engine}`);
   return quote;
 }
@@ -298,11 +322,12 @@ export async function checkAndStorePricing(rfp: StoredRfp, overrides?: PricingOv
 export async function pricingSummaries(): Promise<Record<string, PricingQuote>> {
   seedMemory();
   await hydrateFromRemote();
+  const d = desk();
   const rfps = await listRfps();
   for (const rfp of rfps) {
-    if (!quotes.has(rfp.id)) {
-      quotes.set(rfp.id, await heuristicPricingQuote(rfp));
+    if (!d.quotes.has(rfp.id)) {
+      d.quotes.set(rfp.id, await heuristicPricingQuote(rfp));
     }
   }
-  return Object.fromEntries(quotes);
+  return Object.fromEntries(d.quotes);
 }

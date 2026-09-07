@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { StoredRfp } from "@helix/core";
 import type { ConflictReport } from "@/lib/conflict-types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -16,20 +17,34 @@ function verdictClass(verdict: ConflictReport["verdict"]) {
   return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
 }
 
-export function ConflictPanel({ rfpId }: { rfpId: string }) {
-  const [report, setReport] = useState<ConflictReport | null>(null);
+export function ConflictPanel({
+  rfpId,
+  rfp,
+  initialReport,
+}: {
+  rfpId: string;
+  rfp?: StoredRfp;
+  initialReport?: ConflictReport | null;
+}) {
+  const [report, setReport] = useState<ConflictReport | null>(initialReport ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load(refresh: boolean) {
     setBusy(true);
-    setError(null);
     try {
-      const res = await fetch(`/api/rfps/${rfpId}/conflicts`, { method: refresh ? "POST" : "GET" });
+      const res = await fetch(`/api/rfps/${rfpId}/conflicts`, {
+        method: refresh ? "POST" : "GET",
+        headers: refresh ? { "Content-Type": "application/json" } : undefined,
+        body: refresh && rfp ? JSON.stringify({ rfp }) : undefined,
+      });
       const data = (await res.json()) as { report?: ConflictReport; error?: string };
       if (!res.ok || !data.report) throw new Error(data.error || `HTTP ${res.status}`);
       setReport(data.report);
+      setError(null);
     } catch (err) {
+      // Keep any desk-level COI we already have so the tab never blanks out.
+      if (!report && initialReport) setReport(initialReport);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
@@ -37,6 +52,8 @@ export function ConflictPanel({ rfpId }: { rfpId: string }) {
   }
 
   useEffect(() => {
+    setReport(initialReport ?? null);
+    setError(null);
     void load(false).then(() => void load(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the open RFP changes
   }, [rfpId]);
@@ -48,8 +65,19 @@ export function ConflictPanel({ rfpId }: { rfpId: string }) {
         <AlertDescription>
           Could not reach the checker ({error}). Re-open this RFP or run a heuristic refresh.
         </AlertDescription>
-        <Button size="sm" variant="outline" className="mt-3" onClick={() => void load(true)}>
-          Retry
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-3"
+          disabled={busy}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void load(true);
+          }}
+        >
+          {busy ? "Checking…" : "Retry"}
         </Button>
       </Alert>
     );
@@ -61,6 +89,28 @@ export function ConflictPanel({ rfpId }: { rfpId: string }) {
 
   return (
     <div className="space-y-3">
+      {error ? (
+        <Alert className="border-amber-500/30">
+          <AlertTitle className="text-amber-200">Live refresh failed</AlertTitle>
+          <AlertDescription>
+            Showing the last known COI ({error}). Retry keeps this sheet open.
+          </AlertDescription>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            disabled={busy}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void load(true);
+            }}
+          >
+            {busy ? "Checking…" : "Retry"}
+          </Button>
+        </Alert>
+      ) : null}
       {report.claudeFailed ? (
         <Alert className="border-amber-500/30">
           <AlertTitle className="text-amber-200">Claude unavailable</AlertTitle>
@@ -112,7 +162,17 @@ export function ConflictPanel({ rfpId }: { rfpId: string }) {
           )}
         </ul>
       </ScrollArea>
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => void load(true)}>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          void load(true);
+        }}
+      >
         {busy ? "Checking…" : "Re-run checker"}
       </Button>
     </div>
