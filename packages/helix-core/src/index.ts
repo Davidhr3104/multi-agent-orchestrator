@@ -23,12 +23,38 @@ export { leadScoringPrompt } from "./lead/prompts";
 export { scoreRfpHeuristic, profileOverlap } from "./rfp/heuristic";
 export { parseRfpIngest, runRfpPipeline } from "./rfp/pipeline";
 export { DEFAULT_LEGAL_PROFILE, rfpScoringPrompt } from "./rfp/prompts";
+export { scoreFraudHeuristic } from "./commerce/fraudHeuristic";
+export { predictInventoryHeuristic } from "./commerce/inventoryHeuristic";
+export { classifyInquiryHeuristic } from "./commerce/inquiryHeuristic";
+export {
+  runFraudScoring,
+  runInventoryPrediction,
+  runInquiryClassification,
+} from "./commerce/pipeline";
+export type {
+  AiActionLog,
+  FraudScoreResult,
+  InquiryClassificationResult,
+  InquiryInput,
+  InquiryType,
+  InventoryPredictionResult,
+  OrderInput,
+  OrderItem,
+  ProductInput,
+  RiskLevel,
+  Sentiment,
+  ShippingAddress,
+  StoredInquiry,
+  StoredOrder,
+  StoredProduct,
+} from "./commerce/types";
 export type {
   AgentDecision,
   AgentId,
   AgentRun,
   CorpusStatus,
   CrmStatus,
+  DomainEnrichmentPayload,
   LeadClassification,
   LeadEmit,
   LeadEnrichment,

@@ -5,12 +5,21 @@
     "multi-agent-orchestrator",
     "apps/lead-scoring",
     "apps/legal",
-    "packages/helix-core"
+    "apps/inbox",
+    "apps/commerce",
+    "packages/helix-core",
+    "packages/helix-help"
   ],
   "scripts": {
     "dev:core": "npm run dev --workspace=helix-orchestrator",
     "dev:leads": "npm run dev --workspace=helix-lead-scoring",
     "dev:legal": "npm run dev --workspace=helix-legal",
+    "dev:inbox": "npm run dev --workspace=helix-inbox",
+    "dev:commerce": "npm run dev --workspace=helix-commerce",
     "test": "npm test --workspace=@helix/core"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "playwright": "^1.62.1"
   }
 }
