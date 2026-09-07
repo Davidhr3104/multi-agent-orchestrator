@@ -4,18 +4,28 @@ import {
   patchMessage,
   regenerateSmartReply,
   snoozeThread,
+  applyDeskPatches,
 } from "@/lib/store";
+import {
+  jsonWithDeskCookie,
+  patchFromThread,
+  readDeskCookie,
+  upsertDeskPatch,
+} from "@/lib/desk-state-cookie";
 
 export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+  const state = readDeskCookie(req);
+  applyDeskPatches(state.patches);
   const message = await getMessage(id);
   if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+  const patched = state.patches[id] ? { ...message, ...state.patches[id] } : message;
   const history = await listThreadMessages(id);
-  return Response.json({ message, history });
+  return Response.json({ message: patched, history });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
@@ -34,15 +44,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
     isRead?: boolean;
   };
 
+  let state = readDeskCookie(req);
+  applyDeskPatches(state.patches);
+
   try {
     if (payload.action === "approve") {
+      // Approve draft = send/handoff → routed (product copy: appears on Routed)
       const message = await patchMessage(
         id,
-        { status: "archived", needsReview: false, isRead: true },
+        { status: "routed", needsReview: false, isRead: true },
         { actionType: "approve", humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "route") {
       const message = await patchMessage(
@@ -51,7 +66,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { actionType: "route", humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "block") {
       const message = await patchMessage(
@@ -66,7 +82,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { actionType: "block", humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "unblock") {
       const message = await patchMessage(
@@ -80,17 +97,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { actionType: "unblock", humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "snooze") {
       const message = await snoozeThread(id, payload.until);
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "smart_reply") {
       const message = await regenerateSmartReply(id);
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "star") {
       const current = await getMessage(id);
@@ -100,7 +120,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { isStarred: !current.isStarred },
         { actionType: "star", humanOverride: true }
       );
-      return Response.json({ message });
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "read") {
       const message = await patchMessage(
@@ -109,7 +131,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { actionType: "read", humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     if (payload.draftReply != null) {
       const message = await patchMessage(
@@ -118,7 +141,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         { actionType: "edit_draft", humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
-      return Response.json({ message });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
     }
     return Response.json({ error: "Unknown action" }, { status: 400 });
   } catch (err) {

@@ -1,10 +1,19 @@
-import { ingestMessage, listMessages, wakeSnoozed } from "@/lib/store";
+import { ingestMessage, listMessages, wakeSnoozed, applyDeskPatches } from "@/lib/store";
+import {
+  applyThreadPatches,
+  jsonWithDeskCookie,
+  patchFromThread,
+  readDeskCookie,
+  upsertDeskPatch,
+} from "@/lib/desk-state-cookie";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const state = readDeskCookie(req);
+  applyDeskPatches(state.patches);
   await wakeSnoozed();
-  const messages = await listMessages();
+  const messages = applyThreadPatches(await listMessages(), state.patches);
   return Response.json({ messages });
 }
 
@@ -29,8 +38,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "fromName, fromEmail, subject, body required" }, { status: 400 });
   }
   try {
+    let state = readDeskCookie(req);
+    applyDeskPatches(state.patches);
     const message = await ingestMessage({ fromName, fromEmail, subject, body: text });
-    return Response.json({ message });
+    state = upsertDeskPatch(state, message.id, patchFromThread(message));
+    return jsonWithDeskCookie({ message }, state);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return Response.json({ error: msg }, { status: 500 });

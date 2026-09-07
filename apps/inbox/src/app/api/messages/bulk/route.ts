@@ -1,4 +1,10 @@
-import { patchMessage } from "@/lib/store";
+import { patchMessage, applyDeskPatches } from "@/lib/store";
+import {
+  jsonWithDeskCookie,
+  patchFromThread,
+  readDeskCookie,
+  upsertDeskPatch,
+} from "@/lib/desk-state-cookie";
 
 export const runtime = "nodejs";
 
@@ -16,35 +22,48 @@ export async function POST(req: Request) {
     return Response.json({ error: "ids and action required" }, { status: 400 });
   }
 
+  let state = readDeskCookie(req);
+  applyDeskPatches(state.patches);
+
   const results = [];
   for (const id of ids) {
     if (action === "route") {
-      results.push(
-        await patchMessage(id, { status: "routed", needsReview: false, isRead: true }, {
-          actionType: "bulk_route",
-          humanOverride: true,
-        })
-      );
+      const message = await patchMessage(id, { status: "routed", needsReview: false, isRead: true }, {
+        actionType: "bulk_route",
+        humanOverride: true,
+      });
+      if (message) {
+        state = upsertDeskPatch(state, id, patchFromThread(message));
+        results.push(message);
+      }
     } else if (action === "block") {
-      results.push(
-        await patchMessage(
-          id,
-          { status: "blocked", needsReview: false, category: "spam", routeTo: "Spam", isRead: true },
-          { actionType: "bulk_block", humanOverride: true }
-        )
+      const message = await patchMessage(
+        id,
+        { status: "blocked", needsReview: false, category: "spam", routeTo: "Spam", isRead: true },
+        { actionType: "bulk_block", humanOverride: true }
       );
+      if (message) {
+        state = upsertDeskPatch(state, id, patchFromThread(message));
+        results.push(message);
+      }
     } else if (action === "approve") {
-      results.push(
-        await patchMessage(id, { status: "archived", needsReview: false, isRead: true }, {
-          actionType: "bulk_approve",
-          humanOverride: true,
-        })
-      );
+      const message = await patchMessage(id, { status: "routed", needsReview: false, isRead: true }, {
+        actionType: "bulk_approve",
+        humanOverride: true,
+      });
+      if (message) {
+        state = upsertDeskPatch(state, id, patchFromThread(message));
+        results.push(message);
+      }
     }
   }
 
-  return Response.json({
-    ok: true,
-    updated: results.filter(Boolean).length,
-  });
+  return jsonWithDeskCookie(
+    {
+      ok: true,
+      updated: results.length,
+      messages: results,
+    },
+    state
+  );
 }

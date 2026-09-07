@@ -20,14 +20,21 @@ import {
   supabaseUpsertThreadMessages,
   supabaseUpsertThreads,
 } from "@/lib/supabase-desk";
+import type { ThreadPatch } from "@/lib/desk-state-cookie";
 
 export type { InboxMessage, EmailThread, ThreadMessage, AiActionLog, UserPreferences } from "@/lib/types";
 export { toInboxMessage, categoryLabel } from "@/lib/types";
 
-const threads = new Map<string, EmailThread>();
-const messages = new Map<string, ThreadMessage[]>();
-const aiLogs: AiActionLog[] = [];
-let prefs: UserPreferences = {
+type DeskMemory = {
+  threads: Map<string, EmailThread>;
+  messages: Map<string, ThreadMessage[]>;
+  aiLogs: AiActionLog[];
+  prefs: UserPreferences;
+  seeded: boolean;
+  remoteBootstrapped: boolean;
+};
+
+const DEFAULT_PREFS: UserPreferences = {
   id: "pref-northwind",
   workspaceId: DEFAULT_WORKSPACE_ID,
   autoTriage: true,
@@ -55,8 +62,26 @@ let prefs: UserPreferences = {
     },
   ],
 };
-let seeded = false;
-let remoteBootstrapped = false;
+
+function deskMem(): DeskMemory {
+  const g = globalThis as typeof globalThis & { __helixInboxDesk?: DeskMemory };
+  if (!g.__helixInboxDesk) {
+    g.__helixInboxDesk = {
+      threads: new Map(),
+      messages: new Map(),
+      aiLogs: [],
+      prefs: {
+        ...DEFAULT_PREFS,
+        customRules: [...DEFAULT_PREFS.customRules],
+        templates: [...DEFAULT_PREFS.templates],
+        vipSenders: [...DEFAULT_PREFS.vipSenders],
+      },
+      seeded: false,
+      remoteBootstrapped: false,
+    };
+  }
+  return g.__helixInboxDesk;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -112,6 +137,7 @@ async function logAction(
   confidenceScore: number,
   humanOverride = false
 ) {
+  const mem = deskMem();
   const entry: AiActionLog = {
     id: `log-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     workspaceId: DEFAULT_WORKSPACE_ID,
@@ -122,15 +148,34 @@ async function logAction(
     humanOverride,
     createdAt: nowIso(),
   };
-  aiLogs.unshift(entry);
-  if (aiLogs.length > 200) aiLogs.length = 200;
+  mem.aiLogs.unshift(entry);
+  if (mem.aiLogs.length > 200) mem.aiLogs.length = 200;
   await supabaseInsertAiLog(entry);
 }
 
 function seedMemory() {
-  if (seeded) return;
-  seeded = true;
-  const samples: Array<Omit<EmailThread, "id" | "createdAt" | "updatedAt" | "engine" | "snoozeUntil" | "workspaceId" | "emailAccountId" | "toEmail" | "snippet" | "draftTone" | "isRead" | "isStarred" | "receivedAt" | "externalThreadId">> = [
+  const mem = deskMem();
+  if (mem.seeded) return;
+  mem.seeded = true;
+  const samples: Array<
+    Omit<
+      EmailThread,
+      | "id"
+      | "createdAt"
+      | "updatedAt"
+      | "engine"
+      | "snoozeUntil"
+      | "workspaceId"
+      | "emailAccountId"
+      | "toEmail"
+      | "snippet"
+      | "draftTone"
+      | "isRead"
+      | "isStarred"
+      | "receivedAt"
+      | "externalThreadId"
+    >
+  > = [
     {
       fromName: "Maya Chen",
       fromEmail: "maya@northwindhvac.com",
@@ -206,8 +251,8 @@ function seedMemory() {
       engine: "heuristic",
       isRead: sample.status === "archived" || sample.status === "blocked",
     });
-    threads.set(id, thread);
-    messages.set(id, [
+    mem.threads.set(id, thread);
+    mem.messages.set(id, [
       {
         id: `tm-${id}-0`,
         threadId: id,
@@ -224,47 +269,58 @@ function seedMemory() {
 }
 
 async function hydrateFromRemote() {
-  if (remoteBootstrapped || !isSupabaseConfigured()) return;
+  const mem = deskMem();
+  if (mem.remoteBootstrapped || !isSupabaseConfigured()) return;
   seedMemory();
   const remote = await supabaseListThreads();
   if (remote === null) return;
-  remoteBootstrapped = true;
+  mem.remoteBootstrapped = true;
   if (remote.length > 0) {
-    threads.clear();
-    for (const t of remote) threads.set(t.id, t);
+    mem.threads.clear();
+    for (const t of remote) mem.threads.set(t.id, t);
   } else {
-    await supabaseUpsertThreads([...threads.values()]);
-    for (const list of messages.values()) await supabaseUpsertThreadMessages(list);
+    await supabaseUpsertThreads([...mem.threads.values()]);
+    for (const list of mem.messages.values()) await supabaseUpsertThreadMessages(list);
   }
   const remotePrefs = await supabaseGetPreferences(DEFAULT_WORKSPACE_ID);
   if (remotePrefs) {
-    prefs = {
-      ...prefs,
+    mem.prefs = {
+      ...mem.prefs,
       ...remotePrefs,
-      customRules: remotePrefs.customRules?.length ? remotePrefs.customRules : prefs.customRules,
-      templates: remotePrefs.templates?.length ? remotePrefs.templates : prefs.templates,
+      customRules: remotePrefs.customRules?.length ? remotePrefs.customRules : mem.prefs.customRules,
+      templates: remotePrefs.templates?.length ? remotePrefs.templates : mem.prefs.templates,
     };
   }
   const logs = await supabaseListAiLogs();
   if (logs?.length) {
-    aiLogs.length = 0;
-    aiLogs.push(...logs);
+    mem.aiLogs.length = 0;
+    mem.aiLogs.push(...logs);
   }
 }
 
 async function persist(thread: EmailThread) {
-  threads.set(thread.id, thread);
+  deskMem().threads.set(thread.id, thread);
   await supabaseUpsertThread(thread);
+}
+
+/** Re-apply cookie / client patches into process memory after seed/hydrate. */
+export function applyDeskPatches(patches: Record<string, ThreadPatch>) {
+  if (!patches || Object.keys(patches).length === 0) return;
+  seedMemory();
+  const mem = deskMem();
+  for (const [id, patch] of Object.entries(patches)) {
+    const current = mem.threads.get(id);
+    if (!current) continue;
+    mem.threads.set(id, { ...current, ...patch });
+  }
 }
 
 export async function listMessages(): Promise<InboxMessage[]> {
   seedMemory();
   await hydrateFromRemote();
-  const remote = await supabaseListThreads();
-  if (remote && remote.length > 0) {
-    for (const t of remote) threads.set(t.id, t);
-  }
-  return [...threads.values()]
+  // Do not re-fetch Supabase on every list — that clobbers in-memory HITL
+  // mutations when remote upserts fail or lag behind the process store.
+  return [...deskMem().threads.values()]
     .filter((t) => !t.snoozeUntil || Date.parse(t.snoozeUntil) <= Date.now())
     .map(toInboxMessage)
     .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
@@ -272,20 +328,20 @@ export async function listMessages(): Promise<InboxMessage[]> {
 
 export async function listAllThreads(): Promise<EmailThread[]> {
   await listMessages();
-  return [...threads.values()].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+  return [...deskMem().threads.values()].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
 }
 
 export async function getMessage(id: string): Promise<InboxMessage | null> {
   seedMemory();
   await hydrateFromRemote();
-  const t = threads.get(id);
+  const t = deskMem().threads.get(id);
   return t ? toInboxMessage(t) : null;
 }
 
 export async function getThread(id: string): Promise<EmailThread | null> {
   seedMemory();
   await hydrateFromRemote();
-  return threads.get(id) ?? null;
+  return deskMem().threads.get(id) ?? null;
 }
 
 export async function listThreadMessages(threadId: string): Promise<ThreadMessage[]> {
@@ -293,10 +349,10 @@ export async function listThreadMessages(threadId: string): Promise<ThreadMessag
   await hydrateFromRemote();
   const remote = await supabaseListThreadMessages(threadId);
   if (remote && remote.length > 0) {
-    messages.set(threadId, remote);
+    deskMem().messages.set(threadId, remote);
     return remote;
   }
-  return [...(messages.get(threadId) ?? [])].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+  return [...(deskMem().messages.get(threadId) ?? [])].sort((a, b) => a.sentAt.localeCompare(b.sentAt));
 }
 
 export async function patchMessage(
@@ -340,6 +396,7 @@ export async function ingestMessage(input: {
   subject: string;
   body: string;
 }): Promise<InboxMessage> {
+  const mem = deskMem();
   seedMemory();
   await hydrateFromRemote();
   const scored = triageHeuristic(input);
@@ -369,9 +426,9 @@ export async function ingestMessage(input: {
       createdAt,
     },
   ];
-  messages.set(id, history);
+  mem.messages.set(id, history);
 
-  if (prefs.autoTriage) {
+  if (mem.prefs.autoTriage) {
     const smart = await smartReplyWithContext(thread, history);
     thread = {
       ...thread,
@@ -379,12 +436,12 @@ export async function ingestMessage(input: {
       engine: smart.engine,
       aiConfidence: smart.confidence,
       reasoning: smart.reasoning ? `${thread.reasoning} · ${smart.reasoning}` : thread.reasoning,
-      draftTone: prefs.defaultTone,
+      draftTone: mem.prefs.defaultTone,
     };
   }
 
   const hay = `${input.subject}\n${input.body}`.toLowerCase();
-  for (const rule of prefs.customRules.filter((r) => r.enabled && r.ifContains.trim())) {
+  for (const rule of mem.prefs.customRules.filter((r) => r.enabled && r.ifContains.trim())) {
     if (!hay.includes(rule.ifContains.toLowerCase())) continue;
     if (rule.then === "urgent") {
       thread = {
@@ -423,7 +480,7 @@ export async function ingestMessage(input: {
     }
   }
 
-  if (prefs.vipSenders.some((v) => v.toLowerCase() === input.fromEmail.toLowerCase())) {
+  if (mem.prefs.vipSenders.some((v) => v.toLowerCase() === input.fromEmail.toLowerCase())) {
     thread = {
       ...thread,
       urgencyScore: Math.max(thread.urgencyScore, 85),
@@ -457,7 +514,7 @@ export async function regenerateSmartReply(id: string): Promise<InboxMessage | n
     engine: smart.engine,
     aiConfidence: smart.confidence,
     updatedAt: nowIso(),
-    draftTone: prefs.defaultTone,
+    draftTone: deskMem().prefs.defaultTone,
     reasoning: smart.reasoning ?? thread.reasoning,
   };
   await persist(next);
@@ -485,7 +542,7 @@ export async function wakeSnoozed(): Promise<number> {
   await hydrateFromRemote();
   const now = Date.now();
   let n = 0;
-  for (const thread of threads.values()) {
+  for (const thread of deskMem().threads.values()) {
     if (thread.snoozeUntil && Date.parse(thread.snoozeUntil) <= now) {
       await persist({
         ...thread,
@@ -505,21 +562,22 @@ export async function listAiLogs(): Promise<AiActionLog[]> {
   await hydrateFromRemote();
   const remote = await supabaseListAiLogs();
   if (remote?.length) return remote;
-  return [...aiLogs];
+  return [...deskMem().aiLogs];
 }
 
 export async function getPreferences(): Promise<UserPreferences> {
   seedMemory();
   await hydrateFromRemote();
-  return prefs;
+  return deskMem().prefs;
 }
 
 export async function updatePreferences(patch: Partial<UserPreferences>): Promise<UserPreferences> {
-  prefs = { ...prefs, ...patch };
-  await supabaseUpsertPreferences(prefs);
-  return prefs;
+  const mem = deskMem();
+  mem.prefs = { ...mem.prefs, ...patch };
+  await supabaseUpsertPreferences(mem.prefs);
+  return mem.prefs;
 }
 
 export function getDraftTone(): DraftTone {
-  return prefs.defaultTone;
+  return deskMem().prefs.defaultTone;
 }
