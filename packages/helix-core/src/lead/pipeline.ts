@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import { scoreLeadHeuristic } from "./heuristic";
 import { leadScoringPrompt } from "./prompts";
+import { tierFromScore } from "./tiers";
 
 function id(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -78,11 +79,7 @@ function normalizeClaude(
   const tier =
     raw.tier === "hot" || raw.tier === "warm" || raw.tier === "cold"
       ? raw.tier
-      : score >= 75
-        ? "hot"
-        : score >= 50
-          ? "warm"
-          : "cold";
+      : tierFromScore(score);
   const confidence = Math.max(
     0.15,
     Math.min(0.98, Number(raw.confidence) || fallback.confidence)

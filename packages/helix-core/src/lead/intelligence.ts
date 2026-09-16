@@ -5,12 +5,14 @@ import type {
   FollowUpPlan,
   LeadEnrichment,
   LeadIngestInput,
-  LeadTier,
   SalesRep,
   ScoreHistoryEntry,
   SentimentLabel,
   StoredLead,
 } from "../types";
+import { tierFromScore } from "./tiers";
+
+export { tierFromScore };
 
 export const DEFAULT_REPS: SalesRep[] = [
   {
@@ -250,14 +252,9 @@ export function detectLanguage(message?: string): "es" | "en" | "pt" {
   return "en";
 }
 
-export function tierFromScore(score: number): LeadTier {
-  if (score >= 75) return "hot";
-  if (score >= 50) return "warm";
-  return "cold";
-}
-
 export function planFollowUp(score: number): FollowUpPlan {
-  if (score > 80) {
+  const tier = tierFromScore(score);
+  if (tier === "hot") {
     return {
       delay: "immediate",
       subject: "Thanks for your interest — let’s talk today",
@@ -265,7 +262,7 @@ export function planFollowUp(score: number): FollowUpPlan {
       status: "queued",
     };
   }
-  if (score >= 60) {
+  if (tier === "warm") {
     return {
       delay: "2h",
       subject: "How teams like yours qualify inbound",

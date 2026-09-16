@@ -2,6 +2,7 @@ export { completeWithClaude, isClaudeConfigured, parseJsonObject } from "./claud
 export { citeSpan, hydrateScoredField, missingCite } from "./fact";
 export { encodeSse } from "./sse";
 export { scoreLeadHeuristic } from "./lead/heuristic";
+export { LEAD_TIER_THRESHOLDS, leadTierBandCopy, tierFromScore } from "./lead/tiers";
 export {
   applyBehavior,
   attachIntelligence,

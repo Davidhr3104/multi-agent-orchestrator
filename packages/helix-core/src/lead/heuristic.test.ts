@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { citeSpan } from "../fact";
 import { scoreLeadHeuristic } from "./heuristic";
+import { LEAD_TIER_THRESHOLDS } from "./tiers";
 
 describe("lead heuristic", () => {
   it("classifies crypto blast as spam", () => {
@@ -26,7 +27,7 @@ describe("lead heuristic", () => {
     });
     expect(scored.classification).toBe("lead");
     expect(scored.tier).toBe("hot");
-    expect(scored.score).toBeGreaterThanOrEqual(75);
+    expect(scored.score).toBeGreaterThanOrEqual(LEAD_TIER_THRESHOLDS.hotMin);
   });
 
   it("flags thin mid scores for HITL", () => {

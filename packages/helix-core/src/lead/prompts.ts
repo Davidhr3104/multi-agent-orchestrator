@@ -1,4 +1,5 @@
 import type { LeadIngestInput } from "../types";
+import { leadTierBandCopy } from "./tiers";
 
 export function leadScoringPrompt(input: LeadIngestInput, addendum?: string): string {
   return `You are Helix EXT+REC for B2B/local-service lead scoring.
@@ -22,7 +23,7 @@ Rules:
 - spam: fake emails, ads, scrape, crypto/SEO blast, no real intent
 - info: questions, vendor research, no buying signal
 - lead: plausible contact + intent to buy or book
-- hot: score >= 75, warm 50-74, cold < 50
+- ${leadTierBandCopy().promptRule}
 - Include fields: contact_quality, intent, budget_signal, timeline_signal, source_quality
 - If data is thin, lower confidence; do not invent budget or timeline
 - Extract any mentioned competitor names into competitors. If found, battle_card is 3 bullets (SaaS best practices) on beating them.

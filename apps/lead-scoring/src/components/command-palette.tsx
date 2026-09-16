@@ -54,6 +54,7 @@ export function CommandPalette({
       { id: "leads", label: "Go to Leads", hint: "Page", run: () => { router.push("/leads"); onClose(); } },
       { id: "analytics", label: "Go to Analytics", hint: "Page", run: () => { router.push("/analytics"); onClose(); } },
       { id: "inbox", label: "Go to Inbox", hint: "Page", run: () => { router.push("/inbox"); onClose(); } },
+      { id: "settings", label: "Go to Settings", hint: "Page", run: () => { router.push("/settings"); onClose(); } },
       { id: "usage", label: "Go to Usage & API", hint: "Page", run: () => { router.push("/settings/usage"); onClose(); } },
       { id: "prompts", label: "Go to Prompt Playground", hint: "Page", run: () => { router.push("/settings/prompts"); onClose(); } },
       { id: "scoring", label: "Go to Scoring Rules", hint: "Settings", run: () => { router.push("/settings/scoring"); onClose(); } },
