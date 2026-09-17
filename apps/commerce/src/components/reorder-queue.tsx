@@ -2,8 +2,10 @@
 
 import type { StoredProduct } from "@helix/core";
 import { cn } from "@/lib/utils";
+import { useDemoToast } from "@/components/demo-toast";
 
 export function ReorderQueue({ products }: { products: StoredProduct[] }) {
+  const { show, node: toast } = useDemoToast();
   const urgent = products
     .filter((p) => p.restockRecommended)
     .sort((a, b) => a.predictedStockoutDays - b.predictedStockoutDays)
@@ -59,7 +61,13 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
                   </span>
                 </div>
               </div>
-              <button className="rounded bg-[#059669] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#059669]/85">
+              <button
+                type="button"
+                onClick={() =>
+                  show(`Coming soon — PO draft queued for ${product.sku} (demo, no vendor send).`)
+                }
+                className="rounded bg-[#059669] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#059669]/85"
+              >
                 Quick Restock PO
               </button>
             </div>
@@ -69,6 +77,7 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
           <p className="py-4 text-sm text-muted-foreground">No urgent restocks right now.</p>
         ) : null}
       </div>
+      {toast}
     </div>
   );
 }

@@ -83,7 +83,7 @@ export function ResultDashboard({
         <Stat label="Tiempo total" value={`${seconds}s`} />
         <Stat label="Agentes activos" value={String(result.activeAgents)} />
         <Stat
-          label="Confidence promedio"
+          label="Confianza promedio"
           value={`${Math.round(result.overallConfidence * 100)}%`}
         />
         <Stat
@@ -141,10 +141,10 @@ export function ResultDashboard({
           HITL {result.thresholds.hitlThreshold.toFixed(2)}
         </Badge>
         <Badge variant="outline">
-          Claude {result.claudeEnabled ? "on" : "off"}
+          Claude {result.claudeEnabled ? "activo" : "apagado"}
         </Badge>
         <Badge variant="outline">
-          Supabase {result.supabaseEnabled ? "on" : "off"}
+          Supabase {result.supabaseEnabled ? "activo" : "apagado"}
         </Badge>
       </div>
     </div>

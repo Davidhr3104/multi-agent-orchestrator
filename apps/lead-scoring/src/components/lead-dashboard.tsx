@@ -98,12 +98,22 @@ function exportCsv(rows: StoredLead[]) {
   URL.revokeObjectURL(url);
 }
 
-export function LeadDashboard() {
-  const [leads, setLeads] = useState<StoredLead[]>([]);
-  const [ghlConfigured, setGhlConfigured] = useState(false);
+export function LeadDashboard({
+  initialLeads = [],
+  initialGhlConfigured = false,
+  initialAttribution = [],
+  initialRoi = null,
+}: {
+  initialLeads?: StoredLead[];
+  initialGhlConfigured?: boolean;
+  initialAttribution?: { source: string; total: number; hotPct: number }[];
+  initialRoi?: { hoursSaved: number; pipelineUsd: number; spamBlocked: number } | null;
+}) {
+  const [leads, setLeads] = useState<StoredLead[]>(initialLeads);
+  const [ghlConfigured, setGhlConfigured] = useState(initialGhlConfigured);
   const [nowMs, setNowMs] = useState<number | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(initialLeads.length > 0);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<StoredLead | null>(null);
@@ -115,10 +125,10 @@ export function LeadDashboard() {
   const [toast, setToast] = useState<string | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
   const [attribution, setAttribution] = useState<{ source: string; total: number; hotPct: number }[]>(
-    []
+    initialAttribution
   );
   const [roi, setRoi] = useState<{ hoursSaved: number; pipelineUsd: number; spamBlocked: number } | null>(
-    null
+    initialRoi
   );
   const [resurrect, setResurrect] = useState<
     { id: string; name: string; reason: string; scoreBoost: number }[]

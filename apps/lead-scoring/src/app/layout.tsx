@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { listLeads } from "@/lib/store";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
     "Classify inbound contacts, score fit, human review, mock CRM handoff.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const leads = await listLeads();
+  const initialNewCount = leads.filter((l) => (l.pipelineStage ?? "new") === "new").length;
+  const initialReviewCount = leads.filter((l) => l.needsReview).length;
   return (
     <html
       lang="en"
@@ -29,7 +33,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <TooltipProvider>
-          <AppShell>{children}</AppShell>
+          <AppShell initialNewCount={initialNewCount} initialReviewCount={initialReviewCount}>
+            {children}
+          </AppShell>
         </TooltipProvider>
       </body>
     </html>

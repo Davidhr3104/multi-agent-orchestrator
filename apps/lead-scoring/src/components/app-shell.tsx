@@ -53,14 +53,22 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  initialNewCount = 0,
+  initialReviewCount = 0,
+}: {
+  children: ReactNode;
+  initialNewCount?: number;
+  initialReviewCount?: number;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [productsOpen, setProductsOpen] = useState(false);
-  const [newCount, setNewCount] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
+  const [newCount, setNewCount] = useState(initialNewCount);
+  const [reviewCount, setReviewCount] = useState(initialReviewCount);
   const [ready, setReady] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);

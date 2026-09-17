@@ -37,18 +37,26 @@ function filterFromHash(): FilterTab {
   return "all";
 }
 
-export function InboxDashboard() {
-  const [messages, setMessages] = useState<InboxMessage[]>([]);
+export function InboxDashboard({
+  initialMessages = [],
+  initialPersistence = "memory",
+}: {
+  initialMessages?: InboxMessage[];
+  initialPersistence?: "memory" | "supabase";
+}) {
+  const [messages, setMessages] = useState<InboxMessage[]>(initialMessages);
   const [history, setHistory] = useState<ThreadMessage[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialMessages.find((m) => m.needsReview)?.id ?? initialMessages[0]?.id ?? null
+  );
   const [filter, setFilter] = useState<FilterTab>("all");
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialMessages.length === 0);
   const [busy, setBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [persistence, setPersistence] = useState<"memory" | "supabase">("memory");
+  const [persistence, setPersistence] = useState<"memory" | "supabase">(initialPersistence);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [templates, setTemplates] = useState<{ id: string; name: string; body: string }[]>([]);
   const [form, setForm] = useState({

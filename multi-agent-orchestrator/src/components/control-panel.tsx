@@ -91,7 +91,7 @@ export function ControlPanel({
             className="w-full accent-amber-400"
           />
           <p className="text-muted-foreground text-[11px]">
-            Por debajo: requiere revisión humana. Default 0.85.
+            Campos por debajo de este valor requieren confirmación humana. Default 0.85.
           </p>
         </div>
       </div>
