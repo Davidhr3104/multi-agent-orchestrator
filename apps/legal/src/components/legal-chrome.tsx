@@ -19,7 +19,7 @@ export type LegalNavId =
 
 export const LEGAL_HREF: Record<LegalNavId, string> = {
   dashboard: "/",
-  opportunities: "/#legal-opportunities",
+  opportunities: "/opportunities",
   documents: "/documents",
   deadlines: "/deadlines",
   analytics: "/analytics",
@@ -198,8 +198,10 @@ export function LegalChrome({
           ? "pricing"
           : pathname.startsWith("/documents")
             ? "documents"
-            : pathname.startsWith("/deadlines")
-              ? "deadlines"
+            : pathname.startsWith("/opportunities")
+              ? "opportunities"
+              : pathname.startsWith("/deadlines")
+                ? "deadlines"
               : pathname.startsWith("/help")
                 ? "help"
                 : pathname === "/"
@@ -216,8 +218,10 @@ export function LegalChrome({
         ? "Intelligence"
         : pathname.startsWith("/documents")
           ? "Documents"
-          : pathname.startsWith("/deadlines")
-            ? "Deadlines"
+          : pathname.startsWith("/opportunities")
+            ? "Opportunities"
+            : pathname.startsWith("/deadlines")
+              ? "Deadlines"
             : pathname.startsWith("/pricing")
               ? "Pricing"
               : pathname.startsWith("/analytics")
