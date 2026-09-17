@@ -25,6 +25,8 @@ export type HowToUseGuide = {
   /** Optional product walkthrough video (served from the app public/ folder). */
   videoSrc?: string;
   videoTitle?: string;
+  /** Honest caveat under the player (e.g. walkthrough recorded against an older seed). */
+  videoNote?: string;
 };
 
 /** Family-wide concepts shared by every Helix desk */
@@ -77,7 +79,10 @@ export const HOW_TO_USE_COMMERCE: HowToUseGuide = {
   overview:
     "Score orders for fraud, flag restock risks, and keep high-risk fulfillment decisions in human review before Shopify sync.",
   videoSrc: "/help/helix-commerce-howto.mp4",
-  videoTitle: "Product walkthrough (~1m 45s)",
+  // ffprobe: helix-commerce-howto.mp4 duration 101.8s (Remotion 4.0.520). Re-record still required.
+  videoTitle: "Product walkthrough (1m 42s)",
+  videoNote:
+    "This walkthrough was recorded against an earlier demo catalog (different customers, SKUs, and dashboard totals). The live desk currently seeds 5 orders totaling $5,865.50 — figures in the video will not match until the walkthrough is re-recorded.",
   steps: [
     {
       title: "1. Open the Dashboard",

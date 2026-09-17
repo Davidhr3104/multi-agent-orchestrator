@@ -26,6 +26,10 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
+// TODO(commerce-howto): Help video `helix-commerce-howto.mp4` still shows the older Remotion
+// catalog (Marcus Chen / Ava Patel / Jordan Lee / Nora Kim, dashboard $128,450 / 1,161 orders).
+// Do not reshape this 5-order / $5,865.50 seed to match that marketing plate — re-record
+// HelixForCommerceHowto against the current desk instead.
 function mockOrders(): OrderInput[] {
   return [
     {

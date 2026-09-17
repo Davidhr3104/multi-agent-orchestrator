@@ -40,8 +40,13 @@ export function HowToUsePanel({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Watch the desk tour, then follow the steps below in your workspace.
+            Watch the recording, then follow the steps below in your workspace.
           </p>
+          {guide.videoNote ? (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              {guide.videoNote}
+            </p>
+          ) : null}
         </section>
       ) : null}
 
