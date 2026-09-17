@@ -1,33 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 
-export function useDemoToast() {
+const EVENT = "helix-commerce-toast";
+
+export function showCommerceToast(message: string) {
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: message }));
+}
+
+export function CommerceToastHost() {
   const [toast, setToast] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    function onToast(event: Event) {
+      const message = (event as CustomEvent<string>).detail;
+      if (!message) return;
+      setToast(message);
+      window.setTimeout(() => setToast(null), 4000);
+    }
+    window.addEventListener(EVENT, onToast);
+    return () => window.removeEventListener(EVENT, onToast);
   }, []);
 
-  const show = useCallback((message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 4000);
-  }, []);
+  if (!toast) return null;
 
-  const node =
-    mounted && toast
-      ? createPortal(
-          <div
-            role="status"
-            className="fixed right-4 bottom-4 z-[200] max-w-sm rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs text-foreground shadow-2xl"
-          >
-            {toast}
-          </div>,
-          document.body
-        )
-      : null;
-
-  return { show, node };
+  return (
+    <div
+      role="status"
+      className="pointer-events-none fixed right-4 bottom-4 z-[200] max-w-sm rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs text-foreground shadow-2xl"
+    >
+      {toast}
+    </div>
+  );
 }

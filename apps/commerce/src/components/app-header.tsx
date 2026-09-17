@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, HelpCircle, RefreshCw, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useDemoToast } from "@/components/demo-toast";
+import { showCommerceToast } from "@/components/demo-toast";
 
 const LABELS: Record<string, string> = {
   "/": "Dashboard",
@@ -20,7 +20,6 @@ const LABELS: Record<string, string> = {
 export function AppHeader() {
   const pathname = usePathname();
   const label = LABELS[pathname] ?? "Dashboard";
-  const { show, node: toast } = useDemoToast();
 
   return (
     <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/90 px-6 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md">
@@ -55,7 +54,7 @@ export function AppHeader() {
         <button
           type="button"
           onClick={() =>
-            show("Coming soon — Shopify is not configured. Desk stays on the mock catalog.")
+            showCommerceToast("Coming soon — Shopify is not configured. Desk stays on the mock catalog.")
           }
           className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98]"
         >
@@ -82,7 +81,6 @@ export function AppHeader() {
         </Link>
         <ThemeToggle />
       </div>
-      {toast}
     </header>
   );
 }
