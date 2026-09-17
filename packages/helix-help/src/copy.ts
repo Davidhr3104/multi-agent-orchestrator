@@ -131,7 +131,7 @@ export const HOW_TO_USE_INBOX: HowToUseGuide = {
     },
     {
       title: "4. Act in the inspector",
-      body: "Approve the draft, route to the owner, regenerate the reply, snooze, or block spam. Every action is audited.",
+      body: "Approve the draft, route to the owner, regenerate the reply, snooze, or block spam. Every action is recorded in Audit log.",
     },
     {
       title: "5. Tune preferences",
@@ -144,6 +144,7 @@ export const HOW_TO_USE_INBOX: HowToUseGuide = {
     { keys: "⌘K / Ctrl+K", action: "Focus the queue filter" },
     { keys: "Filters", action: "All · Urgent · Needs Review on the Dashboard" },
     { keys: "Theme toggle", action: "Switch light / dark from the header" },
+    { keys: "Audit log", action: "AI decisions and HITL overrides" },
   ],
 };
 
@@ -252,7 +253,7 @@ export const TOUR_INBOX: TourStepDef[] = [
   {
     element: "[data-tour='inbox-inspector']",
     title: "Active inspector",
-    description: "Approve, route, regenerate, snooze, or block — every action is audited.",
+    description: "Approve, route, regenerate, snooze, or block — every action is recorded in Audit log.",
   },
 ];
 

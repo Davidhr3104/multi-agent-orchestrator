@@ -1,4 +1,4 @@
-import { listAllThreads, listMessages, applyDeskPatches } from "@/lib/store";
+import { listAllThreads, listMessages, applyDeskPatches, wakeSnoozed } from "@/lib/store";
 import type { ThreadStatus } from "@/lib/types";
 import { toInboxMessage } from "@/lib/types";
 import { applyThreadPatches, readDeskCookie } from "@/lib/desk-state-cookie";
@@ -11,11 +11,17 @@ export async function GET(req: Request) {
   const needsReview = url.searchParams.get("needs_review");
   const state = readDeskCookie(req);
   applyDeskPatches(state.patches);
+  await wakeSnoozed();
 
   if (needsReview === "1" || needsReview === "true" || status === "review") {
     const all = applyThreadPatches(await listMessages(), state.patches);
     const threads = all.filter((t) => t.needsReview);
     return Response.json({ threads });
+  }
+
+  if (status === "routed") {
+    const all = applyThreadPatches(await listMessages(), state.patches);
+    return Response.json({ threads: all.filter((t) => t.status === "routed") });
   }
 
   const all = applyThreadPatches(
@@ -24,7 +30,7 @@ export async function GET(req: Request) {
   );
   let threads = all;
 
-  if (status === "routed" || status === "blocked" || status === "open" || status === "archived") {
+  if (status === "blocked" || status === "open" || status === "archived") {
     const st = status as ThreadStatus;
     threads = threads.filter((t) => t.status === st);
   } else if (status === "spam") {

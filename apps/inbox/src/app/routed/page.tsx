@@ -19,10 +19,10 @@ export default function RoutedPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void fetch("/api/threads?status=routed")
+    void fetch("/api/messages")
       .then((r) => r.json())
-      .then((d: { threads?: InboxMessage[] }) => {
-        setThreads(d.threads ?? []);
+      .then((d: { messages?: InboxMessage[] }) => {
+        setThreads((d.messages ?? []).filter((m) => m.status === "routed"));
         setLoading(false);
       })
       .catch(() => setLoading(false));

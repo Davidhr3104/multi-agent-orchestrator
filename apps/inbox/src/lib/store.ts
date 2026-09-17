@@ -218,7 +218,7 @@ function seedMemory() {
       aiConfidence: 96,
       routeTo: "Archive",
       draftReply: "",
-      status: "archived",
+      status: "routed",
       reasoning: "Informational only, no action required",
       needsReview: false,
     },
@@ -249,7 +249,7 @@ function seedMemory() {
       updatedAt: createdAt,
       snoozeUntil: null,
       engine: "heuristic",
-      isRead: sample.status === "archived" || sample.status === "blocked",
+      isRead: sample.status === "archived" || sample.status === "blocked" || sample.status === "routed",
     });
     mem.threads.set(id, thread);
     mem.messages.set(id, [
@@ -265,7 +265,18 @@ function seedMemory() {
         createdAt,
       },
     ]);
+    mem.aiLogs.push({
+      id: `log-seed-${id}`,
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      threadId: id,
+      actionType: sample.status === "routed" ? "route" : sample.status === "blocked" ? "block" : "triage",
+      aiDecision: `${sample.category}/${sample.sentiment} status=${sample.status}`,
+      confidenceScore: sample.aiConfidence,
+      humanOverride: false,
+      createdAt,
+    });
   });
+  mem.aiLogs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 async function hydrateFromRemote() {
