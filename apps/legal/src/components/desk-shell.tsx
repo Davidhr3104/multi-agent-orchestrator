@@ -48,7 +48,7 @@ export function DeskShell({
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        router.push("/#legal-opportunities");
+        router.push("/opportunities");
       }
     }
     window.addEventListener("keydown", onKey);
@@ -66,6 +66,7 @@ export function DeskShell({
           id === "audit" ||
           id === "dashboard" ||
           id === "documents" ||
+          id === "opportunities" ||
           id === "deadlines" ||
           id === "pricing" ||
           id === "help"
@@ -80,7 +81,7 @@ export function DeskShell({
       opportunityCount={opportunityCount}
       deadlineCount={deadlineCount}
       reviewCount={reviewCount}
-      onSearch={() => router.push("/#legal-opportunities")}
+      onSearch={() => router.push("/opportunities")}
     >
       {children}
     </LegalChrome>

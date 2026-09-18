@@ -3,6 +3,7 @@ import {
   runInquiryClassification,
   runInventoryPrediction,
   type InquiryInput,
+  type ProductInput,
   type StoredInquiry,
   type StoredOrder,
   type StoredProduct,
@@ -22,6 +23,7 @@ const products = new Map<string, StoredProduct>();
 const inquiries = new Map<string, StoredInquiry>();
 let seeded = false;
 let seeding: Promise<void> | null = null;
+let catalogImported = false;
 
 function id(prefix: string, seed: string): string {
   // Slicing the sanitized seed (rather than hashing it) previously truncated every
@@ -141,12 +143,45 @@ export async function patchOrder(
 
 export async function listProducts(): Promise<StoredProduct[]> {
   await seedIfNeeded();
-  const remote = await supabaseListProducts();
-  if (remote && remote.length > 0) {
-    for (const product of remote) products.set(product.id, product);
-    return remote;
+  if (!catalogImported) {
+    const remote = await supabaseListProducts();
+    if (remote && remote.length > 0) {
+      for (const product of remote) products.set(product.id, product);
+      return remote;
+    }
   }
   return [...products.values()].sort((a, b) => a.predictedStockoutDays - b.predictedStockoutDays);
+}
+
+export async function importCatalog(
+  inputs: ProductInput[],
+  mode: "merge" | "replace" = "merge"
+): Promise<StoredProduct[]> {
+  await seedIfNeeded();
+  if (mode === "replace") products.clear();
+
+  const bySku = new Map<string, StoredProduct>();
+  for (const product of products.values()) {
+    bySku.set(product.sku.trim().toLowerCase(), product);
+  }
+
+  const imported: StoredProduct[] = [];
+  for (const input of inputs) {
+    const key = input.sku.trim().toLowerCase();
+    const existing = bySku.get(key);
+    const predicted = await runInventoryPrediction(input);
+    const product: StoredProduct = {
+      ...input,
+      ...predicted,
+      id: existing?.id ?? id("product", input.sku || input.shopifyProductId),
+    };
+    products.set(product.id, product);
+    bySku.set(key, product);
+    await supabaseUpsertProduct(product);
+    imported.push(product);
+  }
+  catalogImported = true;
+  return imported;
 }
 
 export async function saveProduct(product: StoredProduct): Promise<StoredProduct> {

@@ -131,7 +131,7 @@ export function OrchestratorApp() {
             <div>
               <p className="text-sm font-semibold tracking-tight">Helix Orchestrator</p>
               <p className="text-muted-foreground text-[11px]">
-                Multi-agent · audit log · HITL
+                Multi-agente · registro de auditoría · HITL
               </p>
             </div>
           </div>
@@ -195,10 +195,10 @@ export function OrchestratorApp() {
           </p>
           <ol className="mt-5 flex flex-wrap gap-2 text-[11px] text-white/70">
             {[
-              "1. Input",
+              "1. Entrada",
               "2. Extractor",
-              "3. SEO ∥ Facts",
-              "4. Reviewer",
+              "3. SEO ∥ Hechos",
+              "4. Revisor",
               "5. Recs",
               "6. HITL",
             ].map((step) => (
@@ -285,7 +285,7 @@ export function OrchestratorApp() {
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="console">Timeline</TabsTrigger>
+            <TabsTrigger value="console">Línea de tiempo</TabsTrigger>
             <TabsTrigger value="result">Resultado</TabsTrigger>
           </TabsList>
           <TabsContent value="console" className="pt-4">
@@ -297,7 +297,7 @@ export function OrchestratorApp() {
                 <p className="text-muted-foreground mx-auto mt-2 max-w-md text-sm leading-6">
                   Pulsa <span className="text-foreground">Correr pipeline</span>{" "}
                   para ver extracción, SEO, verificación y el checkpoint
-                  humano con confidence por campo.
+                  humano con confianza por campo.
                 </p>
               </div>
             )}

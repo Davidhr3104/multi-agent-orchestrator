@@ -5,6 +5,7 @@ import {
   type StoredRfp,
 } from "@helix/core";
 import type { AuditEvent } from "@/lib/audit-types";
+import type { BidSignOff } from "@/lib/bid-signoff";
 import type { ConflictReport } from "@/lib/conflict-types";
 import { heuristicConflictReport, runConflictCheck } from "@/lib/conflicts";
 import type { PricingOverrides, PricingQuote } from "@/lib/pricing-types";
@@ -47,6 +48,7 @@ type LegalDesk = {
   audit: AuditEvent[];
   conflicts: Map<string, ConflictReport>;
   quotes: Map<string, PricingQuote>;
+  signOffs: Map<string, BidSignOff>;
 };
 
 function desk(): LegalDesk {
@@ -60,8 +62,10 @@ function desk(): LegalDesk {
       audit: [],
       conflicts: new Map(),
       quotes: new Map(),
+      signOffs: new Map(),
     };
   }
+  if (!g.__helixLegalDesk.signOffs) g.__helixLegalDesk.signOffs = new Map();
   return g.__helixLegalDesk;
 }
 
@@ -254,6 +258,31 @@ export async function listAudit(): Promise<AuditEvent[]> {
     return remote;
   }
   return [...d.audit];
+}
+
+export async function recordSignOff(signOff: BidSignOff): Promise<BidSignOff> {
+  const d = desk();
+  seedMemory();
+  d.signOffs.set(signOff.rfpId, signOff);
+  return signOff;
+}
+
+export function getSignOff(rfpId: string): BidSignOff | undefined {
+  return desk().signOffs.get(rfpId);
+}
+
+export function listSignOffs(): Record<string, BidSignOff> {
+  seedMemory();
+  return Object.fromEntries(desk().signOffs);
+}
+
+export function mergeSignOffs(incoming: Record<string, BidSignOff>) {
+  seedMemory();
+  const d = desk();
+  for (const [id, row] of Object.entries(incoming)) {
+    const existing = d.signOffs.get(id);
+    if (!existing || existing.at <= row.at) d.signOffs.set(id, row);
+  }
 }
 
 export async function recordAudit(actor: string, action: string, detail: string): Promise<AuditEvent> {

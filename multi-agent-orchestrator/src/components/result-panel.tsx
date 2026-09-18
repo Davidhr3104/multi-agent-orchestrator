@@ -19,10 +19,12 @@ function FieldRow({
   field,
   approved,
   onToggle,
+  hitlThreshold,
 }: {
   field: ScoredField;
   approved: boolean;
   onToggle: (key: string, next: boolean) => void;
+  hitlThreshold: number;
 }) {
   return (
     <article className="rounded-xl border border-white/8 bg-white/4 p-4">
@@ -41,7 +43,7 @@ function FieldRow({
               Confirmar
             </label>
           ) : (
-            <span className="text-muted-foreground text-[11px]">auto-ok</span>
+            <span className="text-muted-foreground text-[11px]">auto-aprobado</span>
           )}
         </div>
       </div>
@@ -49,6 +51,11 @@ function FieldRow({
       <p className="text-muted-foreground mt-2 text-xs leading-5">
         Evidencia: {field.evidence}
       </p>
+      {field.needsHuman ? (
+        <p className="mt-2 font-mono text-[11px] text-amber-200/90">
+          {field.confidence.toFixed(2)} &lt; umbral HITL {hitlThreshold.toFixed(2)}
+        </p>
+      ) : null}
       <Progress className="mt-3" value={Math.round(field.confidence * 100)} />
     </article>
   );
@@ -84,6 +91,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
             <FieldRow
               key={field.key}
               field={field}
+              hitlThreshold={result.thresholds.hitlThreshold}
               approved={!!approved[field.key]}
               onToggle={(key, next) =>
                 setApproved((prev) => ({ ...prev, [key]: next }))
@@ -96,7 +104,7 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
       {result.claims.length ? (
         <section className="space-y-3">
           <h3 className="text-sm font-semibold tracking-wide text-white/80 uppercase">
-            Claims
+            Afirmaciones
           </h3>
           <div className="space-y-2">
             {result.claims.map((claim, i) => (
@@ -182,7 +190,8 @@ export function ResultPanel({ result }: { result: PipelineResult }) {
         <section className="rounded-2xl border border-amber-400/25 bg-amber-400/8 p-5">
           <p className="text-sm font-medium text-amber-100">Checkpoint humano</p>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm leading-6">
-            Confirma los campos de baja confianza. Helix no publica a ciegas.
+            Confirma cada campo por debajo del umbral HITL (
+            {result.thresholds.hitlThreshold.toFixed(2)}). Helix no publica a ciegas.
           </p>
           <Button
             className="mt-4"

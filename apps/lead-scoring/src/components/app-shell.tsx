@@ -53,14 +53,22 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  initialNewCount = 0,
+  initialReviewCount = 0,
+}: {
+  children: ReactNode;
+  initialNewCount?: number;
+  initialReviewCount?: number;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [productsOpen, setProductsOpen] = useState(false);
-  const [newCount, setNewCount] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
+  const [newCount, setNewCount] = useState(initialNewCount);
+  const [reviewCount, setReviewCount] = useState(initialReviewCount);
   const [ready, setReady] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -260,32 +268,41 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="mt-1">
           <NavLabel label="Settings">
-            <button
-              type="button"
+            <div
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/5",
-                !expanded && !mobileOpen && "justify-center px-0",
+                "flex items-center rounded-lg text-sm font-medium text-white/70",
                 pathname.startsWith("/settings") && "bg-cyan-500/20 text-cyan-400"
               )}
-              onClick={() => {
-                if (!expanded && !mobileOpen) {
-                  setCollapsed(false);
-                  setSettingsOpen(true);
-                  return;
-                }
-                setSettingsOpen((v) => !v);
-              }}
             >
-              <Settings className="size-5 shrink-0" />
+              <Link
+                href="/settings"
+                className={cn(
+                  "flex min-w-0 flex-1 items-center gap-3 rounded-lg px-4 py-3 hover:bg-white/5",
+                  !expanded && !mobileOpen && "justify-center px-0",
+                  pathname.startsWith("/settings") && "hover:bg-transparent"
+                )}
+                onClick={() => {
+                  if (!expanded && !mobileOpen) setCollapsed(false);
+                  setSettingsOpen(true);
+                }}
+              >
+                <Settings className="size-5 shrink-0" />
+                {expanded || mobileOpen ? <span className="truncate">Settings</span> : null}
+              </Link>
               {expanded || mobileOpen ? (
-                <>
-                  <span className="flex-1 text-left">Settings</span>
+                <button
+                  type="button"
+                  className="mr-2 rounded-md p-1 hover:bg-white/5"
+                  aria-expanded={settingsOpen}
+                  aria-label={settingsOpen ? "Collapse settings" : "Expand settings"}
+                  onClick={() => setSettingsOpen((v) => !v)}
+                >
                   <ChevronDown
                     className={cn("size-4 transition-transform", settingsOpen && "rotate-180")}
                   />
-                </>
+                </button>
               ) : null}
-            </button>
+            </div>
           </NavLabel>
           {settingsOpen && (expanded || mobileOpen) ? (
             <div className="mt-1 space-y-1">

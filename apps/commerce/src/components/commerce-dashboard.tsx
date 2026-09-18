@@ -11,25 +11,18 @@ import { ReorderQueue } from "@/components/reorder-queue";
 import { RevenueTrendChart } from "@/components/revenue-trend-chart";
 import { formatCurrency } from "@/lib/format";
 
-export function CommerceDashboard() {
-  const [orders, setOrders] = useState<StoredOrder[]>([]);
-  const [products, setProducts] = useState<StoredProduct[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  async function refresh() {
-    const [ordersRes, productsRes] = await Promise.all([
-      fetch("/api/orders"),
-      fetch("/api/products"),
-    ]);
-    const ordersData = (await ordersRes.json()) as { orders: StoredOrder[] };
-    const productsData = (await productsRes.json()) as { products: StoredProduct[] };
-    setOrders(ordersData.orders);
-    setProducts(productsData.products);
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, []);
+export function CommerceDashboard({
+  initialOrders = [],
+  initialProducts = [],
+}: {
+  initialOrders?: StoredOrder[];
+  initialProducts?: StoredProduct[];
+}) {
+  const [orders, setOrders] = useState<StoredOrder[]>(initialOrders);
+  const [products] = useState<StoredProduct[]>(initialProducts);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialOrders.find((o) => o.requiresReview)?.id ?? null
+  );
 
   useEffect(() => {
     if (!selectedId) {

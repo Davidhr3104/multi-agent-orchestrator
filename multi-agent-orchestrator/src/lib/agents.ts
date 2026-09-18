@@ -256,14 +256,14 @@ function recommend(
   fields: ScoredField[],
   seoSummary: string,
   claims: Claim[],
-  minConfidence: number
+  hitlThreshold: number
 ): Recommendation[] {
   const recs: Recommendation[] = [];
-  const weak = fields.filter((f) => f.confidence < minConfidence);
+  const weak = fields.filter((f) => f.needsHuman);
   if (weak.length) {
     recs.push({
-      title: "Revisar campos de baja confianza",
-      detail: `HITL: ${weak.map((w) => w.label).join(", ")}. Umbral mínimo ${minConfidence.toFixed(2)}.`,
+      title: "Revisar campos bajo el umbral HITL",
+      detail: `HITL: ${weak.map((w) => w.label).join(", ")}. Umbral HITL ${hitlThreshold.toFixed(2)}.`,
       priority: "alta",
       confidence: 0.9,
     });
@@ -668,7 +668,7 @@ export async function runPipeline(
       confidence: 0,
     });
     await delay(140);
-    recs = recommend(inputKind, fields, seoSummary, claims, minConfidence);
+    recs = recommend(inputKind, fields, seoSummary, claims, hitlThreshold);
     recs.forEach((rec, i) => {
       log("recommender", "success", rec.title, {
         field: `rec_${i + 1}`,

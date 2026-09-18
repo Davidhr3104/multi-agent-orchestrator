@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, HelpCircle, RefreshCw, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { showCommerceToast } from "@/components/demo-toast";
 
 const LABELS: Record<string, string> = {
   "/": "Dashboard",
@@ -50,7 +51,13 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98]">
+        <button
+          type="button"
+          onClick={() =>
+            showCommerceToast("Coming soon — Shopify is not configured. Desk stays on the mock catalog.")
+          }
+          className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98]"
+        >
           <RefreshCw className="size-3.5 text-primary" />
           Sync Shopify
         </button>

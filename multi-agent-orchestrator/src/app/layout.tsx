@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Helix Orchestrator · Multi-Agent Content System",
+  title: "Helix Orchestrator · Sistema multi-agente de contenido",
   description:
-    "Orquestador multi-agente para análisis de contenido: extracción con confidence score, SEO, verificación de hechos, recomendaciones y revisión cruzada.",
+    "Orquestador multi-agente para análisis de contenido: extracción con score de confianza, SEO, verificación de hechos, recomendaciones y revisión cruzada.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

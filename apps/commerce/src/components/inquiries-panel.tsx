@@ -24,9 +24,13 @@ const SENTIMENT_STYLES: Record<StoredInquiry["sentiment"], string> = {
   negative: "text-rose-400",
 };
 
-export function InquiriesPanel() {
-  const [inquiries, setInquiries] = useState<StoredInquiry[]>([]);
-  const [loading, setLoading] = useState(true);
+export function InquiriesPanel({
+  initialInquiries = [],
+}: {
+  initialInquiries?: StoredInquiry[];
+}) {
+  const [inquiries, setInquiries] = useState<StoredInquiry[]>(initialInquiries);
+  const [loading, setLoading] = useState(initialInquiries.length === 0);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ customerEmail: "", inquiryText: "" });
 
@@ -38,8 +42,9 @@ export function InquiriesPanel() {
   }
 
   useEffect(() => {
+    if (initialInquiries.length > 0) return;
     void refresh();
-  }, []);
+  }, [initialInquiries.length]);
 
   async function resolve(id: string) {
     const res = await fetch(`/api/inquiries/${id}/resolve`, { method: "POST" });

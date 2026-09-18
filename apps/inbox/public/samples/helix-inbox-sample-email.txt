@@ -1,0 +1,14 @@
+From: Luis Ortega <luis.ortega@example-greenfield.com>
+To: Ops Desk <ops@example-northwind-services.com>
+Date: Tue, 16 Sep 2026 14:22:00 -0500
+Subject: Invoice #4821 + question about Saturday service window
+
+Hi team,
+
+Two things:
+1) Please confirm you received invoice #4821 for August landscaping ($1,240).
+2) Can someone cover a Saturday morning window (Sep 20, 8–11am) for a one-off cleanup at 880 Cedar Ln? Not urgent if you are booked — just need a yes/no by Thursday.
+
+Thanks,
+Luis Ortega
+Greenfield HOA (sample)

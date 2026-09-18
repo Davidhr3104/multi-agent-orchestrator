@@ -6,6 +6,44 @@ export type DeadlineHit = {
   days: number | null;
 };
 
+const MONTHS: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
+/** Canonical YYYY-MM-DD so ISO and long-form dates collapse to one event. */
+export function normalizeDeadlineDate(raw: string): string | null {
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const long = s.match(/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (long) {
+    const month = MONTHS[long[1].toLowerCase()];
+    const day = Number(long[2]);
+    const year = Number(long[3]);
+    if (month && day >= 1 && day <= 31 && year >= 2000) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+function daysUntilIso(iso: string, now: number): number {
+  const ts = Date.parse(`${iso}T12:00:00.000Z`);
+  return (ts - now) / 86_400_000;
+}
+
 export type ComplianceGap = {
   label: string;
   severity: "red" | "amber";
@@ -51,11 +89,6 @@ const DEADLINE_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "Document delivery", re: /(?:document delivery|deliverables due)[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/gi },
 ];
 
-function parseDate(s: string): number | null {
-  const t = Date.parse(s);
-  return Number.isNaN(t) ? null : t;
-}
-
 export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
   const hits: DeadlineHit[] = [];
   const seen = new Set<string>();
@@ -64,25 +97,29 @@ export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(blob))) {
-      const date = m[1];
-      const key = `${label}:${date}`;
+      const iso = normalizeDeadlineDate(m[1] ?? "");
+      if (!iso) continue;
+      const start = m.index ?? 0;
+      if (label === "Submission" && /Q&A\s+$/i.test(blob.slice(Math.max(0, start - 4), start))) continue;
+      const key = `${label}:${iso}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const ts = parseDate(date);
       hits.push({
         label,
-        date,
-        days: ts == null ? null : (ts - now) / 86_400_000,
+        date: iso,
+        days: daysUntilIso(iso, now),
       });
     }
   }
   if (hits.length === 0 && rfp.deadline && !/unspecified|tbd/i.test(rfp.deadline)) {
-    const ts = parseDate(rfp.deadline);
-    hits.push({
-      label: "Submission",
-      date: rfp.deadline,
-      days: ts == null ? null : (ts - now) / 86_400_000,
-    });
+    const iso = normalizeDeadlineDate(rfp.deadline);
+    if (iso) {
+      hits.push({
+        label: "Submission",
+        date: iso,
+        days: daysUntilIso(iso, now),
+      });
+    }
   }
   return hits.sort((a, b) => (a.days ?? 999) - (b.days ?? 999));
 }
@@ -110,7 +147,7 @@ function veventBlock(rfp: StoredRfp, hit: DeadlineHit): string | null {
   if (!start) return null;
   return [
     "BEGIN:VEVENT",
-    `UID:${rfp.id}-${hit.label.replace(/\s+/g, "")}@helix.legal`,
+    `UID:${rfp.id}-${hit.label.replace(/\s+/g, "")}-${hit.date}@helix.legal`,
     `DTSTAMP:${start}`,
     `DTSTART;VALUE=DATE:${start.slice(0, 8)}`,
     `SUMMARY:Helix · ${hit.label} · ${rfp.title}`,

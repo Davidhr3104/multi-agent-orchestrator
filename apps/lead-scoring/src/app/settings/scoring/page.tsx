@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { leadTierBandCopy } from "@helix/core";
 import { HelixPage } from "@/components/helix-page";
 import { writeOnboarding, readOnboarding } from "@/lib/prefs";
+
+const TIER_COPY = leadTierBandCopy();
 
 export default function ScoringSettingsPage() {
   const [hitl, setHitl] = useState(65);
@@ -27,7 +30,7 @@ export default function ScoringSettingsPage() {
   return (
     <HelixPage
       title="Scoring Rules"
-      hint="Hot ≥ 75, warm ≥ 50. Move the HITL gate: Strict auto-approves only high-confidence leads."
+      hint={`${TIER_COPY.scoringHint}. Move the HITL gate: Strict auto-approves only high-confidence leads.`}
     >
       <div className="card-bg space-y-4 rounded-xl p-5 text-sm text-slate-300">
         <p>Email open +5 · Link click +10 · Pricing visit +15 · Reply +12 · No reply 7d −10.</p>

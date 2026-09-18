@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
   type StructuredProfile,
 } from "@/lib/client-profile";
 import { formatUsdAmount, formatUsdNumber } from "@/lib/money";
+import { signOffLabel, type BidSignOff, type BidSignOffAction } from "@/lib/bid-signoff";
 import {
   alertCadence,
   assignTeam,
@@ -146,10 +147,12 @@ export function LegalDashboard() {
   const [sheetTab, setSheetTab] = useState<SheetTab>("overview");
   const [conflicts, setConflicts] = useState<Record<string, ConflictReport>>({});
   const [pricing, setPricing] = useState<Record<string, PricingQuote>>({});
+  const [signOffs, setSignOffs] = useState<Record<string, BidSignOff>>({});
   const [nav, setNav] = useState<LegalNavId>("dashboard");
   const searchRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   async function refresh() {
     const res = await fetch("/api/rfps");
@@ -158,10 +161,12 @@ export function LegalDashboard() {
       clientProfile?: string;
       conflicts?: Record<string, ConflictReport>;
       pricing?: Record<string, PricingQuote>;
+      signOffs?: Record<string, BidSignOff>;
     };
     setRfps(data.rfps);
     if (data.conflicts) setConflicts(data.conflicts);
     if (data.pricing) setPricing(data.pricing);
+    if (data.signOffs) setSignOffs(data.signOffs);
     if (data.clientProfile) setStructured(parseProfile(data.clientProfile));
   }
 
@@ -185,7 +190,7 @@ export function LegalDashboard() {
         ? tab
         : "overview";
     openRfp(rfp, nextTab);
-    router.replace("/", { scroll: false });
+    router.replace(window.location.pathname || "/", { scroll: false });
   }, [mounted, rfps, searchParams, router]);
 
   function openRfp(rfp: StoredRfp, tab: SheetTab = "overview") {
@@ -208,9 +213,17 @@ export function LegalDashboard() {
   useEffect(() => {
     if (!mounted) return;
     const id = window.location.hash.replace("#", "");
-    if (!id) return;
-    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-  }, [mounted]);
+    if (id) {
+      window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      return;
+    }
+    if (pathname === "/opportunities") {
+      window.setTimeout(
+        () => document.getElementById("legal-opportunities")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        50
+      );
+    }
+  }, [mounted, pathname]);
 
   const now = nowMs ?? Date.now();
 
@@ -389,12 +402,19 @@ export function LegalDashboard() {
     }
   }
 
-  async function clearReview(id: string) {
-    const res = await fetch(`/api/rfps/${id}/review`, { method: "POST" });
-    const data = (await res.json()) as { rfp?: StoredRfp };
+  async function submitSignOff(id: string, action: BidSignOffAction) {
+    const res = await fetch(`/api/rfps/${id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = (await res.json()) as { rfp?: StoredRfp; signOff?: BidSignOff };
     if (data.rfp) {
       setRfps((prev) => prev.map((r) => (r.id === id ? data.rfp! : r)));
       setSelected(data.rfp);
+    }
+    if (data.signOff) {
+      setSignOffs((prev) => ({ ...prev, [id]: data.signOff! }));
     }
   }
 
@@ -763,6 +783,22 @@ export function LegalDashboard() {
                                 >
                                   Bid {formatUsdNumber(quote.target)}
                                 </button>
+                              ) : null}
+                              {signOffs[rfp.id] ? (
+                                <span
+                                  className={cn(
+                                    "rounded-[3px] px-1.5 py-[2px] font-medium leading-none",
+                                    signOffs[rfp.id].bid === "GO"
+                                      ? "bg-[#064E3B] text-[#6EE7B7]"
+                                      : "bg-[#7F1D1D] text-[#FCA5A5]"
+                                  )}
+                                >
+                                  Signed {signOffs[rfp.id].bid}
+                                </span>
+                              ) : rfp.needsReview ? (
+                                <span className="rounded-[3px] bg-[#422006] px-1.5 py-[2px] font-medium leading-none text-[#FCD34D]">
+                                  HITL
+                                </span>
                               ) : null}
                               <span className="rounded-[3px] bg-[#1F2937] px-1.5 py-[2px] leading-none text-[#6B7280]">
                                 {assign.initials} · {assign.role}
@@ -1227,8 +1263,9 @@ export function LegalDashboard() {
               setTab={setSheetTab}
               conflict={conflicts[selected.id]}
               quote={pricing[selected.id]}
+              signOff={signOffs[selected.id]}
               profile={serializeProfile(structured)}
-              onReview={() => void clearReview(selected.id)}
+              onSignOff={(action) => void submitSignOff(selected.id, action)}
               onCorpus={() => void askCorpus(selected.id)}
               onProposal={() => downloadProposal(selected)}
             />
@@ -1236,6 +1273,73 @@ export function LegalDashboard() {
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+function HitlCheckpoint({
+  aiVerdict,
+  aiScore,
+  aiWhy,
+  signOff,
+  onSignOff,
+}: {
+  aiVerdict: "GO" | "CONDITIONAL" | "NO-GO";
+  aiScore: number;
+  aiWhy: string;
+  signOff?: BidSignOff;
+  onSignOff: (action: BidSignOffAction) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "space-y-3 rounded-xl border p-3",
+        signOff
+          ? signOff.bid === "GO"
+            ? "border-emerald-500/40 bg-emerald-500/10"
+            : "border-rose-500/40 bg-rose-500/10"
+          : "border-[#F59E0B]/50 bg-[#F59E0B]/10"
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold tracking-wide text-[#F59E0B] uppercase">HITL · Partner sign-off</p>
+        {signOff ? (
+          <span
+            className={cn(
+              "rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold",
+              signOff.bid === "GO" ? "bg-[#064E3B] text-[#6EE7B7]" : "bg-[#7F1D1D] text-[#FCA5A5]"
+            )}
+          >
+            Signed {signOff.bid}
+          </span>
+        ) : (
+          <span className="rounded-[3px] bg-[#422006] px-1.5 py-0.5 text-[10px] font-semibold text-[#FCD34D]">
+            Awaiting sign-off
+          </span>
+        )}
+      </div>
+      <p className="text-sm font-semibold text-[#F3F4F6]">
+        AI recommendation: {aiVerdict} · {aiScore}
+      </p>
+      <p className="text-xs text-muted-foreground">{aiWhy}</p>
+      {signOff ? (
+        <p className="text-xs text-[#9CA3AF]">
+          {signOffLabel(signOff.action)} · bid {signOff.bid} · {signOff.at.slice(0, 10)}
+        </p>
+      ) : (
+        <p className="text-xs text-[#9CA3AF]">Approve to pursue, reject to no-bid, or override the AI call.</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => onSignOff("approve")}>
+          Approve bid
+        </Button>
+        <Button size="sm" variant="destructive" onClick={() => onSignOff("reject")}>
+          Reject / no-bid
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onSignOff("override")}>
+          Override AI
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1247,8 +1351,9 @@ function RfpSheet({
   setTab,
   conflict,
   quote,
+  signOff,
   profile,
-  onReview,
+  onSignOff,
   onCorpus,
   onProposal,
 }: {
@@ -1259,8 +1364,9 @@ function RfpSheet({
   setTab: (t: SheetTab) => void;
   conflict?: ConflictReport;
   quote?: PricingQuote;
+  signOff?: BidSignOff;
   profile: string;
-  onReview: () => void;
+  onSignOff: (action: BidSignOffAction) => void;
   onCorpus: () => void;
   onProposal: () => void;
 }) {
@@ -1339,6 +1445,13 @@ function RfpSheet({
               <Badge variant="secondary">{countdownLabel(deadlines[0]?.days ?? null)}</Badge>
               <Badge variant="outline">{assign.attorney} · {assign.role}</Badge>
             </div>
+            <HitlCheckpoint
+              aiVerdict={go.verdict}
+              aiScore={go.score}
+              aiWhy={go.why}
+              signOff={signOff}
+              onSignOff={onSignOff}
+            />
             <p className="text-sm leading-relaxed">{selected.reasoning}</p>
             <p className="text-xs text-muted-foreground">
               {assign.reason} · {assign.workload}h / {assign.capacity}h this week
@@ -1424,6 +1537,13 @@ function RfpSheet({
               </p>
               <p className="text-xs text-muted-foreground">{go.why}</p>
             </div>
+            <HitlCheckpoint
+              aiVerdict={go.verdict}
+              aiScore={go.score}
+              aiWhy={go.why}
+              signOff={signOff}
+              onSignOff={onSignOff}
+            />
             <ul className="space-y-2">
               {gaps.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No eliminator language flagged.</p>
@@ -1492,7 +1612,10 @@ function RfpSheet({
             <div className="rounded-lg border border-[#1F2937] bg-[#0B0F19] p-3 text-[11px] text-[#9CA3AF]">
               <p className="mb-2 font-semibold tracking-wide text-[#F59E0B] uppercase">Pack checklist</p>
               <ul className="space-y-1">
-                <li>[ ] Partner sign-off on Go/No-Go ({go.verdict})</li>
+                <li>
+                  {signOff ? "[x]" : "[ ]"} Partner sign-off on Go/No-Go (
+                  {signOff ? `${signOff.bid} · ${signOffLabel(signOff.action)}` : go.verdict})
+                </li>
                 <li>
                   [ ] COI {conflict?.verdict ?? "pending"}
                   {conflict?.why ? ` — ${conflict.why.slice(0, 80)}` : ""}
@@ -1664,19 +1787,25 @@ function RfpSheet({
         ) : null}
       </div>
       <SheetFooter>
-        {selected.needsReview ? (
-          <Button variant="secondary" onClick={onReview}>
-            Mark reviewed
+        <div className="flex w-full flex-wrap gap-2">
+          <Button size="sm" onClick={() => onSignOff("approve")}>
+            Approve bid
           </Button>
-        ) : null}
-        <Button variant="outline" onClick={onProposal}>
-          <Download className="size-4" />
-          Proposal pack
-        </Button>
-        <Button onClick={onCorpus}>
-          <Database className="size-4" />
-          Ask corpus
-        </Button>
+          <Button size="sm" variant="destructive" onClick={() => onSignOff("reject")}>
+            Reject / no-bid
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onSignOff("override")}>
+            Override AI
+          </Button>
+          <Button variant="outline" onClick={onProposal}>
+            <Download className="size-4" />
+            Proposal pack
+          </Button>
+          <Button onClick={onCorpus}>
+            <Database className="size-4" />
+            Ask corpus
+          </Button>
+        </div>
       </SheetFooter>
     </>
   );

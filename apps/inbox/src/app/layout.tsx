@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { InboxOnboardingHost } from "@/components/inbox-onboarding-host";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
+import { loadDeskMessages } from "@/lib/load-desk";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,7 +28,14 @@ export const metadata: Metadata = {
 
 const themeBootScript = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)};var t=localStorage.getItem(k);if(t!=='light'&&t!=='dark')t='dark';var r=document.documentElement;if(t==='dark')r.classList.add('dark');else r.classList.remove('dark');r.dataset.theme=t;r.style.colorScheme=t;}catch(e){document.documentElement.classList.add('dark');}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { messages } = await loadDeskMessages();
+  const initialCounts = {
+    queue: messages.filter((m) => m.status === "open" || m.status === "review").length,
+    review: messages.filter((m) => m.needsReview).length,
+    routed: messages.filter((m) => m.status === "routed").length,
+    blocked: messages.filter((m) => m.status === "blocked" || m.category === "spam").length,
+  };
   return (
     <html
       lang="en"
@@ -42,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <TooltipProvider delay={300}>
             <CosmicParticles />
             <div className="relative z-10 flex min-h-full flex-1 flex-col">
-              <MaybeDeskShell>{children}</MaybeDeskShell>
+              <MaybeDeskShell initialCounts={initialCounts}>{children}</MaybeDeskShell>
             </div>
             <InboxOnboardingHost />
           </TooltipProvider>

@@ -12,7 +12,7 @@ const MODULES = [
   {
     title: "Opportunities",
     blurb: "Hot / warm / cold match queue with COI and bid chips.",
-    href: "/#legal-opportunities",
+    href: "/opportunities",
     cta: "View opportunities",
   },
   {

@@ -1,3 +1,4 @@
+import { tierFromScore } from "@helix/core";
 import { getLead, patchLead } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -17,7 +18,7 @@ export async function POST(
   }
   const score = Math.max(0, Math.min(100, Math.round(Number(body.score))));
   if (!Number.isFinite(score)) return Response.json({ error: "score required" }, { status: 400 });
-  const tier = score >= 75 ? "hot" : score >= 50 ? "warm" : "cold";
+  const tier = tierFromScore(score);
   const lead = await patchLead(id, {
     score,
     tier,

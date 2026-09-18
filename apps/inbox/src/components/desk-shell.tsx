@@ -5,12 +5,18 @@ import { usePathname } from "next/navigation";
 import { InboxChrome } from "@/components/inbox-chrome";
 import type { InboxMessage } from "@/lib/types";
 
-export function DeskShell({ children }: { children: ReactNode }) {
+export function DeskShell({
+  children,
+  initialCounts,
+}: {
+  children: ReactNode;
+  initialCounts?: { queue: number; review: number; routed: number; blocked: number };
+}) {
   const pathname = usePathname();
-  const [queueCount, setQueueCount] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
-  const [routedCount, setRoutedCount] = useState(0);
-  const [blockedCount, setBlockedCount] = useState(0);
+  const [queueCount, setQueueCount] = useState(initialCounts?.queue ?? 0);
+  const [reviewCount, setReviewCount] = useState(initialCounts?.review ?? 0);
+  const [routedCount, setRoutedCount] = useState(initialCounts?.routed ?? 0);
+  const [blockedCount, setBlockedCount] = useState(initialCounts?.blocked ?? 0);
 
   useEffect(() => {
     void fetch("/api/messages")

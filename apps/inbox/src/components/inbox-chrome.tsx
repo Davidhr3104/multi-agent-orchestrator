@@ -3,11 +3,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, ChevronLeft, CircleHelp, LayoutDashboard, Repeat2, Send, Settings, Shield } from "lucide-react";
+import { Activity, BarChart3, ChevronLeft, CircleHelp, FileText, LayoutDashboard, Repeat2, Send, Settings, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type InboxNavId = "dashboard" | "queue" | "routed" | "blocked" | "settings" | "help" | "analytics";
+export type InboxNavId = "dashboard" | "queue" | "routed" | "blocked" | "settings" | "help" | "analytics" | "audit";
 
 type ProductLink = { name: string; href: string; className: string };
 
@@ -85,6 +85,7 @@ export function InboxChrome({
     { id: "routed", label: "Routed", href: "/routed", badge: routedCount, badgeTone: "muted" },
     { id: "blocked", label: "Blocked", href: "/blocked", badge: blockedCount, badgeTone: "muted" },
     { id: "analytics", label: "Analytics", href: "/analytics" },
+    { id: "audit", label: "Audit log", href: "/audit" },
     { id: "settings", label: "Settings", href: "/settings" },
     { id: "help", label: "How to use", href: "/help" },
   ];
@@ -141,11 +142,13 @@ export function InboxChrome({
                       ? Send
                       : item.id === "analytics"
                         ? BarChart3
-                        : item.id === "settings"
-                          ? Settings
-                          : item.id === "help"
-                            ? CircleHelp
-                            : Shield;
+                        : item.id === "audit"
+                          ? FileText
+                          : item.id === "settings"
+                            ? Settings
+                            : item.id === "help"
+                              ? CircleHelp
+                              : Shield;
               return (
                 <Link
                   key={item.id}
@@ -234,11 +237,13 @@ export function InboxChrome({
       <div className={cn("relative flex min-h-screen flex-1 flex-col", offset)}>
         <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface/90 px-6 backdrop-blur-xl dark:border-white/[0.08] dark:bg-[rgba(12,6,26,0.72)]">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Workspaces</span>
+            <Link href="/workspace" className="hover:text-foreground">
+              Workspaces
+            </Link>
             <span className="text-muted-foreground/60">/</span>
             <span className="flex items-center gap-1.5 font-medium text-foreground">
               <span className="size-1.5 rounded-full bg-accent" />
-              Inbox triage
+              {pathname.startsWith("/workspace") ? "Northwind EA" : "Inbox triage"}
             </span>
           </div>
           <div className="flex items-center gap-3.5">

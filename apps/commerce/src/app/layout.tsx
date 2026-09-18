@@ -3,6 +3,7 @@ import { Inter, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/app-shell";
 import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
+import { listOrders, listProducts } from "@/lib/store";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,7 +21,8 @@ export const metadata: Metadata = {
   description: "Enterprise commerce operations and fraud intelligence.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const [orders, products] = await Promise.all([listOrders(), listProducts()]);
   return (
     <html
       lang="en"
@@ -33,7 +35,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="h-full bg-background antialiased">
         <ThemeProvider>
           <TooltipProvider>
-            <AppShell>{children}</AppShell>
+            <AppShell
+              initialOrdersNeedingReview={orders.filter((o) => o.requiresReview).length}
+              initialInventoryAlerts={products.filter((p) => p.restockRecommended).length}
+            >
+              {children}
+            </AppShell>
           </TooltipProvider>
         </ThemeProvider>
       </body>

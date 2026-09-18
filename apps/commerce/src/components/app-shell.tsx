@@ -5,9 +5,17 @@ import type { StoredOrder, StoredProduct } from "@helix/core";
 import { Sidebar } from "@/components/sidebar";
 import { AppHeader } from "@/components/app-header";
 
-export function AppShell({ children }: { children: ReactNode }) {
-  const [ordersNeedingReview, setOrdersNeedingReview] = useState(0);
-  const [inventoryAlerts, setInventoryAlerts] = useState(0);
+export function AppShell({
+  children,
+  initialOrdersNeedingReview = 0,
+  initialInventoryAlerts = 0,
+}: {
+  children: ReactNode;
+  initialOrdersNeedingReview?: number;
+  initialInventoryAlerts?: number;
+}) {
+  const [ordersNeedingReview, setOrdersNeedingReview] = useState(initialOrdersNeedingReview);
+  const [inventoryAlerts, setInventoryAlerts] = useState(initialInventoryAlerts);
 
   useEffect(() => {
     void (async () => {

@@ -2,6 +2,7 @@
 
 import type { StoredProduct } from "@helix/core";
 import { cn } from "@/lib/utils";
+import { showCommerceToast } from "@/components/demo-toast";
 
 export function ReorderQueue({ products }: { products: StoredProduct[] }) {
   const urgent = products
@@ -59,7 +60,13 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
                   </span>
                 </div>
               </div>
-              <button className="rounded bg-[#059669] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#059669]/85">
+              <button
+                type="button"
+                onClick={() =>
+                  showCommerceToast(`Coming soon — PO draft queued for ${product.sku} (demo, no vendor send).`)
+                }
+                className="rounded bg-[#059669] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#059669]/85"
+              >
                 Quick Restock PO
               </button>
             </div>

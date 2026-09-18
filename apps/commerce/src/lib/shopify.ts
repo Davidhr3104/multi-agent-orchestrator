@@ -26,6 +26,10 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
+// TODO(commerce-howto): Keep prod `apps/commerce/public/help/helix-commerce-howto.mp4` visible
+// on /help. Helix-Personal re-record (Refund & Cancel) should OVERWRITE that same file
+// (see public/help/README.md + COMMERCE_HOWTO_VIDEO). Do not hide the player. Do not reshape
+// this 5-order / $5,865.50 seed to match the older Remotion plate.
 function mockOrders(): OrderInput[] {
   return [
     {

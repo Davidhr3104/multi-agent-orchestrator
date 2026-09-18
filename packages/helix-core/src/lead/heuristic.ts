@@ -3,9 +3,9 @@ import type {
   LeadClassification,
   LeadIngestInput,
   LeadScoreResult,
-  LeadTier,
   ScoredField,
 } from "../types";
+import { tierFromScore } from "./tiers";
 
 const SPAM_RE =
   /crypto|nft|seo blast|buy followers|unsubscribe|viagra|casino|click here|free money/i;
@@ -80,10 +80,7 @@ export function scoreLeadHeuristic(
   if (classification === "spam") score = Math.min(score, 18);
   if (classification === "info") score = Math.min(score, 42);
   score = Math.max(0, Math.min(100, Math.round(score)));
-
-  let tier: LeadTier = "cold";
-  if (score >= 75) tier = "hot";
-  else if (score >= 50) tier = "warm";
+  const tier = tierFromScore(score);
 
   const confidence = clamp01(
     classification === "spam"
