@@ -44,7 +44,8 @@ export const INBOX_HELP = {
   urgent: "High-urgency or SLA-sensitive threads that should be handled within the hour.",
   blocked: "Spam and filtered mail. Unblock to return a thread to the active triage queue.",
   queue: "Live triage list. Select a thread to inspect the draft, route target, and reasoning.",
-  ingest: "Paste an inbound email to score category, urgency, and draft a reply automatically.",
+  ingest:
+    "Paste an inbound email, or upload a .txt / .eml, to score category, urgency, and draft a reply automatically.",
   inspector: "Review the AI recommendation, edit if needed, then approve, route, snooze, or block.",
   autoTriage: "When enabled, new inbound mail is classified and drafted without a manual ingest step.",
   vipSenders: "Senders on this list are always prioritized in the queue, regardless of content signals.",
@@ -73,16 +74,32 @@ export const COMMERCE_HELP = {
   restock: "Inventory signals that recommend reorder before stockouts hit the storefront.",
 } as const;
 
+/**
+ * Drop-in slot for the Commerce Help walkthrough. Keep the current prod mp4 until
+ * Helix-Personal delivers the re-record (Refund & Cancel). Then overwrite THIS
+ * filename in place — do not hide `/help`, do not add a second player, do not
+ * delete the live file in an ingest-only pass.
+ *
+ * Disk: apps/commerce/public/help/helix-commerce-howto.mp4
+ * URL:  /help/helix-commerce-howto.mp4
+ * After overwrite: ffprobe duration → videoTitle; rewrite or drop videoNote.
+ */
+export const COMMERCE_HOWTO_VIDEO = {
+  filename: "helix-commerce-howto.mp4",
+  diskPath: "apps/commerce/public/help/helix-commerce-howto.mp4",
+  publicSrc: "/help/helix-commerce-howto.mp4",
+} as const;
+
 export const HOW_TO_USE_COMMERCE: HowToUseGuide = {
   product: "Helix for Commerce",
   title: "How to use",
   overview:
     "Score orders for fraud, flag restock risks, and keep high-risk fulfillment decisions in human review before Shopify sync.",
-  videoSrc: "/help/helix-commerce-howto.mp4",
-  // ffprobe: helix-commerce-howto.mp4 duration 101.8s (Remotion 4.0.520). Re-record still required.
+  videoSrc: COMMERCE_HOWTO_VIDEO.publicSrc,
+  // ffprobe current prod file: 101.8s (Remotion 4.0.520). Keep player visible.
   videoTitle: "Product walkthrough (1m 42s)",
   videoNote:
-    "This walkthrough was recorded against an earlier demo catalog (different customers, SKUs, and dashboard totals). The live desk currently seeds 5 orders totaling $5,865.50 — figures in the video will not match until the walkthrough is re-recorded.",
+    "This walkthrough still plays. It was recorded against an earlier demo catalog (different customers, SKUs, and dashboard totals). Live seed is 5 orders totaling $5,865.50. A Helix-Personal re-record (Refund & Cancel) will replace apps/commerce/public/help/helix-commerce-howto.mp4 in place — do not hide this player.",
   steps: [
     {
       title: "1. Open the Dashboard",
