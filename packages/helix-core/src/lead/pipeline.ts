@@ -277,16 +277,31 @@ export function parseLeadIngest(body: unknown): LeadIngestInput | string {
   const email = String(row.email ?? "").trim();
   if (!name) return "name is required.";
   if (!email) return "email is required.";
+  const city = row.city != null ? String(row.city).trim() : "";
+  const state = row.state != null ? String(row.state).trim() : "";
+  const region =
+    row.region != null && String(row.region).trim()
+      ? String(row.region).trim()
+      : [city, state].filter(Boolean).join(", ") || undefined;
+  const title = row.title != null ? String(row.title).trim() : "";
+  const tags = Array.isArray(row.tags)
+    ? row.tags.map((t) => String(t).trim()).filter(Boolean).join(", ")
+    : row.tags != null
+      ? String(row.tags).trim()
+      : "";
+  const baseMessage = row.message != null ? String(row.message).trim() : "";
+  const extras = [title ? `Title: ${title}` : "", tags ? `Tags: ${tags}` : ""].filter(Boolean);
+  const message = [baseMessage, ...extras].filter(Boolean).join("\n") || undefined;
   return {
     name,
     email,
     source: row.source != null ? String(row.source) : undefined,
-    message: row.message != null ? String(row.message) : undefined,
+    message,
     budget: row.budget != null ? String(row.budget) : undefined,
     timeline: row.timeline != null ? String(row.timeline) : undefined,
     phone: row.phone != null ? String(row.phone) : undefined,
     company: row.company != null ? String(row.company) : undefined,
     country: row.country != null ? String(row.country) : undefined,
-    region: row.region != null ? String(row.region) : undefined,
+    region,
   };
 }

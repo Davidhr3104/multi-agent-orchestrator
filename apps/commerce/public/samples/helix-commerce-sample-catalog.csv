@@ -1,0 +1,6 @@
+sku,title,category,price_usd,on_hand,reorder_point,supplier,status
+BLK-090,"Blackout Roller Shade 90""",window,189.00,12,8,ShadeCo Sample,active
+LIN-60,"Linen Curtain Panel 60""",window,74.50,4,10,Textile Demo LLC,active
+ROD-48,"Brushed Nickel Rod 48""",hardware,29.99,40,15,Hardware Sample Co,active
+KIT-MT,Mounting Kit Universal,hardware,14.00,2,20,Hardware Sample Co,active
+CLN-01,Fabric Freshener Spray,care,12.00,55,25,Care Demo Inc,active

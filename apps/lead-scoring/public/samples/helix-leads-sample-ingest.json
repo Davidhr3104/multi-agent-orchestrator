@@ -1,0 +1,24 @@
+{
+  "source": "demo-loom",
+  "note": "Synthetic sample for Helix for Leads ingest \u2014 not a real person.",
+  "leads": [
+    {
+      "name": "Maya Torres",
+      "email": "maya.torres@example-riveroak.com",
+      "phone": "+1-214-555-0142",
+      "company": "River Oak Properties",
+      "title": "Facilities Manager",
+      "source": "website-form",
+      "message": "Need quarterly HVAC maintenance quotes for a 42-unit multifamily property in Plano. Budget around $6k\u20138k/year. Want kickoff this month.",
+      "budget": 7000,
+      "timeline": "this-month",
+      "city": "Plano",
+      "state": "TX",
+      "tags": [
+        "hvac",
+        "multifamily",
+        "inbound"
+      ]
+    }
+  ]
+}

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, RefreshCw, Search, Zap } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { Plus, RefreshCw, Search, Upload, Zap } from "lucide-react";
 import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { EducationalEmpty } from "@/components/educational-empty";
 import { INBOX_HELP, EMPTY_INBOX } from "@helix/help";
+import { isEmailUpload, parseUploadedEmail } from "@/lib/parse-email";
 
 type FilterTab = "all" | "urgent" | "review" | "routed" | "blocked";
 
@@ -65,10 +66,30 @@ export function InboxDashboard({
     subject: "",
     body: "",
   });
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploadDrag, setUploadDrag] = useState(false);
+  const emailFileRef = useRef<HTMLInputElement>(null);
 
   function flash(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2200);
+  }
+
+  async function applyEmailFile(file: File) {
+    if (!isEmailUpload(file)) {
+      setError("Upload a .txt or .eml file.");
+      return;
+    }
+    const text = await file.text();
+    const parsed = parseUploadedEmail(text);
+    setForm({
+      fromName: parsed.fromName,
+      fromEmail: parsed.fromEmail,
+      subject: parsed.subject,
+      body: parsed.body,
+    });
+    setUploadNote(`Prefill from ${file.name} — review, then Triage with AI.`);
+    setError(null);
   }
 
   async function refresh() {
@@ -174,6 +195,7 @@ export function InboxDashboard({
       const data = (await res.json()) as { message?: InboxMessage; error?: string };
       if (!res.ok || !data.message) throw new Error(data.error || `HTTP ${res.status}`);
       setForm({ fromName: "", fromEmail: "", subject: "", body: "" });
+      setUploadNote(null);
       setSelectedId(data.message.id);
       flash(`Triaged · ${data.message.category} · ${data.message.urgencyScore}`);
       await refresh();
@@ -603,12 +625,51 @@ export function InboxDashboard({
               <button
                 type="button"
                 className="text-xs font-medium text-accent transition-colors hover:text-accent dark:text-[#C4B5FD]"
-                onClick={() => setForm({ fromName: "", fromEmail: "", subject: "", body: "" })}
+                onClick={() => {
+                  setForm({ fromName: "", fromEmail: "", subject: "", body: "" });
+                  setUploadNote(null);
+                }}
               >
                 Clear
               </button>
             </div>
-            <p className="mb-4 text-[13px] text-muted-foreground">Paste an email to score and draft automatically</p>
+            <p className="mb-4 text-[13px] text-muted-foreground">
+              Paste an email or upload .txt / .eml, then score and draft automatically
+            </p>
+            <label
+              onDragOver={(e: DragEvent) => {
+                e.preventDefault();
+                setUploadDrag(true);
+              }}
+              onDragLeave={() => setUploadDrag(false)}
+              onDrop={(e: DragEvent) => {
+                e.preventDefault();
+                setUploadDrag(false);
+                const file = e.dataTransfer.files[0];
+                if (file) void applyEmailFile(file);
+              }}
+              className={cn(
+                "mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs transition",
+                uploadDrag
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-border text-muted-foreground hover:border-accent/50"
+              )}
+            >
+              <Upload className="size-3.5" />
+              Upload .txt or .eml
+              <input
+                ref={emailFileRef}
+                type="file"
+                accept=".txt,.eml,text/plain,message/rfc822"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void applyEmailFile(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {uploadNote ? <p className="mb-3 text-[11px] text-accent">{uploadNote}</p> : null}
             <form className="space-y-3" onSubmit={(e) => void ingest(e)}>
               <div className="grid grid-cols-2 gap-3">
                 <div>
