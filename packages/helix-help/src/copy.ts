@@ -109,6 +109,41 @@ export const HOW_TO_USE_COMMERCE: HowToUseGuide = {
   ],
 };
 
+export const HOW_TO_USE_MARKETING: HowToUseGuide = {
+  product: "Helix for Marketing",
+  title: "How to use",
+  overview:
+    "Join ad spend to Helix lead scores. Rec recommends pause / scale / keep. You confirm locally. This is not Ads Manager and not a post generator.",
+  steps: [
+    {
+      title: "1. Read the table",
+      body: "Each row is a campaign: spend, form volume, average score, cost per hot lead, and the REC action.",
+    },
+    {
+      title: "2. Check the catalog example",
+      body: "Ad A (120 forms, score ~24) should recommend pause. Ad B (22 forms, score ~79) should recommend scale.",
+    },
+    {
+      title: "3. HITL",
+      body: "Open a campaign and Confirm pause, Confirm scale, or Keep. Status is local only — Meta/Google stay stubs.",
+    },
+    {
+      title: "4. Ingest CSV",
+      body: "Paste spend with campaign_id, name, platform, spend, form_leads. Joins against the demo scored leads by campaign_id.",
+    },
+    {
+      title: "5. Settings",
+      body: "CSV is connected. Meta and Google are explicitly not connected.",
+    },
+  ],
+  hitlTip:
+    "Do not treat Confirm pause as a live Ads Manager write. Evidence first, human second, API later.",
+  shortcuts: [
+    { keys: "pause / scale / keep", action: "Filter REC actions" },
+    { keys: "review", action: "HITL queue" },
+  ],
+};
+
 export const HOW_TO_USE_INBOX: HowToUseGuide = {
   product: "Helix for Inbox",
   title: "How to use",

@@ -7,6 +7,7 @@
     "apps/legal",
     "apps/inbox",
     "apps/commerce",
+    "apps/marketing",
     "packages/helix-core",
     "packages/helix-help"
   ],
@@ -16,6 +17,7 @@
     "dev:legal": "npm run dev --workspace=helix-legal",
     "dev:inbox": "npm run dev --workspace=helix-inbox",
     "dev:commerce": "npm run dev --workspace=helix-commerce",
+    "dev:marketing": "npm run dev --workspace=helix-marketing",
     "test": "npm test --workspace=@helix/core"
   },
   "devDependencies": {

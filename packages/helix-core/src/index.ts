@@ -10,6 +10,7 @@ export {
   sourceAttribution,
 } from "./lead/intelligence";
 export { domainFromEmail, enrichEmailDomain } from "./lead/enrich";
+export type { DomainEnrichment as DomainEnrichmentPayload } from "./lead/enrich";
 export {
   draftOutreachHeuristic,
   lookalikeLeads,
@@ -48,13 +49,25 @@ export type {
   StoredOrder,
   StoredProduct,
 } from "./commerce/types";
+export { parseSpendCsv } from "./marketing/spendCsv";
+export { joinCampaignMetrics, scoreCampaignHeuristic } from "./marketing/heuristic";
+export { runCampaignPipeline } from "./marketing/pipeline";
+export type {
+  AdPlatform,
+  AttributedLead,
+  CampaignAction,
+  CampaignMetrics,
+  CampaignScoreResult,
+  CampaignStatus,
+  SpendRowInput,
+  StoredCampaign,
+} from "./marketing/types";
 export type {
   AgentDecision,
   AgentId,
   AgentRun,
   CorpusStatus,
   CrmStatus,
-  DomainEnrichmentPayload,
   LeadClassification,
   LeadEmit,
   LeadEnrichment,
