@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EngineShell } from "@/components/engine-shell";
 
 type Status = { meta: boolean; google: boolean; csv: boolean };
 
@@ -35,62 +34,41 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
-      <div className="flex items-center justify-between">
+    <EngineShell active="settings">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8 lg:px-8">
         <div>
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/helix-for-marketing.png"
-              alt="Helix for Marketing"
-              className="h-10 w-auto shrink-0"
-            />
-            <div>
-              <p className="text-xs tracking-[0.2em] text-primary uppercase">Helix for Marketing</p>
-              <h1 className="mt-1 text-2xl font-medium">Settings</h1>
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Nothing here claims Ads Manager is connected.
-          </p>
+          <h1 className="text-2xl font-medium text-white">Settings</h1>
+          <p className="mt-2 text-sm text-[#9CA3AF]">Nothing here claims Ads Manager is connected.</p>
         </div>
-        <Link
-          href="/"
-          className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem]"
-        >
-          Campaigns
-        </Link>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Integrations</CardTitle>
-          <CardDescription>CSV is real. Ad APIs are stubs.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {ROWS.map((row) => {
-            const connected = status?.[row.key];
-            return (
-              <div key={row.key} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0">
-                <div>
-                  <p className="text-sm font-medium">{row.label}</p>
-                  <p className="text-xs text-muted-foreground">{row.hint}</p>
+        <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
+          <h2 className="text-sm font-semibold text-white">Integrations</h2>
+          <p className="mt-1 text-xs text-[#6B7280]">CSV is real. Ad APIs are stubs.</p>
+          <div className="mt-4 flex flex-col gap-4">
+            {ROWS.map((row) => {
+              const connected = status?.[row.key];
+              return (
+                <div key={row.key} className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-3 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-white">{row.label}</p>
+                    <p className="text-xs text-[#6B7280]">{row.hint}</p>
+                  </div>
+                  {status == null ? (
+                    <span className="text-xs text-[#6B7280]">Checking…</span>
+                  ) : connected ? (
+                    <span className="flex items-center gap-1 text-xs text-[#34D399]">
+                      <CheckCircle2 className="size-3.5" /> Connected
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-[#FBBF24]">
+                      <XCircle className="size-3.5" /> Not configured
+                    </span>
+                  )}
                 </div>
-                {status == null ? (
-                  <span className="text-xs text-muted-foreground">Checking…</span>
-                ) : connected ? (
-                  <span className="flex items-center gap-1 text-xs text-emerald-300">
-                    <CheckCircle2 className="size-3.5" /> Connected
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs text-amber-300">
-                    <XCircle className="size-3.5" /> Not configured
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-    </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </EngineShell>
   );
 }
