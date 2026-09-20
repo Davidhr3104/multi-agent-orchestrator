@@ -1,0 +1,12 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "cd ../.. && npm run build --workspace=helix-inbox",
+  "outputDirectory": ".next",
+  "crons": [
+    {
+      "path": "/api/weekly-report",
+      "schedule": "0 14 * * 1"
+    }
+  ]
+}
