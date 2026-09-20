@@ -93,38 +93,52 @@ function seedIfNeeded() {
   applyDemoCatalog();
 }
 
-export async function listLeads(): Promise<StoredLead[]> {
+/**
+ * orgId is required whenever Supabase is configured — it's the real tenant
+ * boundary (see supabase-leads.ts; the server client bypasses RLS via the
+ * service-role key, so this explicit filter IS the isolation).
+ *
+ * The in-memory fallback (no Supabase configured) stays single-tenant: it's
+ * the local/demo path, not multi-org production. orgId is accepted there
+ * for signature symmetry but ignored — this is intentional, not a leak,
+ * since there is no second tenant to leak data to in that mode.
+ */
+export async function listLeads(orgId?: string): Promise<StoredLead[]> {
   seedIfNeeded();
-  const remote = await supabaseListLeads();
-  if (remote && remote.length > 0) {
-    for (const lead of remote) memory.set(lead.id, lead);
-    return remote;
+  if (orgId) {
+    const remote = await supabaseListLeads(orgId);
+    if (remote && remote.length > 0) {
+      for (const lead of remote) memory.set(lead.id, lead);
+      return remote;
+    }
+    if (remote !== null) return []; // Supabase configured and answered: an empty org has zero leads, not the demo seed.
   }
   return [...memory.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function saveLead(lead: StoredLead): Promise<StoredLead> {
+export async function saveLead(lead: StoredLead, orgId?: string): Promise<StoredLead> {
   seedIfNeeded();
   memory.set(lead.id, lead);
-  await supabaseUpsertLead(lead);
+  if (orgId) await supabaseUpsertLead(lead, orgId);
   return lead;
 }
 
-export async function getLead(id: string): Promise<StoredLead | null> {
+export async function getLead(id: string, orgId?: string): Promise<StoredLead | null> {
   seedIfNeeded();
   if (memory.has(id)) return memory.get(id) ?? null;
-  const all = await listLeads();
+  const all = await listLeads(orgId);
   return all.find((l) => l.id === id) ?? null;
 }
 
 export async function patchLead(
   id: string,
-  patch: Partial<Omit<StoredLead, "id">>
+  patch: Partial<Omit<StoredLead, "id">>,
+  orgId?: string
 ): Promise<StoredLead | null> {
-  const current = await getLead(id);
+  const current = await getLead(id, orgId);
   if (!current) return null;
   const next = { ...current, ...patch };
-  return saveLead(next);
+  return saveLead(next, orgId);
 }
 
 export async function deleteLeads(ids: string[]): Promise<number> {
@@ -138,11 +152,12 @@ export async function deleteLeads(ids: string[]): Promise<number> {
 
 export async function patchLeads(
   ids: string[],
-  patch: Partial<Pick<StoredLead, "crmStatus" | "needsReview" | "pipelineStage" | "reviewedBy" | "reviewedAt">>
+  patch: Partial<Pick<StoredLead, "crmStatus" | "needsReview" | "pipelineStage" | "reviewedBy" | "reviewedAt">>,
+  orgId?: string
 ): Promise<StoredLead[]> {
   const out: StoredLead[] = [];
   for (const id of ids) {
-    const next = await patchLead(id, patch);
+    const next = await patchLead(id, patch, orgId);
     if (next) out.push(next);
   }
   return out;

@@ -170,3 +170,33 @@ textarea::-webkit-scrollbar-thumb {
   background: rgba(14, 165, 233, 0.2);
   border-radius: 4px;
 }
+/* Score explainability report — print-ready. Scoped to body[data-report-print]
+   so it never affects printing any other page in the dashboard. */
+@media print {
+  body[data-report-print] aside,
+  body[data-report-print] header {
+    display: none !important;
+  }
+  body[data-report-print] .report-no-print {
+    display: none !important;
+  }
+  body[data-report-print],
+  body[data-report-print] .report-page {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  body[data-report-print] .report-page {
+    box-shadow: none !important;
+  }
+  body[data-report-print] .report-quote {
+    color: #334155 !important;
+    border-color: #94a3b8 !important;
+  }
+  body[data-report-print] .report-unverified {
+    color: #92400e !important;
+  }
+  body[data-report-print] tr,
+  body[data-report-print] li {
+    break-inside: avoid;
+  }
+}

@@ -12,9 +12,11 @@ export function ActiveInspector({
   onUpdate: () => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function act(action: string) {
     setBusy(action);
+    setError(null);
     try {
       await fetch(`/api/messages/${thread.id}`, {
         method: "PATCH",
@@ -27,6 +29,8 @@ export function ActiveInspector({
         }
       });
       onUpdate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(null);
     }
@@ -57,6 +61,11 @@ export function ActiveInspector({
         <span className="rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent dark:text-[#DDD6FE]">
           {thread.sentiment}
         </span>
+        {thread.leadIntent ? (
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-300">
+            Buyer intent
+          </span>
+        ) : null}
       </div>
       <div className="mb-2 flex items-center gap-1.5 text-xs text-foreground/80">
         <span className="text-muted-foreground">Route target:</span>
@@ -74,6 +83,16 @@ export function ActiveInspector({
           {thread.draftReply}
         </p>
       ) : null}
+      {error ? (
+        <p className="mb-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-2 text-[11px] text-red-600 dark:text-[#FCA5A5]">
+          {error}
+        </p>
+      ) : null}
+      {thread.handedOffAt ? (
+        <p className="mb-3 text-[11px] text-emerald-600 dark:text-[#34D399]">
+          Sent to Helix for Leads {new Date(thread.handedOffAt).toLocaleString("en-US")}.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -83,6 +102,16 @@ export function ActiveInspector({
         >
           {busy === "approve" ? "…" : "Send reply"}
         </button>
+        {thread.leadIntent && !thread.handedOffAt ? (
+          <button
+            type="button"
+            disabled={busy != null}
+            className="btn-tactile h-8 rounded-md border border-amber-500/40 px-3 text-[11px] text-amber-600 dark:text-amber-300 disabled:opacity-50"
+            onClick={() => void act("handoff_leads")}
+          >
+            {busy === "handoff_leads" ? "…" : "Send to Leads"}
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={busy != null}

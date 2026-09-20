@@ -4,8 +4,13 @@ import { finishLeadIngest } from "@/lib/finish-ingest";
 export const runtime = "nodejs";
 
 /**
- * Inbound GHL form/webhook. Returns the scored lead as JSON (webhooks cannot consume SSE).
- * Maps campaign / UTM / phone when the payload includes them.
+ * Inbound GHL form/webhook — legacy, unscoped path. Kept for existing GHL
+ * integrations already pointed at this URL; ingests into the legacy/no-org
+ * bucket (same as before org tenancy existed). For per-org isolation, create
+ * a new webhook URL in Settings and point GHL at
+ * /api/leads/webhook/ghl/[token] instead — GHL calls this server-to-server
+ * with no session, so org identity has to come from the URL itself, not a
+ * signed-in user (see withOrgScope, which is for browser sessions).
  */
 export async function POST(req: Request) {
   let body: unknown;

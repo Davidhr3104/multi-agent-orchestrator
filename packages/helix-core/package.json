@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./operator": "./src/operator.ts",
-    "./secret-fields": "./src/secret-fields.ts"
+    "./action-token": "./src/action-token.ts",
+    "./secret-fields": "./src/secret-fields.ts",
+    "./lead/intelligence": "./src/lead/intelligence.ts"
   },
   "scripts": {
     "test": "vitest run"

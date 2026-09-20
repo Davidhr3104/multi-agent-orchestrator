@@ -103,7 +103,14 @@ Do you have 15 minutes this week?
 
 export type RoiSnapshot = {
   hoursSaved: number;
+  /** Estimated budget still in play — hot leads not yet won or lost. Not realized revenue. */
   pipelineUsd: number;
+  /** Real closed revenue: sum of dealValue on leads marked won. */
+  wonUsd: number;
+  wonCount: number;
+  lostCount: number;
+  /** won / (won + lost), 0 when there's no closed history yet. */
+  winRate: number;
   spamBlocked: number;
   leadsScored: number;
 };
@@ -112,10 +119,15 @@ export function roiMetrics(leads: StoredLead[]): RoiSnapshot {
   const minutes = 5;
   const hoursSaved = Math.round(((leads.length * minutes) / 60) * 10) / 10;
   const pipelineUsd = leads
-    .filter((l) => l.classification === "lead" && l.tier === "hot")
+    .filter((l) => l.classification === "lead" && l.tier === "hot" && l.pipelineStage !== "won" && l.pipelineStage !== "lost")
     .reduce((s, l) => s + (budgetNumber(l.budget) ?? 0), 0);
+  const wonLeads = leads.filter((l) => l.pipelineStage === "won");
+  const lostCount = leads.filter((l) => l.pipelineStage === "lost").length;
+  const wonUsd = wonLeads.reduce((s, l) => s + (l.dealValue ?? 0), 0);
+  const wonCount = wonLeads.length;
+  const winRate = wonCount + lostCount > 0 ? wonCount / (wonCount + lostCount) : 0;
   const spamBlocked = leads.filter((l) => l.classification === "spam").length;
-  return { hoursSaved, pipelineUsd, spamBlocked, leadsScored: leads.length };
+  return { hoursSaved, pipelineUsd, wonUsd, wonCount, lostCount, winRate, spamBlocked, leadsScored: leads.length };
 }
 
 export type MeetingSlot = { label: string; start: string; url: string };

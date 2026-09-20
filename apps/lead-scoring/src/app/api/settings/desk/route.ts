@@ -17,3 +17,4 @@ export async function POST(req: Request) {
   if (body.action === "empty") return Response.json(await clearDesk());
   return Response.json({ error: "action must be demo or empty." }, { status: 400 });
 }
+

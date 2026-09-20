@@ -23,6 +23,8 @@ export function joinCampaignMetrics(
   const formLeads = spend.formLeads ?? mine.length;
   const cpl = formLeads > 0 ? spend.spend / formLeads : null;
   const costPerHot = nHot > 0 ? spend.spend / nHot : null;
+  const spamRate = mine.length === 0 ? 0 : nSpam / mine.length;
+  const spendOnSpam = mine.length === 0 ? 0 : round(spend.spend * spamRate);
   return {
     campaignId: spend.campaignId,
     nLeads: mine.length,
@@ -32,6 +34,8 @@ export function joinCampaignMetrics(
     formLeads,
     cpl: cpl == null ? null : round(cpl),
     costPerHot: costPerHot == null ? null : round(costPerHot),
+    spendOnSpam,
+    spamRate: round(spamRate),
   };
 }
 
@@ -57,6 +61,9 @@ export function scoreCampaignHeuristic(
 
   const reasoning = [
     `${spend.name}: spend $${spend.spend.toFixed(0)}, ${metrics.formLeads} forms, ${metrics.nLeads} scored leads, avg score ${metrics.avgScore}, ${metrics.nHot} hot.`,
+    metrics.spendOnSpam > 0
+      ? `~$${metrics.spendOnSpam} attributed to spam (${Math.round(metrics.spamRate * 100)}% of scored).`
+      : "No spam-attributed spend in scored set.",
     metrics.costPerHot == null
       ? "No hot leads — cost per hot is undefined."
       : `Cost per hot lead $${metrics.costPerHot}.`,

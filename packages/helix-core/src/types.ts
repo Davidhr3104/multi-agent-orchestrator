@@ -124,11 +124,16 @@ export type LeadScoreResult = {
 export type StoredLead = LeadScoreResult &
   LeadIngestInput & {
     id: string;
+    orgId?: string;
     createdAt: string;
     runId: string;
     crmStatus: CrmStatus;
     ghlContactId?: string;
+    ghlOpportunityId?: string;
+    ghlOpportunityError?: string;
     pipelineStage?: PipelineStage;
+    dealValue?: number;
+    closedAt?: string;
     source: string;
     message: string;
     phone?: string;
@@ -153,6 +158,7 @@ export type StoredLead = LeadScoreResult &
     agentTrace?: AgentRun[];
     outreachDraft?: string;
     meetingLink?: string;
+    meetingConfirmedAt?: string;
     enrichedIndustry?: string | null;
     enrichedSize?: string | null;
     enrichedCountry?: string | null;
@@ -172,7 +178,20 @@ export type LeadEmit = (event: LeadStreamEvent) => void;
 
 export type RfpMethod = "BEAR" | "SPI" | "other";
 export type RfpTier = "hot" | "warm" | "cold";
-export type CorpusStatus = "not_asked" | "mocked";
+/** not_asked → never queried; live → real firm cites; unavailable → empty corpus; mocked → legacy stub */
+export type CorpusStatus = "not_asked" | "live" | "unavailable" | "mocked";
+
+export type CorpusHit = {
+  docId: string;
+  docTitle: string;
+  chunkId: string;
+  excerpt: string;
+  quote: string;
+  spanStart: number;
+  spanEnd: number;
+  score: number;
+  verified: boolean;
+};
 
 export type RfpIngestInput = {
   title: string;
@@ -197,6 +216,9 @@ export type RfpScoreResult = {
 
 export type PartnerVerdict = "GO" | "CONDITIONAL" | "NO-GO";
 
+/** Closed-loop result after partner verdict — drives Legal win-rate story. */
+export type MatterOutcome = "pending" | "won" | "lost" | "withdrawn" | "no_bid";
+
 export type PartnerDecision = {
   verdict: PartnerVerdict;
   coiCleared: boolean;
@@ -204,6 +226,12 @@ export type PartnerDecision = {
   notes?: string;
   decidedBy: string;
   decidedAt: string;
+  /** Default pending for GO/CONDITIONAL; no_bid when verdict is NO-GO. */
+  outcome?: MatterOutcome;
+  outcomeAt?: string;
+  outcomeNotes?: string;
+  /** Actual fee / matter value when won (falls back to bidAmount in metrics). */
+  wonAmount?: string;
 };
 
 export type StoredRfp = RfpScoreResult & {
@@ -215,6 +243,8 @@ export type StoredRfp = RfpScoreResult & {
   body: string;
   clientProfile: string;
   corpusStatus: CorpusStatus;
+  /** Firm-document cites from Ask corpus (live retrieval). */
+  corpusHits?: CorpusHit[];
   partnerDecision?: PartnerDecision;
 };
 

@@ -3,6 +3,7 @@ import { getSecret, onSecretsChanged } from "@helix/core";
 import type {
   AiActionLog,
   DraftTone,
+  EmailAccount,
   EmailThread,
   ThreadCategory,
   ThreadMessage,
@@ -75,7 +76,13 @@ type DeskQuery = {
 
 function inboxTable(
   db: Client,
-  table: "email_threads" | "thread_messages" | "ai_actions_log" | "user_preferences" | "workspaces"
+  table:
+    | "email_threads"
+    | "thread_messages"
+    | "ai_actions_log"
+    | "user_preferences"
+    | "workspaces"
+    | "email_accounts"
 ): DeskQuery {
   return (
     db as unknown as { schema: (name: string) => { from: (t: string) => DeskQuery } }
@@ -127,6 +134,8 @@ export function toThreadRow(thread: EmailThread) {
     needs_review: thread.needsReview,
     snooze_until: thread.snoozeUntil,
     engine: thread.engine,
+    lead_intent: thread.leadIntent,
+    handed_off_at: thread.handedOffAt ?? null,
     received_at: thread.receivedAt,
     created_at: thread.createdAt,
     updated_at: thread.updatedAt,
@@ -160,6 +169,8 @@ export function fromThreadRow(row: Record<string, unknown>): EmailThread {
     reasoning: String(row.classification_reasoning ?? row.reasoning ?? ""),
     needsReview: Boolean(row.needs_review),
     engine: row.engine === "claude" ? "claude" : "heuristic",
+    leadIntent: Boolean(row.lead_intent),
+    handedOffAt: row.handed_off_at != null ? String(row.handed_off_at) : undefined,
     receivedAt: String(row.received_at ?? row.created_at),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at ?? row.created_at),
@@ -171,6 +182,8 @@ function toMessageRow(msg: ThreadMessage) {
     id: msg.id,
     thread_id: msg.threadId,
     message_id: msg.messageId ?? null,
+    gmail_message_id: msg.gmailMessageId ?? null,
+    rfc_message_id: msg.rfcMessageId ?? null,
     from_email: msg.fromEmail,
     to_email: msg.toEmail ?? null,
     subject: msg.subject ?? null,
@@ -185,6 +198,8 @@ function fromMessageRow(row: Record<string, unknown>): ThreadMessage {
     id: String(row.id),
     threadId: String(row.thread_id),
     messageId: row.message_id != null ? String(row.message_id) : undefined,
+    gmailMessageId: row.gmail_message_id != null ? String(row.gmail_message_id) : undefined,
+    rfcMessageId: row.rfc_message_id != null ? String(row.rfc_message_id) : undefined,
     fromEmail: String(row.from_email ?? ""),
     toEmail: row.to_email != null ? String(row.to_email) : undefined,
     subject: row.subject != null ? String(row.subject) : undefined,
@@ -345,6 +360,100 @@ export async function supabaseUpsertPreferences(prefs: UserPreferences): Promise
       theme: prefs.theme,
       custom_rules: { rules: prefs.customRules, templates: prefs.templates },
     },
+    { onConflict: "id" }
+  );
+  return !error;
+}
+
+function fromAccountRow(row: Record<string, unknown>): EmailAccount {
+  return {
+    id: String(row.id),
+    workspaceId: row.workspace_id != null ? String(row.workspace_id) : null,
+    emailAddress: String(row.email_address ?? ""),
+    provider: row.provider != null ? String(row.provider) : null,
+    accessToken: row.access_token != null ? String(row.access_token) : undefined,
+    refreshToken: row.refresh_token != null ? String(row.refresh_token) : undefined,
+    tokenExpiresAt: row.token_expires_at != null ? String(row.token_expires_at) : undefined,
+    gmailHistoryId: row.gmail_history_id != null ? String(row.gmail_history_id) : undefined,
+    isConnected: Boolean(row.is_connected ?? true),
+    lastSyncedAt: row.last_synced_at != null ? String(row.last_synced_at) : undefined,
+  };
+}
+
+/** All Gmail accounts (mailboxes/aliases) connected to the workspace — a workspace can have more than one (ops@, support@, ...). */
+export async function supabaseListEmailAccounts(workspaceId: string): Promise<EmailAccount[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  const { data, error } = await inboxTable(db, "email_accounts")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: true });
+  if (error || !data) return [];
+  return data.map(fromAccountRow);
+}
+
+/**
+ * The workspace's first/primary connected Gmail account, if any. Kept for
+ * call sites that reasonably default to "the" mailbox (e.g. resolving org
+ * webhook identity) — anything that needs to handle multiple connected
+ * mailboxes (sync, reply-in-thread) should use supabaseListEmailAccounts or
+ * supabaseGetEmailAccountById instead.
+ */
+export async function supabaseGetEmailAccount(workspaceId: string): Promise<EmailAccount | null> {
+  const accounts = await supabaseListEmailAccounts(workspaceId);
+  return accounts[0] ?? null;
+}
+
+export async function supabaseGetEmailAccountById(accountId: string): Promise<EmailAccount | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await inboxTable(db, "email_accounts")
+    .select("*")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return fromAccountRow(data);
+}
+
+export async function supabaseUpsertEmailAccount(account: {
+  workspaceId: string;
+  emailAddress: string;
+  accessToken: string;
+  refreshToken?: string;
+  tokenExpiresAt: string;
+}): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  const { error } = await inboxTable(db, "email_accounts").upsert(
+    {
+      workspace_id: account.workspaceId,
+      email_address: account.emailAddress,
+      provider: "gmail",
+      access_token: account.accessToken,
+      refresh_token: account.refreshToken ?? null,
+      token_expires_at: account.tokenExpiresAt,
+      is_connected: true,
+      last_synced_at: new Date().toISOString(),
+    },
+    { onConflict: "email_address" }
+  );
+  if (error) {
+    console.warn("[helix-inbox] upsert email account skipped:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/** Persists a refreshed access token (and its new expiry) without touching the refresh token itself. */
+export async function supabaseUpdateAccessToken(
+  accountId: string,
+  accessToken: string,
+  tokenExpiresAt: string
+): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  const { error } = await inboxTable(db, "email_accounts").upsert(
+    { id: accountId, access_token: accessToken, token_expires_at: tokenExpiresAt },
     { onConflict: "id" }
   );
   return !error;

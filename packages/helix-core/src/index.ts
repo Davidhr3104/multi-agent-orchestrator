@@ -22,6 +22,7 @@ export { scoreLeadHeuristic } from "./lead/heuristic";
 export {
   applyBehavior,
   attachIntelligence,
+  budgetNumber,
   findDuplicate,
   isBehaviorKind,
   sourceAttribution,
@@ -41,6 +42,15 @@ export { leadScoringPrompt } from "./lead/prompts";
 export { scoreRfpHeuristic, profileOverlap } from "./rfp/heuristic";
 export { parseRfpIngest, runRfpPipeline } from "./rfp/pipeline";
 export { DEFAULT_LEGAL_PROFILE, rfpScoringPrompt } from "./rfp/prompts";
+export { summarizeLegalOutcomes, parseMoneyLoose, effectiveOutcome } from "./rfp/outcomes";
+export type { LegalOutcomesSummary } from "./rfp/outcomes";
+export {
+  chunkDocument,
+  retrieveCorpusHits,
+  buildCorpusQuery,
+  tokenize,
+} from "./rfp/corpus";
+export type { CorpusChunk, CorpusDocument } from "./rfp/corpus";
 export { scoreFraudHeuristic } from "./commerce/fraudHeuristic";
 export { predictInventoryHeuristic } from "./commerce/inventoryHeuristic";
 export { classifyInquiryHeuristic } from "./commerce/inquiryHeuristic";
@@ -49,6 +59,8 @@ export {
   runInventoryPrediction,
   runInquiryClassification,
 } from "./commerce/pipeline";
+export { summarizeDeskRisk } from "./commerce/risk";
+export type { DeskRiskSummary } from "./commerce/risk";
 export type {
   AiActionLog,
   FraudScoreResult,
@@ -70,6 +82,7 @@ export { parseSpendCsv } from "./marketing/spendCsv";
 export { joinCampaignMetrics, scoreCampaignHeuristic } from "./marketing/heuristic";
 export { runCampaignPipeline } from "./marketing/pipeline";
 export { buildMarketingSeed } from "./marketing/seed";
+export { summarizeDeskWaste } from "./marketing/waste";
 export {
   addUtcDays,
   dailySpendSeries,
@@ -88,6 +101,7 @@ export type {
   CampaignMetrics,
   CampaignScoreResult,
   CampaignStatus,
+  DeskWasteSummary,
   HitlDecision,
   MarketingWindow,
   SpendEvent,
@@ -100,6 +114,7 @@ export type {
   AgentId,
   AgentRun,
   CorpusStatus,
+  CorpusHit,
   CrmStatus,
   LeadClassification,
   LeadEmit,
@@ -111,6 +126,7 @@ export type {
   PipelineLog,
   PartnerDecision,
   PartnerVerdict,
+  MatterOutcome,
   PipelineStage,
   RfpEmit,
   RfpIngestInput,

@@ -64,6 +64,23 @@ export type CampaignMetrics = {
   formLeads: number;
   cpl: number | null;
   costPerHot: number | null;
+  /** Spend attributed to spam-classified leads (proportional). */
+  spendOnSpam: number;
+  spamRate: number;
+};
+
+export type DeskWasteSummary = {
+  totalSpend: number;
+  spendOnSpam: number;
+  spendOnHotShare: number;
+  wastePct: number;
+  nSpam: number;
+  nHot: number;
+  nLeads: number;
+  costPerHot: number | null;
+  worstCampaignId: string | null;
+  worstCampaignName: string | null;
+  worstSpendOnSpam: number;
 };
 
 export type CampaignScoreResult = {

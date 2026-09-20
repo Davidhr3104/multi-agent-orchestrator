@@ -7,14 +7,7 @@ import type { StoredLead } from "@helix/core";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CommandPalette, ShortcutsHelp } from "@/components/command-palette";
-import {
-  applyBrand,
-  readBrand,
-  readCurrentWorkspace,
-  readWorkspaces,
-  writeCurrentWorkspace,
-  type Workspace,
-} from "@/lib/prefs";
+import { readCurrentWorkspace, readWorkspaces, writeCurrentWorkspace, type Workspace } from "@/lib/prefs";
 import {
   BarChart3,
   ChevronDown,
@@ -24,7 +17,6 @@ import {
   Inbox,
   LayoutDashboard,
   Menu,
-  Palette,
   Plug,
   Repeat2,
   Search,
@@ -74,16 +66,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     try {
       setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
       setSettingsOpen(window.localStorage.getItem(SETTINGS_KEY) !== "0");
-      const brand = readBrand();
-      applyBrand(brand);
-      setBrandName(brand.productName);
-      setLogoUrl(brand.logoUrl);
       setWorkspaces(readWorkspaces());
       setWorkspaceId(readCurrentWorkspace());
     } catch {
       /* ignore */
     }
     setReady(true);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/org")
+      .then((r) => r.json())
+      .then((d: { org?: { orgName?: string; logoUrl?: string; primaryColor?: string } | null }) => {
+        if (d.org?.orgName) setBrandName(d.org.orgName);
+        if (d.org?.logoUrl) setLogoUrl(d.org.logoUrl);
+        document.documentElement.style.setProperty("--helix-primary", d.org?.primaryColor || "#38bdf8");
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -168,7 +167,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/settings/usage", label: "Usage & API", icon: Cpu },
     { href: "/settings/automations", label: "Automations", icon: Workflow },
     { href: "/settings/integrations", label: "Integrations", icon: Plug },
-    { href: "/settings/brand", label: "White-label", icon: Palette },
   ] as const;
 
   function NavLabel({ label, children }: { label: string; children: ReactNode }) {
@@ -418,11 +416,48 @@ export function AppShell({ children }: { children: ReactNode }) {
               </option>
             ))}
           </select>
+          <OrgSessionBadge />
         </div>
         <div className="flex-1">{children}</div>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
+  );
+}
+
+function OrgSessionBadge() {
+  const [state, setState] = useState<{
+    configured: boolean;
+    signedIn: boolean;
+    user?: { email: string | null };
+    org?: { orgName: string } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/org")
+      .then((r) => r.json())
+      .then(setState)
+      .catch(() => setState({ configured: false, signedIn: false }));
+  }, []);
+
+  if (!state || !state.configured) return null;
+  if (!state.signedIn) {
+    return (
+      <Link
+        href="/login"
+        className="hidden shrink-0 rounded-md border border-sky-900/50 bg-[#0a1e30] px-2 py-1 text-xs text-slate-300 hover:bg-[#0f2942] sm:block"
+      >
+        Sign in
+      </Link>
+    );
+  }
+  return (
+    <span
+      className="hidden shrink-0 truncate rounded-md border border-emerald-900/50 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-300 sm:block"
+      title={state.user?.email ?? undefined}
+    >
+      {state.org?.orgName ?? "No workspace"}
+    </span>
   );
 }

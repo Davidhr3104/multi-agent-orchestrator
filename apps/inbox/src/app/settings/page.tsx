@@ -1,12 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "@/components/theme-provider";
 import type { CustomRule, DraftTone, EmailTemplate, UserPreferences } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { KEYS_INBOX } from "@helix/core/secret-fields";
 import { DeskOpsForm } from "@helix/help/desk-form";
 import { ApiKeysForm } from "@helix/help/keys-form";
+
+type GmailAccountRow = {
+  id: string;
+  emailAddress: string;
+  connected: boolean;
+  hasRefreshToken: boolean;
+  tokenExpiresAt: string | null;
+};
+
+type GmailAccountStatus = {
+  oauthConfigured: boolean;
+  accounts: GmailAccountRow[];
+};
+
+function GmailConnectCard() {
+  return (
+    <Suspense fallback={<div className="glass-panel rounded-xl p-6" />}>
+      <GmailConnectCardInner />
+    </Suspense>
+  );
+}
+
+function GmailConnectCardInner() {
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<GmailAccountStatus | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/gmail-account")
+      .then((r) => r.json())
+      .then((d: GmailAccountStatus) => setStatus(d));
+  }, []);
+
+  const connectedNotice = searchParams.get("gmail_connected");
+  const errorNotice = searchParams.get("gmail_error");
+
+  return (
+    <div className="glass-panel rounded-xl p-6">
+      <h2 className="mb-1 text-base font-semibold text-foreground">Gmail mailboxes</h2>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Connect one or more refreshable OAuth mailboxes — a shared alias like ops@ or support@ can be
+        connected alongside a personal inbox. Sync pulls from every connected mailbox; replies always go
+        out from the mailbox that received the thread.
+      </p>
+      {connectedNotice ? (
+        <p className="mb-3 rounded-md border border-emerald-900/40 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-400">
+          Connected {connectedNotice}.
+        </p>
+      ) : null}
+      {errorNotice ? (
+        <p className="mb-3 rounded-md border border-rose-900/40 bg-rose-950/30 px-3 py-2 text-xs text-rose-400">
+          Could not connect: {errorNotice}
+        </p>
+      ) : null}
+      {status == null ? (
+        <p className="text-xs text-muted-foreground">Checking…</p>
+      ) : !status.oauthConfigured ? (
+        <p className="text-xs text-amber-500">
+          Paste GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET above first.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {status.accounts.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No mailboxes connected yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {status.accounts.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs"
+                >
+                  <div>
+                    <p className="text-foreground">{a.emailAddress}</p>
+                    <p className="text-muted-foreground">
+                      {a.hasRefreshToken ? "Refreshes automatically." : "No refresh token — reconnect to enable auto-refresh."}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      a.connected ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"
+                    )}
+                  >
+                    {a.connected ? "Connected" : "Reconnect needed"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <a
+            href="/api/auth/gmail/start"
+            className="btn-tactile inline-block rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground"
+          >
+            {status.accounts.length === 0 ? "Connect Gmail" : "Connect another mailbox"}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -79,6 +179,7 @@ export default function SettingsPage() {
         <div className="glass-panel rounded-xl p-6">
           <ApiKeysForm initialFields={KEYS_INBOX} />
         </div>
+        <GmailConnectCard />
         <div className="glass-panel rounded-xl p-6">
           <DeskOpsForm />
         </div>

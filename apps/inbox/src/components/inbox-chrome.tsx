@@ -3,11 +3,20 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, ChevronLeft, CircleHelp, LayoutDashboard, Repeat2, Send, Settings, Shield } from "lucide-react";
+import { Activity, BarChart3, ChevronLeft, CircleHelp, LayoutDashboard, Repeat2, Send, Settings, Shield, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type InboxNavId = "dashboard" | "queue" | "routed" | "blocked" | "settings" | "help" | "analytics";
+export type InboxNavId =
+  | "dashboard"
+  | "queue"
+  | "routed"
+  | "blocked"
+  | "sla"
+  | "weekly-report"
+  | "settings"
+  | "help"
+  | "analytics";
 
 type ProductLink = { name: string; href: string; className: string };
 
@@ -84,6 +93,8 @@ export function InboxChrome({
     { id: "queue", label: "HITL queue", href: "/hitl-queue", badge: reviewCount, badgeTone: "amber" },
     { id: "routed", label: "Routed", href: "/routed", badge: routedCount, badgeTone: "muted" },
     { id: "blocked", label: "Blocked", href: "/blocked", badge: blockedCount, badgeTone: "muted" },
+    { id: "sla", label: "SLA", href: "/sla" },
+    { id: "weekly-report", label: "Weekly report", href: "/weekly-report" },
     { id: "analytics", label: "Analytics", href: "/analytics" },
     { id: "settings", label: "Settings", href: "/settings" },
     { id: "help", label: "How to use", href: "/help" },
@@ -139,13 +150,15 @@ export function InboxChrome({
                     ? Activity
                     : item.id === "routed"
                       ? Send
-                      : item.id === "analytics"
-                        ? BarChart3
-                        : item.id === "settings"
-                          ? Settings
-                          : item.id === "help"
-                            ? CircleHelp
-                            : Shield;
+                      : item.id === "sla"
+                        ? Timer
+                        : item.id === "analytics"
+                          ? BarChart3
+                          : item.id === "settings"
+                            ? Settings
+                            : item.id === "help"
+                              ? CircleHelp
+                              : Shield;
               return (
                 <Link
                   key={item.id}

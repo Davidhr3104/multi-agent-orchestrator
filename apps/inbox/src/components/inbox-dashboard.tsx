@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { EducationalEmpty } from "@/components/educational-empty";
 import { INBOX_HELP, EMPTY_INBOX } from "@helix/help";
+import { summarizeInboxSla } from "@/lib/sla";
+import Link from "next/link";
 
 type FilterTab = "all" | "urgent" | "review" | "routed" | "blocked";
 
@@ -136,6 +138,8 @@ export function InboxDashboard() {
     const blocked = messages.filter((m) => m.category === "spam" || m.status === "blocked").length;
     return { review, urgent, blocked, total: messages.length };
   }, [messages]);
+
+  const sla = useMemo(() => summarizeInboxSla(messages), [messages]);
 
   const filtered = useMemo(() => {
     return messages.filter((m) => {
@@ -334,6 +338,26 @@ export function InboxDashboard() {
           </button>
         </div>
       </div>
+
+      {sla.breachCount > 0 || sla.hoursSaved > 0 ? (
+        <Link
+          href="/sla"
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs",
+            sla.breachCount > 0
+              ? "border-rose-500/35 bg-rose-500/10 text-rose-200 hover:border-rose-500/55"
+              : "border-violet-500/30 bg-violet-500/10 text-violet-200 hover:border-violet-500/50"
+          )}
+        >
+          <span>
+            {sla.breachCount > 0
+              ? `${sla.breachCount} SLA breach${sla.breachCount === 1 ? "" : "es"} · ${sla.hoursSaved}h saved est.`
+              : `${sla.hoursSaved}h saved est. from auto-triage / spam block`}
+            {sla.worstSubject ? ` — worst: ${sla.worstSubject}` : ""}
+          </span>
+          <span className="shrink-0 font-medium">SLA →</span>
+        </Link>
+      ) : null}
 
       <section data-tour="inbox-metrics" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Open threads */}

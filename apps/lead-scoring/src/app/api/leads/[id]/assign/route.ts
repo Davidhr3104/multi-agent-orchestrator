@@ -1,6 +1,7 @@
 import { patchLead } from "@/lib/store";
 import { listSalesReps } from "@/lib/reps";
 import { operatorActor, requireOperator } from "@helix/core/operator";
+import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
@@ -17,13 +18,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const repId = String((body as { repId?: unknown }).repId ?? "").trim();
   const rep = listSalesReps().find((r) => r.id === repId);
   if (!rep) return Response.json({ error: "Unknown rep" }, { status: 400 });
-  const lead = await patchLead(id, {
-    assignedRepId: rep.id,
-    assignee: rep.name,
-    routingReason: `Assigned by ${operatorActor(req)}`,
-    reviewedBy: operatorActor(req),
-    reviewedAt: new Date().toISOString(),
+  return withOrgScope(async (orgId) => {
+    const lead = await patchLead(
+      id,
+      {
+        assignedRepId: rep.id,
+        assignee: rep.name,
+        routingReason: `Assigned by ${operatorActor(req)}`,
+        reviewedBy: operatorActor(req),
+        reviewedAt: new Date().toISOString(),
+      },
+      orgId
+    );
+    if (!lead) return Response.json({ error: "Lead not found" }, { status: 404 });
+    return Response.json({ lead });
   });
-  if (!lead) return Response.json({ error: "Lead not found" }, { status: 404 });
-  return Response.json({ lead });
 }

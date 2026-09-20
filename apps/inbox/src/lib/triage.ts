@@ -21,6 +21,22 @@ export function categorizeThread(blob: string, fromEmail: string): ThreadCategor
   return "action_required";
 }
 
+/**
+ * True when the message reads like an inbound sales/buyer inquiry rather
+ * than a generic action item — the signal that should offer a handoff to
+ * Helix for Leads instead of just routing internally. Deliberately narrower
+ * than "action_required": most action items are not leads.
+ */
+export function detectLeadIntent(blob: string, category: ThreadCategory): boolean {
+  if (category === "spam" || category === "fyi") return false;
+  const buyerLanguage =
+    /\b(pricing|price|quote|proposal|budget|purchase|buy|interested in|demo|trial|evaluat(e|ing)|vendor|procurement)\b/.test(
+      blob
+    );
+  const askingToStart = /\b(get started|sign up|onboard|rollout|implement|kick off)\b/.test(blob);
+  return buyerLanguage || askingToStart;
+}
+
 export function urgencyScore(blob: string, category: ThreadCategory, sentiment: ThreadSentiment): number {
   if (category === "spam") return 4;
   let score = 48;
@@ -73,6 +89,7 @@ export type TriageResult = {
   draftReply: string;
   reasoning: string;
   needsReview: boolean;
+  leadIntent: boolean;
 };
 
 export function triageHeuristic(input: {
@@ -86,6 +103,7 @@ export function triageHeuristic(input: {
   const category = categorizeThread(blob, input.fromEmail);
   const sentiment = detectSentiment(blob);
   const score = urgencyScore(blob, category, sentiment);
+  const leadIntent = detectLeadIntent(blob, category);
   const draftReply = smartReplyHeuristic({
     fromName: input.fromName,
     subject: input.subject,
@@ -101,13 +119,18 @@ export function triageHeuristic(input: {
         ? "Archive"
         : category === "meeting"
           ? "EA Desk"
-          : "Sales · Deveku";
+          : leadIntent
+            ? "Helix for Leads"
+            : "Sales · Deveku";
   const needsReview = category !== "spam" && category !== "fyi";
   const reasoning = [
     `Category: ${category.replace(/_/g, " ")}`,
     `Sentiment: ${sentiment}`,
+    leadIntent ? "Buyer intent detected — candidate for Helix for Leads handoff." : "",
     score >= 80 ? "Elevated urgency." : category === "fyi" ? "Informational." : "Draft ready for HITL.",
-  ].join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return {
     fromName: input.fromName,
@@ -122,6 +145,7 @@ export function triageHeuristic(input: {
     draftReply,
     reasoning,
     needsReview,
+    leadIntent,
   };
 }
 

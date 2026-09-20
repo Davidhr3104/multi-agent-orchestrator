@@ -8,9 +8,11 @@ import {
 } from "@/lib/types";
 import { suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
 import { smartReplyWithContext } from "@/lib/smart-reply";
+import { notifySlackLeadIntent } from "@/lib/slack";
 import { autoSeedEnabled } from "@helix/core";
 import {
   isSupabaseConfigured,
+  supabaseGetEmailAccountById,
   supabaseGetPreferences,
   supabaseInsertAiLog,
   supabaseListAiLogs,
@@ -194,6 +196,7 @@ function applyDemoCatalog() {
       status: "open",
       reasoning: "Buyer intent + timeline this week + budget stated",
       needsReview: true,
+      leadIntent: true,
     },
     {
       fromName: "Priya Shah",
@@ -209,6 +212,7 @@ function applyDemoCatalog() {
       status: "review",
       reasoning: "Meeting request with multiple stakeholders",
       needsReview: true,
+      leadIntent: false,
     },
     {
       fromName: "Luis Ortega",
@@ -224,6 +228,7 @@ function applyDemoCatalog() {
       status: "archived",
       reasoning: "Informational only, no action required",
       needsReview: false,
+      leadIntent: false,
     },
     {
       fromName: "Crypto Blast",
@@ -239,6 +244,7 @@ function applyDemoCatalog() {
       status: "blocked",
       reasoning: "Obvious spam with urgency tactics",
       needsReview: false,
+      leadIntent: false,
     },
   ];
 
@@ -385,6 +391,7 @@ export async function patchMessage(
       | "isRead"
       | "isStarred"
       | "draftTone"
+      | "handedOffAt"
     >
   >,
   opts?: { humanOverride?: boolean; actionType?: string }
@@ -411,6 +418,10 @@ export async function ingestMessage(input: {
   subject: string;
   body: string;
   externalThreadId?: string;
+  gmailMessageId?: string;
+  rfcMessageId?: string;
+  /** Which connected mailbox this arrived at — when set, toEmail reflects the real alias (ops@, support@), not the global default. */
+  emailAccountId?: string;
 }): Promise<InboxMessage> {
   const mem = deskMem();
   seedMemory();
@@ -418,6 +429,8 @@ export async function ingestMessage(input: {
   const scored = triageHeuristic(input);
   const createdAt = nowIso();
   const id = `thr-${Date.now().toString(36)}`;
+  const account = input.emailAccountId ? await supabaseGetEmailAccountById(input.emailAccountId) : null;
+  const toEmail = account?.emailAddress ?? DEFAULT_TO_EMAIL;
   let thread = makeThread({
     ...scored,
     id,
@@ -428,6 +441,8 @@ export async function ingestMessage(input: {
     engine: "heuristic",
     needsReview: scored.needsReview,
     externalThreadId: input.externalThreadId ?? null,
+    emailAccountId: input.emailAccountId ?? DEFAULT_ACCOUNT_ID,
+    toEmail,
   });
 
   const history: ThreadMessage[] = [
@@ -435,8 +450,10 @@ export async function ingestMessage(input: {
       id: `tm-${id}-0`,
       threadId: id,
       messageId: `msg-${id}`,
+      gmailMessageId: input.gmailMessageId,
+      rfcMessageId: input.rfcMessageId,
       fromEmail: input.fromEmail,
-      toEmail: DEFAULT_TO_EMAIL,
+      toEmail,
       subject: input.subject,
       body: input.body,
       sentAt: createdAt,
@@ -517,6 +534,9 @@ export async function ingestMessage(input: {
     thread.aiConfidence,
     false
   );
+  if (thread.leadIntent) {
+    await notifySlackLeadIntent(thread);
+  }
   return toInboxMessage(thread);
 }
 

@@ -1,5 +1,6 @@
 import { getLead, listLeads } from "@/lib/store";
 import { lookalikeLeads } from "@helix/core";
+import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
@@ -8,16 +9,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const seed = await getLead(id);
-  if (!seed) return Response.json({ error: "Lead not found" }, { status: 404 });
-  const likes = lookalikeLeads(seed, await listLeads()).map((l) => ({
-    id: l.id,
-    name: l.name,
-    email: l.email,
-    score: l.score,
-    tier: l.tier,
-    source: l.source,
-    company: l.company,
-  }));
-  return Response.json({ likes });
+  return withOrgScope(async (orgId) => {
+    const seed = await getLead(id, orgId);
+    if (!seed) return Response.json({ error: "Lead not found" }, { status: 404 });
+    const likes = lookalikeLeads(seed, await listLeads(orgId)).map((l) => ({
+      id: l.id,
+      name: l.name,
+      email: l.email,
+      score: l.score,
+      tier: l.tier,
+      source: l.source,
+      company: l.company,
+    }));
+    return Response.json({ likes });
+  });
 }

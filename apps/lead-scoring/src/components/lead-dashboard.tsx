@@ -117,9 +117,18 @@ export function LeadDashboard() {
   const [attribution, setAttribution] = useState<{ source: string; total: number; hotPct: number }[]>(
     []
   );
-  const [roi, setRoi] = useState<{ hoursSaved: number; pipelineUsd: number; spamBlocked: number } | null>(
-    null
-  );
+  const [roi, setRoi] = useState<{
+    hoursSaved: number;
+    pipelineUsd: number;
+    wonUsd: number;
+    wonCount: number;
+    lostCount: number;
+    winRate: number;
+    spamBlocked: number;
+  } | null>(null);
+  const [wonPrompt, setWonPrompt] = useState<{ id: string; name: string } | null>(null);
+  const [wonAmount, setWonAmount] = useState("");
+  const [wonBusy, setWonBusy] = useState(false);
   const [resurrect, setResurrect] = useState<
     { id: string; name: string; reason: string; scoreBoost: number }[]
   >([]);
@@ -343,16 +352,44 @@ export function LeadDashboard() {
     }
   }
 
-  async function setStage(id: string, pipelineStage: PipelineStage) {
+  async function setStage(id: string, pipelineStage: PipelineStage, dealValue?: number) {
+    if (pipelineStage === "won" && dealValue === undefined) {
+      const lead = leads.find((l) => l.id === id);
+      setWonAmount("");
+      setWonPrompt({ id, name: lead?.name ?? id });
+      return;
+    }
     const res = await fetch(`/api/leads/${id}/stage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pipelineStage }),
+      body: JSON.stringify({ pipelineStage, ...(dealValue !== undefined ? { dealValue } : {}) }),
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      showToast(data?.error ?? "Could not update stage");
+      return;
+    }
     const data = (await res.json()) as { lead?: StoredLead };
     if (data.lead) {
       setLeads((prev) => prev.map((l) => (l.id === id ? data.lead! : l)));
       if (selected?.id === id) setSelected(data.lead);
+    }
+  }
+
+  async function confirmWon() {
+    if (!wonPrompt) return;
+    const amount = Number(wonAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast("Enter a valid deal amount");
+      return;
+    }
+    setWonBusy(true);
+    try {
+      await setStage(wonPrompt.id, "won", amount);
+      setWonPrompt(null);
+      showToast(`Marked won — $${amount.toLocaleString("en-US")}`);
+    } finally {
+      setWonBusy(false);
     }
   }
 
@@ -620,7 +657,31 @@ export function LeadDashboard() {
         <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
           <div className="space-y-0">
             {roi ? (
-              <section className="mb-4 grid gap-3 sm:grid-cols-3">
+              <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="card-bg rounded-xl p-4 ring-1 ring-emerald-500/30">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <DollarSign className="size-3.5 text-emerald-400" />
+                    <span className="text-[11px] tracking-wide uppercase">Helix paid off</span>
+                  </div>
+                  <p className="mt-2 text-3xl font-semibold text-white">
+                    ${roi.wonUsd.toLocaleString("en-US")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {roi.wonCount} won · {roi.lostCount} lost · {Math.round(roi.winRate * 100)}% win rate
+                  </p>
+                </div>
+                <div className="card-bg rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <DollarSign className="size-3.5 text-sky-400" />
+                    <span className="text-[11px] tracking-wide uppercase">Potential pipeline</span>
+                  </div>
+                  <p className="mt-2 text-3xl font-semibold text-white">
+                    ${roi.pipelineUsd.toLocaleString("en-US")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Estimated budget on open hot leads — not yet closed
+                  </p>
+                </div>
                 <div className="card-bg rounded-xl p-4">
                   <div className="flex items-center gap-2 text-slate-400">
                     <Clock className="size-3.5 text-sky-400" />
@@ -640,16 +701,6 @@ export function LeadDashboard() {
                   <p className="mt-1 text-xs text-slate-500">
                     Helix filtered {roi.spamBlocked} spam leads this month
                   </p>
-                </div>
-                <div className="card-bg rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <DollarSign className="size-3.5 text-emerald-400" />
-                    <span className="text-[11px] tracking-wide uppercase">Potential pipeline</span>
-                  </div>
-                  <p className="mt-2 text-3xl font-semibold text-white">
-                    ${roi.pipelineUsd.toLocaleString("en-US")}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">Sum of estimated budget on hot leads</p>
                 </div>
               </section>
             ) : null}
@@ -1010,6 +1061,53 @@ export function LeadDashboard() {
         </div>
       </div>
 
+      {wonPrompt ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card-bg w-full max-w-sm rounded-xl p-5">
+            <div className="mb-3 flex items-start justify-between">
+              <h2 className="text-base font-semibold text-white">Mark won — {wonPrompt.name}</h2>
+              <button
+                type="button"
+                className="text-slate-500 hover:text-white"
+                onClick={() => setWonPrompt(null)}
+                aria-label="Cancel"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-slate-400">
+              Enter the real closed deal amount. This is what counts toward &ldquo;Helix paid
+              off&rdquo; — not the estimated budget captured at intake.
+            </p>
+            <label className="mb-1 block text-xs text-slate-400" htmlFor="won-amount">
+              Deal value (USD)
+            </label>
+            <input
+              id="won-amount"
+              type="number"
+              min="0"
+              step="1"
+              autoFocus
+              className={fieldClass}
+              placeholder="15000"
+              value={wonAmount}
+              onChange={(e) => setWonAmount(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void confirmWon();
+              }}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setWonPrompt(null)}>
+                Cancel
+              </Button>
+              <Button disabled={wonBusy} onClick={() => void confirmWon()}>
+                {wonBusy ? <Loader2 className="size-4 animate-spin" /> : "Confirm won"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {reactivateOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="card-bg max-h-[85vh] w-full max-w-lg overflow-auto rounded-xl p-5">
@@ -1091,7 +1189,9 @@ function LeadDetail({
 }) {
   const [draft, setDraft] = useState(lead.outreachDraft ?? "");
   const [likes, setLikes] = useState<{ id: string; name: string; score: number; source: string }[]>([]);
-  const [slots, setSlots] = useState<{ label: string; url: string }[]>([]);
+  const [slots, setSlots] = useState<{ label: string; url?: string; start?: string }[]>([]);
+  const [slotsSource, setSlotsSource] = useState<"calcom" | "heuristic" | null>(null);
+  const [confirmingSlot, setConfirmingSlot] = useState<string | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
   const [scoreDraft, setScoreDraft] = useState(String(lead.score));
 
@@ -1103,14 +1203,6 @@ function LeadDetail({
   }, [lead.id, lead.outreachDraft, lead.score]);
 
   const competitorNames = (lead.competitors ?? []).map((c) => c.name).filter(Boolean);
-  const category = (re: RegExp, max: number) => {
-    const field = lead.fields.find((f) => re.test(`${f.key} ${f.label}`));
-    const pts = field ? Math.round(field.confidence * max) : Math.round((lead.score / 100) * max);
-    return { pts, max, conf: field?.confidence ?? lead.confidence };
-  };
-  const budgetBar = category(/budget/i, 30);
-  const timelineBar = category(/timeline/i, 25);
-  const fitBar = category(/fit|intent|contact/i, 35);
 
   return (
     <div className="card-bg rounded-xl p-5">
@@ -1181,36 +1273,19 @@ function LeadDetail({
             </ol>
           </div>
         ) : null}
-        <div>
-          <p className="mb-2 text-xs tracking-wide text-slate-500 uppercase">Score breakdown</p>
-          <ul className="space-y-2">
-            {(
-              [
-                { label: "Budget", bar: budgetBar },
-                { label: "Timeline", bar: timelineBar },
-                { label: "Fit", bar: fitBar },
-              ] as const
-            ).map(({ label, bar }) => (
-                <li key={label} className="rounded-lg bg-[#0a1e30] p-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{label}</span>
-                    <span className="text-slate-500">
-                      {bar.pts}/{bar.max} pts
-                    </span>
-                  </div>
-                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-800">
-                    <div
-                      className={cn("h-full", tierBar(lead.tier))}
-                      style={{ width: `${Math.round((bar.pts / bar.max) * 100)}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-          </ul>
-        </div>
         {lead.fields.length > 0 ? (
           <div>
-            <p className="mb-2 text-xs tracking-wide text-slate-500 uppercase">Extracted data</p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs tracking-wide text-slate-500 uppercase">Score breakdown</p>
+              <a
+                href={`/leads/${lead.id}/report`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-sky-400 hover:text-sky-300"
+              >
+                Export report
+              </a>
+            </div>
             <ul className="space-y-2">
               {lead.fields.map((field) => (
                 <li key={field.key} className="rounded-lg bg-[#0a1e30] p-2">
@@ -1218,7 +1293,22 @@ function LeadDetail({
                     <span>{field.label}</span>
                     <span className="text-slate-500">{Math.round(field.confidence * 100)}%</span>
                   </div>
-                  <p className="text-sm">{field.value}</p>
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className={cn("h-full", tierBar(lead.tier))}
+                      style={{ width: `${Math.round(field.confidence * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-sm">{field.value}</p>
+                  {field.verified ? (
+                    <blockquote className="mt-1 border-l-2 border-sky-800 pl-2 text-xs text-slate-400 italic">
+                      &quot;{field.quote}&quot;
+                    </blockquote>
+                  ) : (
+                    <p className="mt-1 text-xs text-amber-400">
+                      no direct quote in source — engine confidence only
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1452,7 +1542,17 @@ function LeadDetail({
               onClick={() => {
                 void fetch(`/api/leads/${lead.id}/meeting`, { method: "POST" })
                   .then((r) => r.json())
-                  .then((d: { slots?: { label: string; url: string }[] }) => setSlots(d.slots ?? []));
+                  .then(
+                    (d: {
+                      slots?: { label: string; url?: string; start?: string }[];
+                      source?: "calcom" | "heuristic";
+                      error?: string;
+                    }) => {
+                      setSlots(d.slots ?? []);
+                      setSlotsSource(d.source ?? null);
+                      if (d.error) onToast(d.error);
+                    }
+                  );
               }}
             >
               Suggest meeting slots
@@ -1506,13 +1606,54 @@ function LeadDetail({
         ) : null}
         {slots.length > 0 ? (
           <div>
-            <p className="mb-1 text-xs tracking-wide text-slate-500 uppercase">Meeting</p>
+            <p className="mb-1 text-xs tracking-wide text-slate-500 uppercase">
+              Meeting {slotsSource === "calcom" ? "· live Cal.com availability" : "· suggested (not confirmed)"}
+            </p>
+            {lead.meetingConfirmedAt && lead.meetingLink ? (
+              <p className="mb-2 text-xs text-emerald-400">
+                Confirmed —{" "}
+                <a className="underline" href={lead.meetingLink} target="_blank" rel="noreferrer">
+                  {lead.meetingLink}
+                </a>
+              </p>
+            ) : null}
             <ul className="space-y-1 text-xs">
               {slots.map((s) => (
-                <li key={s.url}>
-                  <a className="text-sky-400 hover:text-sky-300" href={s.url} target="_blank" rel="noreferrer">
-                    {s.label}
-                  </a>
+                <li key={s.start ?? s.url} className="flex items-center gap-2">
+                  {slotsSource === "calcom" && s.start ? (
+                    <>
+                      <span className="text-slate-300">{s.label}</span>
+                      <Button
+                        variant="secondary"
+                        disabled={confirmingSlot === s.start}
+                        onClick={() => {
+                          if (!s.start) return;
+                          setConfirmingSlot(s.start);
+                          void fetch(`/api/leads/${lead.id}/meeting/confirm`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ start: s.start }),
+                          })
+                            .then((r) => r.json())
+                            .then((d: { lead?: StoredLead; error?: string }) => {
+                              if (d.error) {
+                                onToast(d.error);
+                                return;
+                              }
+                              if (d.lead) onPatched(d.lead);
+                              onToast("Meeting confirmed");
+                            })
+                            .finally(() => setConfirmingSlot(null));
+                        }}
+                      >
+                        {confirmingSlot === s.start ? <Loader2 className="size-3.5 animate-spin" /> : "Confirm"}
+                      </Button>
+                    </>
+                  ) : (
+                    <a className="text-sky-400 hover:text-sky-300" href={s.url} target="_blank" rel="noreferrer">
+                      {s.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

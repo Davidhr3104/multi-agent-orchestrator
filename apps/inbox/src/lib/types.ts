@@ -8,12 +8,29 @@ export type ThreadMessage = {
   id: string;
   threadId: string;
   messageId?: string;
+  /** Gmail's own message id (msg.id from the Gmail API) — needed to fetch/reply to this exact message. */
+  gmailMessageId?: string;
+  /** The RFC 822 Message-Id header (e.g. "<abc@mail.gmail.com>") — needed to build In-Reply-To/References on a threaded reply. */
+  rfcMessageId?: string;
   fromEmail: string;
   toEmail?: string;
   subject?: string;
   body: string;
   sentAt: string;
   createdAt: string;
+};
+
+export type EmailAccount = {
+  id: string;
+  workspaceId: string | null;
+  emailAddress: string;
+  provider: string | null;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: string;
+  gmailHistoryId?: string;
+  isConnected: boolean;
+  lastSyncedAt?: string;
 };
 
 export type AiActionLog = {
@@ -76,6 +93,8 @@ export type EmailThread = {
   reasoning: string;
   needsReview: boolean;
   engine: "claude" | "heuristic";
+  leadIntent: boolean;
+  handedOffAt?: string;
   receivedAt: string;
   createdAt: string;
   updatedAt: string;

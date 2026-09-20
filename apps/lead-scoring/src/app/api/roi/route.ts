@@ -1,9 +1,12 @@
 import { listLeads } from "@/lib/store";
 import { roiMetrics } from "@helix/core";
+import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const leads = await listLeads();
-  return Response.json(roiMetrics(leads));
+  return withOrgScope(async (orgId) => {
+    const leads = await listLeads(orgId);
+    return Response.json(roiMetrics(leads));
+  });
 }

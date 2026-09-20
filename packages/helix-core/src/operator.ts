@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getSecret } from "./secrets";
+import { looksLikeActionToken } from "./action-token";
 
 export const OPERATOR_COOKIE = "helix_operator";
 
@@ -61,13 +62,25 @@ export function slackOpsQuery(): string {
  * When set, require cookie, raw key header, or Slack `ops` query.
  */
 export function operatorActor(req: Request): string {
+  const t = new URL(req.url).searchParams.get("t")?.trim() || "";
+  if (t && looksLikeActionToken(t)) return "slack";
   if (!operatorKey()) return "local";
   const ops = new URL(req.url).searchParams.get("ops")?.trim() || "";
   if (ops && safeEqual(ops, operatorToken(operatorKey()))) return "slack";
   return "operator";
 }
 
+/**
+ * `?t=<signed action token>` is let through here on shape alone (it has the
+ * "<payload>.<sig>" form) — the real HMAC/expiry verification happens in the
+ * route handler via verifyActionToken(), which also needs the token's own
+ * orgId/leadId, not just a pass/fail. This function only decides whether the
+ * request gets past the operator-key gate at all.
+ */
 export function requireOperator(req: Request): Response | null {
+  const t = new URL(req.url).searchParams.get("t")?.trim() || "";
+  if (t && looksLikeActionToken(t)) return null;
+
   const key = operatorKey();
   if (!key) return null;
 

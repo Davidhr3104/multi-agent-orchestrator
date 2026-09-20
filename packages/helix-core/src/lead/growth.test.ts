@@ -19,6 +19,8 @@ function lead(partial: Partial<StoredLead> & { name: string; email: string }): S
       message: partial.message ?? "",
       budget: partial.budget,
       pipelineStage: partial.pipelineStage,
+      dealValue: partial.dealValue,
+      closedAt: partial.closedAt,
     },
     null,
     []
@@ -88,6 +90,42 @@ describe("growth", () => {
     });
     const roi = roiMetrics(Array.from({ length: 12 }, (_, i) => ({ ...one, id: `h${i}` })));
     expect(roi.hoursSaved).toBe(1);
+  });
+
+  it("sums real closed revenue from won deals, separate from pipeline estimate", () => {
+    const won = lead({
+      id: "won1",
+      name: "Won",
+      email: "won@example.org",
+      budget: "9999", // estimate at capture time — must NOT count toward wonUsd
+      tier: "hot",
+      pipelineStage: "won",
+      dealValue: 15000,
+      closedAt: new Date().toISOString(),
+    });
+    const lost = lead({
+      id: "lost1",
+      name: "Lost",
+      email: "lost@example.org",
+      budget: "5000",
+      tier: "hot",
+      pipelineStage: "lost",
+    });
+    const openHot = lead({
+      id: "open1",
+      name: "Open",
+      email: "open@example.org",
+      budget: "8000",
+      tier: "hot",
+      timeline: "this week",
+      message: "HVAC quotes into GoHighLevel this week please.",
+    });
+    const roi = roiMetrics([won, lost, openHot]);
+    expect(roi.wonUsd).toBe(15000);
+    expect(roi.wonCount).toBe(1);
+    expect(roi.lostCount).toBe(1);
+    expect(roi.winRate).toBeCloseTo(0.5);
+    expect(roi.pipelineUsd).toBe(8000); // only the still-open hot lead's estimate
   });
 
   it("picks zombie cold leads older than 6 months", () => {

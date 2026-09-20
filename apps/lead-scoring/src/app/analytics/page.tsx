@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { sourceAttribution, type StoredLead } from "@helix/core";
+import { sourceAttribution } from "@helix/core/lead/intelligence";
+import type { StoredLead } from "@helix/core";
 import { HelixPage } from "@/components/helix-page";
 
 export default function AnalyticsPage() {

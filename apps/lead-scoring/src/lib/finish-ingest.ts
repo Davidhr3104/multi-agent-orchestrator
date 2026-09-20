@@ -17,9 +17,10 @@ import { assignSalesRep } from "@/lib/reps";
 
 export async function finishLeadIngest(
   parsed: LeadIngestInput,
-  emit: LeadEmit
+  emit: LeadEmit,
+  orgId?: string
 ): Promise<StoredLead> {
-  const existing = findDuplicate(await listLeads(), parsed);
+  const existing = findDuplicate(await listLeads(orgId), parsed);
   if (existing) {
     emit({
       type: "log",
@@ -40,7 +41,7 @@ export async function finishLeadIngest(
     addendum: brain.addendum,
   });
   bumpUsage(isClaudeConfigured() ? "claude" : "heuristic");
-  const all = await listLeads();
+  const all = await listLeads(orgId);
   const lead = attachIntelligence(scored, existing, all);
   try {
     const enriched = await enrichEmailDomain(lead.email);
@@ -63,14 +64,17 @@ export async function finishLeadIngest(
   lead.assignedRepId = assigned.id;
   lead.assignee = assigned.name;
   lead.routingReason = assigned.reason;
-  await saveLead(lead);
+  await saveLead(lead, orgId);
   if (lead.needsReview) {
-    await notifySlackHitl({
-      id: lead.id,
-      name: lead.name,
-      score: lead.score,
-      reason: lead.reasoning.slice(0, 180),
-    });
+    await notifySlackHitl(
+      {
+        id: lead.id,
+        name: lead.name,
+        score: lead.score,
+        reason: lead.reasoning.slice(0, 180),
+      },
+      orgId
+    );
   }
   if (existing?.ghlContactId) {
     await addGhlReingestNote(existing.ghlContactId, lead.score);

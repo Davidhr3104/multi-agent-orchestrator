@@ -35,7 +35,12 @@ type LeadsQuery = {
     order: (
       col: string,
       opts: { ascending: boolean }
-    ) => Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+    ) => {
+      eq: (
+        col: string,
+        value: string
+      ) => Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+    };
   };
   upsert: (
     row: Record<string, unknown>
@@ -48,9 +53,10 @@ function leadsTable(db: Client): LeadsQuery {
     .from("leads");
 }
 
-function toRow(lead: StoredLead) {
+function toRow(lead: StoredLead, orgId: string) {
   return {
     id: lead.id,
+    org_id: orgId,
     created_at: lead.createdAt,
     run_id: lead.runId,
     name: lead.name,
@@ -77,7 +83,11 @@ function toRow(lead: StoredLead) {
     needs_review: lead.needsReview,
     crm_status: lead.crmStatus,
     ghl_contact_id: lead.ghlContactId ?? null,
+    ghl_opportunity_id: lead.ghlOpportunityId ?? null,
+    ghl_opportunity_error: lead.ghlOpportunityError ?? null,
     pipeline_stage: lead.pipelineStage ?? "new",
+    deal_value: lead.dealValue ?? null,
+    closed_at: lead.closedAt ?? null,
     assignee: lead.assignee ?? null,
     notes: lead.notes ?? [],
     score_history: lead.scoreHistory ?? [],
@@ -91,12 +101,15 @@ function toRow(lead: StoredLead) {
     battle_card: lead.battleCard ?? null,
     reviewed_by: lead.reviewedBy ?? null,
     reviewed_at: lead.reviewedAt ?? null,
+    meeting_link: lead.meetingLink ?? null,
+    meeting_confirmed_at: lead.meetingConfirmedAt ?? null,
   };
 }
 
 function fromRow(row: Record<string, unknown>): StoredLead {
   return {
     id: String(row.id),
+    orgId: row.org_id != null ? String(row.org_id) : undefined,
     createdAt: String(row.created_at),
     runId: String(row.run_id),
     name: String(row.name),
@@ -123,7 +136,12 @@ function fromRow(row: Record<string, unknown>): StoredLead {
     needsReview: Boolean(row.needs_review),
     crmStatus: (row.crm_status as StoredLead["crmStatus"]) ?? "not_sent",
     ghlContactId: row.ghl_contact_id != null ? String(row.ghl_contact_id) : undefined,
+    ghlOpportunityId: row.ghl_opportunity_id != null ? String(row.ghl_opportunity_id) : undefined,
+    ghlOpportunityError:
+      row.ghl_opportunity_error != null ? String(row.ghl_opportunity_error) : undefined,
     pipelineStage: (row.pipeline_stage as StoredLead["pipelineStage"]) ?? "new",
+    dealValue: row.deal_value != null ? Number(row.deal_value) : undefined,
+    closedAt: row.closed_at != null ? String(row.closed_at) : undefined,
     assignee: row.assignee != null ? String(row.assignee) : undefined,
     notes: Array.isArray(row.notes) ? (row.notes as string[]) : undefined,
     scoreHistory: Array.isArray(row.score_history)
@@ -141,15 +159,24 @@ function fromRow(row: Record<string, unknown>): StoredLead {
     battleCard: row.battle_card != null ? String(row.battle_card) : undefined,
     reviewedBy: row.reviewed_by != null ? String(row.reviewed_by) : undefined,
     reviewedAt: row.reviewed_at != null ? String(row.reviewed_at) : undefined,
+    meetingLink: row.meeting_link != null ? String(row.meeting_link) : undefined,
+    meetingConfirmedAt: row.meeting_confirmed_at != null ? String(row.meeting_confirmed_at) : undefined,
   };
 }
 
-export async function supabaseListLeads(): Promise<StoredLead[] | null> {
+/**
+ * orgId is required and applied as an explicit .eq() filter. RLS on
+ * lead_scoring.leads exists for any client authenticating as an end user,
+ * but this server client uses the service-role key, which bypasses RLS —
+ * so this filter is the real tenant boundary for every server-side read.
+ */
+export async function supabaseListLeads(orgId: string): Promise<StoredLead[] | null> {
   const db = getSupabase();
   if (!db) return null;
-  const { data, error } = await leadsTable(db).select("*").order("created_at", {
-    ascending: false,
-  });
+  const { data, error } = await leadsTable(db)
+    .select("*")
+    .order("created_at", { ascending: false })
+    .eq("org_id", orgId);
   if (error) {
     console.warn("[helix-leads] list skipped:", error.message);
     return null;
@@ -157,10 +184,11 @@ export async function supabaseListLeads(): Promise<StoredLead[] | null> {
   return (data ?? []).map((row) => fromRow(row as Record<string, unknown>));
 }
 
-export async function supabaseUpsertLead(lead: StoredLead): Promise<boolean> {
+/** orgId is stamped on every write — see supabaseListLeads for why this matters server-side. */
+export async function supabaseUpsertLead(lead: StoredLead, orgId: string): Promise<boolean> {
   const db = getSupabase();
   if (!db) return false;
-  const { error } = await leadsTable(db).upsert(toRow(lead));
+  const { error } = await leadsTable(db).upsert(toRow(lead, orgId));
   if (error) {
     console.warn("[helix-leads] upsert skipped:", error.message);
     return false;

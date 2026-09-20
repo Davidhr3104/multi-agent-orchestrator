@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { autoSeedEnabled } from "./desk-mode";
 import { OPERATOR_COOKIE, operatorActor, operatorToken, requireOperator } from "./operator";
 import { resetSecretsCache, setSecrets } from "./secrets";
+
+beforeEach(() => {
+  delete process.env.HELIX_OPERATOR_KEY;
+  resetSecretsCache();
+});
 
 afterEach(() => {
   setSecrets({ HELIX_OPERATOR_KEY: "" });
