@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./operator": "./src/operator.ts"
+    "./operator": "./src/operator.ts",
+    "./secret-fields": "./src/secret-fields.ts"
   },
   "scripts": {
     "test": "vitest run"

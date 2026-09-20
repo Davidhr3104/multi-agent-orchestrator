@@ -1,5 +1,6 @@
 import {
   DEFAULT_LEGAL_PROFILE,
+  autoSeedEnabled,
   scoreRfpHeuristic,
   type RfpIngestInput,
   type StoredRfp,
@@ -18,6 +19,10 @@ import {
   supabaseUpsertAudits,
   supabaseUpsertRfp,
   supabaseUpsertRfps,
+  supabaseGetProfile,
+  supabaseUpsertProfile,
+  supabaseUpsertJson,
+  supabaseLoadJsonMap,
 } from "@/lib/supabase-desk";
 
 export type { AuditEvent } from "@/lib/audit-types";
@@ -35,6 +40,7 @@ export function setClientProfile(next: string): string | null {
   const trimmed = next.trim();
   if (trimmed.length < 24) return null;
   clientProfile = trimmed;
+  void supabaseUpsertProfile(clientProfile);
   void pushAudit("ops", "settings", "Client profile updated");
   return clientProfile;
 }
@@ -88,10 +94,13 @@ const SAMPLES: RfpIngestInput[] = [
   },
 ];
 
-function seedMemory() {
+function applyDemoCatalog() {
   const d = desk();
-  if (d.seeded) return;
-  d.seeded = true;
+  d.memory.clear();
+  d.comms.clear();
+  d.audit.length = 0;
+  d.conflicts.clear();
+  d.quotes.clear();
   SAMPLES.forEach((sample, i) => {
     const scored = scoreRfpHeuristic(sample);
     const rfp: StoredRfp = {
@@ -131,6 +140,17 @@ function seedMemory() {
   pushAuditSync("Priya Shah", "compliance", "Lake County Kubernetes posting flagged SOC2 + IP assignment");
   pushAuditSync("ethics", "coi", "County IT — Kubernetes refresh: GO (88) via heuristic");
   pushAuditSync("pricing", "quote", "County IT — Kubernetes refresh: $288,000 other via heuristic");
+  d.seeded = true;
+}
+
+function seedMemory() {
+  const d = desk();
+  if (d.seeded) return;
+  if (!autoSeedEnabled()) {
+    d.seeded = true;
+    return;
+  }
+  applyDemoCatalog();
 }
 
 function pushAuditSync(actor: string, action: string, detail: string): AuditEvent {
@@ -157,7 +177,6 @@ async function pushAudit(actor: string, action: string, detail: string): Promise
 async function hydrateFromRemote(): Promise<void> {
   const d = desk();
   if (d.remoteBootstrapped || !isSupabaseConfigured()) return;
-  seedMemory();
 
   const remoteRfps = await supabaseListRfps();
   if (remoteRfps === null) return; // schema missing / network — retry next call
@@ -168,7 +187,8 @@ async function hydrateFromRemote(): Promise<void> {
     d.memory.clear();
     for (const rfp of remoteRfps) d.memory.set(rfp.id, rfp);
   } else {
-    await supabaseUpsertRfps([...d.memory.values()]);
+    seedMemory();
+    if (d.memory.size > 0) await supabaseUpsertRfps([...d.memory.values()]);
   }
 
   const remoteAudit = await supabaseListAudit();
@@ -179,6 +199,23 @@ async function hydrateFromRemote(): Promise<void> {
     d.audit.push(...remoteAudit);
   } else if (d.audit.length > 0) {
     await supabaseUpsertAudits([...d.audit]);
+  }
+
+  const profile = await supabaseGetProfile();
+  if (profile && profile.length >= 24) clientProfile = profile;
+  else await supabaseUpsertProfile(clientProfile);
+
+  const remoteConflicts = await supabaseLoadJsonMap("conflicts");
+  if (remoteConflicts) {
+    for (const [id, report] of Object.entries(remoteConflicts)) {
+      d.conflicts.set(id, report as ConflictReport);
+    }
+  }
+  const remoteQuotes = await supabaseLoadJsonMap("quotes");
+  if (remoteQuotes) {
+    for (const [id, quote] of Object.entries(remoteQuotes)) {
+      d.quotes.set(id, quote as PricingQuote);
+    }
   }
 }
 
@@ -214,7 +251,7 @@ export async function getRfp(id: string): Promise<StoredRfp | null> {
 
 export async function patchRfp(
   id: string,
-  patch: Partial<Pick<StoredRfp, "needsReview" | "corpusStatus">>
+  patch: Partial<Pick<StoredRfp, "needsReview" | "corpusStatus" | "partnerDecision">>
 ): Promise<StoredRfp | null> {
   const current = await getRfp(id);
   if (!current) return null;
@@ -273,6 +310,7 @@ export async function cacheHeuristicConflict(rfp: StoredRfp): Promise<ConflictRe
   if (existing) return existing;
   const report = await heuristicConflictReport(rfp);
   d.conflicts.set(rfp.id, report);
+  await supabaseUpsertJson("conflicts", rfp.id, report);
   return report;
 }
 
@@ -280,6 +318,7 @@ export async function checkAndStoreConflict(rfp: StoredRfp): Promise<ConflictRep
   seedMemory();
   const report = await runConflictCheck(rfp);
   desk().conflicts.set(rfp.id, report);
+  await supabaseUpsertJson("conflicts", rfp.id, report);
   await pushAudit("ethics", "coi", `${rfp.title}: ${report.verdict} (${report.score}) via ${report.engine}`);
   return report;
 }
@@ -308,6 +347,7 @@ export async function cacheHeuristicPricing(rfp: StoredRfp): Promise<PricingQuot
   if (existing) return existing;
   const quote = await heuristicPricingQuote(rfp);
   d.quotes.set(rfp.id, quote);
+  await supabaseUpsertJson("quotes", rfp.id, quote);
   return quote;
 }
 
@@ -315,6 +355,7 @@ export async function checkAndStorePricing(rfp: StoredRfp, overrides?: PricingOv
   seedMemory();
   const quote = await runPricingQuote(rfp, overrides);
   desk().quotes.set(rfp.id, quote);
+  await supabaseUpsertJson("quotes", rfp.id, quote);
   await pushAudit("pricing", "quote", `${rfp.title}: ${quote.target} ${quote.practiceArea} via ${quote.engine}`);
   return quote;
 }
@@ -330,4 +371,35 @@ export async function pricingSummaries(): Promise<Record<string, PricingQuote>> 
     }
   }
   return Object.fromEntries(d.quotes);
+}
+
+export type DeskModeStatus = {
+  empty: boolean;
+  demo: boolean;
+  store: "supabase" | "memory";
+  count: number;
+};
+
+export async function deskStatus(): Promise<DeskModeStatus> {
+  const rfps = await listRfps();
+  return {
+    empty: rfps.length === 0,
+    demo: rfps.some((r) => r.id.startsWith("seed-")),
+    store: isSupabaseConfigured() ? "supabase" : "memory",
+    count: rfps.length,
+  };
+}
+
+export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  applyDemoCatalog();
+  return deskStatus();
+}
+
+export async function clearDesk(): Promise<DeskModeStatus> {
+  const g = globalThis as typeof globalThis & { __helixLegalDesk?: LegalDesk };
+  delete g.__helixLegalDesk;
+  const d = desk();
+  d.seeded = true;
+  d.remoteBootstrapped = true;
+  return deskStatus();
 }

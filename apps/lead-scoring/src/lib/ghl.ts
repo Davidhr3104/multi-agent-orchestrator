@@ -1,10 +1,10 @@
-import type { StoredLead } from "@helix/core";
+import { getSecret, type StoredLead } from "@helix/core";
 
 const GHL_BASE = "https://services.leadconnectorhq.com";
 const GHL_VERSION = "2021-07-28";
 
 export function isGhlConfigured(): boolean {
-  return Boolean(process.env.GHL_API_KEY && process.env.GHL_LOCATION_ID);
+  return Boolean(getSecret("GHL_API_KEY") && getSecret("GHL_LOCATION_ID"));
 }
 
 function splitName(name: string): { firstName: string; lastName?: string } {
@@ -20,8 +20,8 @@ export async function sendLeadToGhl(lead: StoredLead): Promise<{
   contactId?: string;
   error?: string;
 }> {
-  const key = process.env.GHL_API_KEY;
-  const locationId = process.env.GHL_LOCATION_ID;
+  const key = getSecret("GHL_API_KEY");
+  const locationId = getSecret("GHL_LOCATION_ID");
   if (!key || !locationId) {
     return { ok: false, mocked: true };
   }
@@ -39,8 +39,14 @@ export async function sendLeadToGhl(lead: StoredLead): Promise<{
       locationId,
       ...names,
       email: lead.email,
+      phone: lead.phone || undefined,
       source: lead.source || "Helix for Leads",
-      tags: ["helix", "lead-scoring", lead.tier, lead.classification],
+      tags: ["helix", "lead-scoring", lead.tier, lead.classification, lead.trade].filter(Boolean),
+      customFields: [
+        lead.campaignId ? { key: "campaign_id", field_value: lead.campaignId } : null,
+        lead.trade ? { key: "trade", field_value: lead.trade } : null,
+        lead.zip ? { key: "zip", field_value: lead.zip } : null,
+      ].filter(Boolean),
     }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -58,7 +64,7 @@ export async function sendLeadToGhl(lead: StoredLead): Promise<{
 }
 
 export async function addGhlReingestNote(contactId: string, score: number): Promise<void> {
-  const key = process.env.GHL_API_KEY;
+  const key = getSecret("GHL_API_KEY");
   if (!key) return;
   await fetch(`${GHL_BASE}/contacts/${contactId}/notes`, {
     method: "POST",

@@ -8,6 +8,7 @@ import {
 } from "@/lib/types";
 import { suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
 import { smartReplyWithContext } from "@/lib/smart-reply";
+import { autoSeedEnabled } from "@helix/core";
 import {
   isSupabaseConfigured,
   supabaseGetPreferences,
@@ -153,9 +154,11 @@ async function logAction(
   await supabaseInsertAiLog(entry);
 }
 
-function seedMemory() {
+function applyDemoCatalog() {
   const mem = deskMem();
-  if (mem.seeded) return;
+  mem.threads.clear();
+  mem.messages.clear();
+  mem.aiLogs.length = 0;
   mem.seeded = true;
   const samples: Array<
     Omit<
@@ -268,10 +271,19 @@ function seedMemory() {
   });
 }
 
+function seedMemory() {
+  const mem = deskMem();
+  if (mem.seeded) return;
+  if (!autoSeedEnabled()) {
+    mem.seeded = true;
+    return;
+  }
+  applyDemoCatalog();
+}
+
 async function hydrateFromRemote() {
   const mem = deskMem();
   if (mem.remoteBootstrapped || !isSupabaseConfigured()) return;
-  seedMemory();
   const remote = await supabaseListThreads();
   if (remote === null) return;
   mem.remoteBootstrapped = true;
@@ -279,8 +291,11 @@ async function hydrateFromRemote() {
     mem.threads.clear();
     for (const t of remote) mem.threads.set(t.id, t);
   } else {
-    await supabaseUpsertThreads([...mem.threads.values()]);
-    for (const list of mem.messages.values()) await supabaseUpsertThreadMessages(list);
+    seedMemory();
+    if (mem.threads.size > 0) {
+      await supabaseUpsertThreads([...mem.threads.values()]);
+      for (const list of mem.messages.values()) await supabaseUpsertThreadMessages(list);
+    }
   }
   const remotePrefs = await supabaseGetPreferences(DEFAULT_WORKSPACE_ID);
   if (remotePrefs) {
@@ -395,6 +410,7 @@ export async function ingestMessage(input: {
   fromEmail: string;
   subject: string;
   body: string;
+  externalThreadId?: string;
 }): Promise<InboxMessage> {
   const mem = deskMem();
   seedMemory();
@@ -411,6 +427,7 @@ export async function ingestMessage(input: {
     status: scored.category === "spam" ? "blocked" : scored.needsReview ? "review" : "open",
     engine: "heuristic",
     needsReview: scored.needsReview,
+    externalThreadId: input.externalThreadId ?? null,
   });
 
   const history: ThreadMessage[] = [
@@ -580,4 +597,35 @@ export async function updatePreferences(patch: Partial<UserPreferences>): Promis
 
 export function getDraftTone(): DraftTone {
   return deskMem().prefs.defaultTone;
+}
+
+export type DeskModeStatus = {
+  empty: boolean;
+  demo: boolean;
+  store: "supabase" | "memory";
+  count: number;
+};
+
+export async function deskStatus(): Promise<DeskModeStatus> {
+  const threads = await listAllThreads();
+  return {
+    empty: threads.length === 0,
+    demo: threads.some((t) => t.fromEmail.includes("northwind") || t.id.startsWith("thr-seed") || t.fromName === "Maya Chen"),
+    store: isSupabaseConfigured() ? "supabase" : "memory",
+    count: threads.length,
+  };
+}
+
+export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  applyDemoCatalog();
+  return deskStatus();
+}
+
+export async function clearDesk(): Promise<DeskModeStatus> {
+  const g = globalThis as typeof globalThis & { __helixInboxDesk?: DeskMemory };
+  delete g.__helixInboxDesk;
+  const mem = deskMem();
+  mem.seeded = true;
+  mem.remoteBootstrapped = true;
+  return deskStatus();
 }

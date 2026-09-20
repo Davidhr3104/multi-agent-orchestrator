@@ -1,4 +1,5 @@
 import {
+  autoSeedEnabled,
   runFraudScoring,
   runInquiryClassification,
   runInventoryPrediction,
@@ -7,7 +8,7 @@ import {
   type StoredOrder,
   type StoredProduct,
 } from "@helix/core";
-import { getShopifyClient } from "./shopify";
+import { getMockShopifyClient, getLiveShopifyClient } from "./shopify";
 import {
   supabaseListInquiries,
   supabaseListOrders,
@@ -57,12 +58,12 @@ const MOCK_INQUIRIES: InquiryInput[] = [
   },
 ];
 
-async function seedIfNeeded(): Promise<void> {
-  if (seeded) return;
-  if (seeding) return seeding;
-
+async function applyDemoCatalog(): Promise<void> {
   seeding = (async () => {
-    const client = getShopifyClient();
+    orders.clear();
+    products.clear();
+    inquiries.clear();
+    const client = getMockShopifyClient();
     const [orderInputs, productInputs] = await Promise.all([
       client.fetchOrders(),
       client.fetchProducts(),
@@ -101,9 +102,20 @@ async function seedIfNeeded(): Promise<void> {
     }
 
     seeded = true;
+    seeding = null;
   })();
 
   return seeding;
+}
+
+async function seedIfNeeded(): Promise<void> {
+  if (seeded) return;
+  if (seeding) return seeding;
+  if (!autoSeedEnabled()) {
+    seeded = true;
+    return;
+  }
+  return applyDemoCatalog();
 }
 
 export async function listOrders(): Promise<StoredOrder[]> {
@@ -132,7 +144,12 @@ export async function getOrder(orderId: string): Promise<StoredOrder | null> {
 
 export async function patchOrder(
   orderId: string,
-  patch: Partial<Pick<StoredOrder, "reviewedBy" | "reviewedAt" | "reviewDecision" | "requiresReview">>
+  patch: Partial<
+    Pick<
+      StoredOrder,
+      "reviewedBy" | "reviewedAt" | "reviewDecision" | "requiresReview" | "fulfillmentStatus" | "financialStatus"
+    >
+  >
 ): Promise<StoredOrder | null> {
   const current = await getOrder(orderId);
   if (!current) return null;
@@ -200,4 +217,72 @@ export async function patchInquiry(
   const current = await getInquiry(inquiryId);
   if (!current) return null;
   return saveInquiry({ ...current, ...patch });
+}
+
+export type DeskModeStatus = {
+  empty: boolean;
+  demo: boolean;
+  store: "supabase" | "memory";
+  count: number;
+};
+
+export async function deskStatus(): Promise<DeskModeStatus> {
+  const [o, p, i] = await Promise.all([listOrders(), listProducts(), listInquiries()]);
+  return {
+    empty: o.length === 0 && p.length === 0,
+    demo: o.some((ord) => ord.shopifyOrderId.includes("gid://shopify/Order/1001")),
+    store: process.env.NEXT_PUBLIC_SUPABASE_URL ? "supabase" : "memory",
+    count: o.length + p.length + i.length,
+  };
+}
+
+export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  seeded = false;
+  seeding = null;
+  await applyDemoCatalog();
+  return deskStatus();
+}
+
+export async function syncShopifyLive(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const client = getLiveShopifyClient();
+  if (!client) {
+    return { ok: false, error: "SHOPIFY_STORE_DOMAIN and SHOPIFY_ACCESS_TOKEN required. Paste them in Settings." };
+  }
+  await seedIfNeeded();
+  const [orderInputs, productInputs] = await Promise.all([client.fetchOrders(), client.fetchProducts()]);
+  for (const input of orderInputs) {
+    const scored = await runFraudScoring(input);
+    const existing = [...orders.values()].find((o) => o.shopifyOrderId === input.shopifyOrderId);
+    const order: StoredOrder = {
+      ...(existing ?? { id: id("order", input.shopifyOrderId) }),
+      ...input,
+      ...scored,
+      id: existing?.id ?? id("order", input.shopifyOrderId),
+    };
+    orders.set(order.id, order);
+    await supabaseUpsertOrder(order);
+  }
+  for (const input of productInputs) {
+    const predicted = await runInventoryPrediction(input);
+    const existing = [...products.values()].find((p) => p.shopifyProductId === input.shopifyProductId);
+    const product: StoredProduct = {
+      ...(existing ?? { id: id("product", input.shopifyProductId) }),
+      ...input,
+      ...predicted,
+      id: existing?.id ?? id("product", input.shopifyProductId),
+    };
+    products.set(product.id, product);
+    await supabaseUpsertProduct(product);
+  }
+  seeded = true;
+  return { ok: true };
+}
+
+export async function clearDesk(): Promise<DeskModeStatus> {
+  orders.clear();
+  products.clear();
+  inquiries.clear();
+  seeded = true;
+  seeding = null;
+  return deskStatus();
 }

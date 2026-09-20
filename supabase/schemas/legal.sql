@@ -29,3 +29,28 @@ create index if not exists rfps_created_at_idx on legal.rfps (created_at desc);
 create index if not exists rfps_tier_idx on legal.rfps (tier);
 
 alter table legal.rfps enable row level security;
+
+create table if not exists legal.audit_events (
+  id text primary key,
+  at timestamptz not null default now(),
+  actor text not null,
+  action text not null,
+  detail text not null default ''
+);
+
+create table if not exists legal.desk_meta (
+  id text primary key,
+  body text not null default ''
+);
+
+create table if not exists legal.conflicts (
+  rfp_id text primary key,
+  report jsonb not null
+);
+
+create table if not exists legal.quotes (
+  rfp_id text primary key,
+  quote jsonb not null
+);
+
+alter table legal.rfps add column if not exists partner_decision jsonb;

@@ -160,7 +160,7 @@ export default function LeadsPage() {
             <div className="px-5 py-10 text-center">
               <p className="text-sm font-semibold text-white">No leads in this filter</p>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-                Seeded mock leads load from the API. Adjust filters or ingest from the Dashboard.
+                Desk starts empty. Ingest from the Dashboard or POST /api/leads/webhook/ghl. Load demo in Settings if you need samples.
               </p>
               <Link href="/" className="mt-3 inline-block text-xs text-sky-400 hover:text-sky-300">
                 Open dashboard →

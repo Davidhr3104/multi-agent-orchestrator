@@ -24,7 +24,9 @@ export async function GET(req: Request) {
   );
   let threads = all;
 
-  if (status === "routed" || status === "blocked" || status === "open" || status === "archived") {
+  if (status === "routed" || status === "sent") {
+    threads = threads.filter((t) => t.status === "routed" || t.status === "sent");
+  } else if (status === "blocked" || status === "open" || status === "archived") {
     const st = status as ThreadStatus;
     threads = threads.filter((t) => t.status === st);
   } else if (status === "spam") {

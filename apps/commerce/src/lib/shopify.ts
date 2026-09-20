@@ -1,4 +1,4 @@
-import type { OrderInput, ProductInput } from "@helix/core";
+import { getSecret, type OrderInput, type ProductInput } from "@helix/core";
 
 /**
  * Shape mirrors what a real Shopify Admin API client would return, so swapping the mock
@@ -11,7 +11,7 @@ export interface ShopifyClient {
 }
 
 export function isShopifyConfigured(): boolean {
-  return Boolean(process.env.SHOPIFY_STORE_DOMAIN && process.env.SHOPIFY_ACCESS_TOKEN);
+  return Boolean(getSecret("SHOPIFY_STORE_DOMAIN") && getSecret("SHOPIFY_ACCESS_TOKEN"));
 }
 
 const MOCK_CUSTOMERS = [
@@ -194,8 +194,145 @@ class MockShopifyClient implements ShopifyClient {
   }
 }
 
-export function getShopifyClient(): ShopifyClient {
-  // Real Admin API implementation is wired here once SHOPIFY_STORE_DOMAIN /
-  // SHOPIFY_ACCESS_TOKEN are configured — isShopifyConfigured() gates that swap.
+function shopDomain(): string {
+  return getSecret("SHOPIFY_STORE_DOMAIN").replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+function numericId(gid: string): string {
+  const match = gid.match(/(\d+)\s*$/);
+  return match ? match[1] : gid.replace(/\D/g, "");
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+class LiveShopifyClient implements ShopifyWriteClient {
+  private async admin(path: string, init?: RequestInit): Promise<Response> {
+    const domain = shopDomain();
+    const token = getSecret("SHOPIFY_ACCESS_TOKEN");
+    return fetch(`https://${domain}/admin/api/2024-10/${path}`, {
+      ...init,
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(init?.headers ?? {}),
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
+  }
+
+  async fetchOrders(): Promise<OrderInput[]> {
+    const res = await this.admin("orders.json?status=any&limit=50");
+    if (!res.ok) throw new Error(`Shopify orders HTTP ${res.status}`);
+    const payload = (await res.json()) as { orders?: unknown[] };
+    return (payload.orders ?? []).map((raw) => {
+      const order = asRecord(raw) ?? {};
+      const customer = asRecord(order.customer) ?? {};
+      const shipping = asRecord(order.shipping_address) ?? {};
+      const items = Array.isArray(order.line_items) ? order.line_items : [];
+      return {
+        shopifyOrderId: `gid://shopify/Order/${order.id}`,
+        customerName: String(customer.first_name || shipping.name || "Customer"),
+        customerEmail: String(order.email || customer.email || ""),
+        totalPrice: Number(order.total_price || 0),
+        currency: String(order.currency || "USD"),
+        financialStatus: String(order.financial_status || ""),
+        fulfillmentStatus: String(order.fulfillment_status || "unfulfilled"),
+        items: items.map((item) => {
+          const row = asRecord(item) ?? {};
+          return {
+            title: String(row.title || "Item"),
+            sku: row.sku != null ? String(row.sku) : undefined,
+            quantity: Number(row.quantity || 1),
+            price: Number(row.price || 0),
+          };
+        }),
+        shippingAddress: {
+          name: shipping.name != null ? String(shipping.name) : undefined,
+          address1: shipping.address1 != null ? String(shipping.address1) : undefined,
+          city: shipping.city != null ? String(shipping.city) : undefined,
+          province: shipping.province != null ? String(shipping.province) : undefined,
+          country: shipping.country != null ? String(shipping.country) : undefined,
+          zip: shipping.zip != null ? String(shipping.zip) : undefined,
+        },
+        createdAt: String(order.created_at || new Date().toISOString()),
+        customerOrderCount: Number(customer.orders_count || 0),
+      };
+    });
+  }
+
+  async fetchProducts(): Promise<ProductInput[]> {
+    const res = await this.admin("products.json?limit=50");
+    if (!res.ok) throw new Error(`Shopify products HTTP ${res.status}`);
+    const payload = (await res.json()) as { products?: unknown[] };
+    return (payload.products ?? []).map((raw) => {
+      const product = asRecord(raw) ?? {};
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      const variant = asRecord(variants[0]) ?? {};
+      return {
+        shopifyProductId: `gid://shopify/Product/${product.id}`,
+        title: String(product.title || "Product"),
+        sku: String(variant.sku || product.id || ""),
+        currentInventory: Number(variant.inventory_quantity || 0),
+        reorderPoint: 5,
+        price: Number(variant.price || 0),
+        salesVelocity: 0,
+      };
+    });
+  }
+
+  async fulfillOrder(shopifyOrderId: string): Promise<void> {
+    const id = numericId(shopifyOrderId);
+    const fo = await this.admin(`orders/${id}/fulfillment_orders.json`);
+    if (!fo.ok) throw new Error(`Shopify fulfillment_orders HTTP ${fo.status}`);
+    const data = (await fo.json()) as { fulfillment_orders?: Array<{ id?: number; status?: string }> };
+    const open = (data.fulfillment_orders ?? []).filter((row) => row.status !== "closed" && row.id);
+    if (open.length === 0) {
+      const legacy = await this.admin(`orders/${id}/fulfillments.json`, {
+        method: "POST",
+        body: JSON.stringify({ fulfillment: { notify_customer: false } }),
+      });
+      if (!legacy.ok) throw new Error(`Shopify fulfill HTTP ${legacy.status}`);
+      return;
+    }
+    const create = await this.admin("fulfillments.json", {
+      method: "POST",
+      body: JSON.stringify({
+        fulfillment: {
+          notify_customer: false,
+          line_items_by_fulfillment_order: open.map((row) => ({ fulfillment_order_id: row.id })),
+        },
+      }),
+    });
+    if (!create.ok) throw new Error(`Shopify fulfill HTTP ${create.status}`);
+  }
+
+  async cancelOrder(shopifyOrderId: string): Promise<void> {
+    const id = numericId(shopifyOrderId);
+    const res = await this.admin(`orders/${id}/cancel.json`, {
+      method: "POST",
+      body: JSON.stringify({ reason: "other", email: false }),
+    });
+    if (!res.ok) throw new Error(`Shopify cancel HTTP ${res.status}`);
+  }
+}
+
+export interface ShopifyWriteClient extends ShopifyClient {
+  fulfillOrder(shopifyOrderId: string): Promise<void>;
+  cancelOrder(shopifyOrderId: string): Promise<void>;
+}
+
+export function getMockShopifyClient(): ShopifyClient {
   return new MockShopifyClient();
+}
+
+export function getLiveShopifyClient(): ShopifyWriteClient | null {
+  if (!isShopifyConfigured()) return null;
+  return new LiveShopifyClient();
+}
+
+export function getShopifyClient(): ShopifyClient {
+  return getLiveShopifyClient() ?? getMockShopifyClient();
 }

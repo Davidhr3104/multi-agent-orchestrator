@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { getSecret } from "./secrets";
 
 export const OPERATOR_COOKIE = "helix_operator";
 
@@ -8,8 +9,12 @@ export type HelixProductLink = {
   className: string;
 };
 
+function operatorKey(): string {
+  return getSecret("HELIX_OPERATOR_KEY");
+}
+
 export function operatorKeyConfigured(): boolean {
-  return Boolean(process.env.HELIX_OPERATOR_KEY?.trim());
+  return Boolean(operatorKey());
 }
 
 export function operatorToken(key: string): string {
@@ -24,13 +29,13 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export function verifyOperatorKey(input: string): boolean {
-  const key = process.env.HELIX_OPERATOR_KEY?.trim();
+  const key = operatorKey();
   if (!key || !input) return false;
   return safeEqual(input, key);
 }
 
 export function operatorCookieMatches(cookieValue: string | undefined): boolean {
-  const key = process.env.HELIX_OPERATOR_KEY?.trim();
+  const key = operatorKey();
   if (!key || !cookieValue) return false;
   return safeEqual(cookieValue, operatorToken(key));
 }
@@ -44,16 +49,52 @@ export function readCookie(header: string | null | undefined, name: string): str
   return undefined;
 }
 
+export function slackOpsQuery(): string {
+  const key = operatorKey();
+  if (!key) return "";
+  return `ops=${operatorToken(key)}`;
+}
+
+/**
+ * Who acted: local (no key), operator (cookie/header), or slack (`ops=`).
+ * When the operator key is unset, local HITL stays open.
+ * When set, require cookie, raw key header, or Slack `ops` query.
+ */
+export function operatorActor(req: Request): string {
+  if (!operatorKey()) return "local";
+  const ops = new URL(req.url).searchParams.get("ops")?.trim() || "";
+  if (ops && safeEqual(ops, operatorToken(operatorKey()))) return "slack";
+  return "operator";
+}
+
+export function requireOperator(req: Request): Response | null {
+  const key = operatorKey();
+  if (!key) return null;
+
+  const cookie = readCookie(req.headers.get("cookie"), OPERATOR_COOKIE);
+  if (operatorCookieMatches(cookie)) return null;
+
+  const headerKey = req.headers.get("x-helix-operator-key")?.trim() || "";
+  if (headerKey && verifyOperatorKey(headerKey)) return null;
+
+  const ops = new URL(req.url).searchParams.get("ops")?.trim() || "";
+  if (ops && safeEqual(ops, operatorToken(key))) return null;
+
+  return Response.json({ error: "Operator unlock required." }, { status: 401 });
+}
+
 export function operatorProductLinks(): HelixProductLink[] {
   const leads = process.env.HELIX_LEADS_URL?.trim() || "http://localhost:43148";
   const legal = process.env.HELIX_LEGAL_URL?.trim() || "http://localhost:43149";
   const inbox = process.env.HELIX_INBOX_URL?.trim() || "http://localhost:43151";
   const commerce = process.env.HELIX_COMMERCE_URL?.trim() || "http://localhost:43150";
+  const marketing = process.env.HELIX_MARKETING_URL?.trim() || "http://localhost:43152";
   return [
     { name: "Helix for Leads", href: leads, className: "text-cyan-400" },
     { name: "Helix for Legal", href: legal, className: "text-amber-300" },
     { name: "Helix for Inbox", href: inbox, className: "text-blue-400" },
     { name: "Helix for Commerce", href: commerce, className: "text-emerald-400" },
+    { name: "Helix for Marketing", href: marketing, className: "text-orange-400" },
     { name: "Helix for Video", href: "#", className: "text-red-400/50" },
     { name: "Helix for Social", href: "#", className: "text-pink-400/50" },
     { name: "Helix for Edit", href: "#", className: "text-violet-400/50" },

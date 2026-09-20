@@ -9,9 +9,10 @@ const trashLeads: AttributedLead[] = Array.from({ length: 20 }, (_, i) => ({
   name: `Lead ${i}`,
   email: `a${i}@example.com`,
   classification: i < 8 ? "spam" : "info",
-  score: 20 + (i % 8),
-  tier: "cold" as const,
-  confidence: 0.7,
+    score: 20 + (i % 8),
+    tier: "cold" as const,
+    confidence: 0.7,
+    createdAt: "2026-09-18",
 }));
 
 const qualityLeads: AttributedLead[] = Array.from({ length: 8 }, (_, i) => ({
@@ -20,9 +21,10 @@ const qualityLeads: AttributedLead[] = Array.from({ length: 8 }, (_, i) => ({
   name: `Hot ${i}`,
   email: `b${i}@hvac.example`,
   classification: "lead" as const,
-  score: 78 + i,
-  tier: "hot" as const,
-  confidence: 0.8,
+    score: 78 + i,
+    tier: "hot" as const,
+    confidence: 0.8,
+    createdAt: "2026-09-18",
 }));
 
 describe("scoreCampaignHeuristic", () => {

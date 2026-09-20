@@ -1,5 +1,6 @@
 import type { EmailThread, ThreadMessage } from "@/lib/types";
 import { smartReplyHeuristic } from "@/lib/triage";
+import { getSecret } from "@helix/core";
 
 type ClaudeReplyJson = {
   draftReply?: string;
@@ -23,7 +24,7 @@ export async function smartReplyWithContext(
     prior: history,
   });
 
-  const key = process.env.ANTHROPIC_API_KEY?.trim();
+  const key = getSecret("ANTHROPIC_API_KEY");
   if (!key || thread.category === "spam" || thread.category === "fyi") {
     return { draftReply: fallback, engine: "heuristic", confidence: thread.aiConfidence || 62 };
   }

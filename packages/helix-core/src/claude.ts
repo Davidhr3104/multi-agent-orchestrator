@@ -1,12 +1,14 @@
+import { getSecret } from "./secrets";
+
 export function isClaudeConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(getSecret("ANTHROPIC_API_KEY"));
 }
 
 export async function completeWithClaude(
   prompt: string,
   maxTokens = 900
 ): Promise<string | null> {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = getSecret("ANTHROPIC_API_KEY");
   if (!key) return null;
 
   try {

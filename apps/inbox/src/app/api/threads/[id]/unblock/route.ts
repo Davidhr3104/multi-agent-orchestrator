@@ -6,12 +6,15 @@ import {
   readDeskCookie,
   upsertDeskPatch,
 } from "@/lib/desk-state-cookie";
+import { requireOperator } from "@helix/core/operator";
 
 export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, ctx: Ctx) {
+  const denied = requireOperator(req);
+  if (denied) return denied;
   const { id } = await ctx.params;
   try {
     let state = readDeskCookie(req);

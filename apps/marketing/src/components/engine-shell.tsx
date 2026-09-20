@@ -1,15 +1,17 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CircleHelp, Gauge, Settings } from "lucide-react";
+import { CircleHelp, Gauge, Gavel, Settings, Unlink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Nav = "engine" | "help" | "settings";
+type Nav = "engine" | "unmatched" | "review" | "help" | "settings";
 
-const ITEMS: { id: Nav; href: string; label: string; icon: typeof Gauge }[] = [
-  { id: "engine", href: "/", label: "Performance Engine", icon: Gauge },
-  { id: "help", href: "/help", label: "How to use", icon: CircleHelp },
-  { id: "settings", href: "/settings", label: "Settings", icon: Settings },
+const ITEMS: { id: Nav; href: string; label: string; short: string; icon: typeof Gauge }[] = [
+  { id: "engine", href: "/", label: "Performance Engine", short: "Engine", icon: Gauge },
+  { id: "unmatched", href: "/unmatched", label: "Join queue", short: "Join", icon: Unlink },
+  { id: "review", href: "/review", label: "HITL", short: "HITL", icon: Gavel },
+  { id: "help", href: "/help", label: "How to use", short: "Help", icon: CircleHelp },
+  { id: "settings", href: "/settings", label: "Settings", short: "Settings", icon: Settings },
 ];
 
 export function EngineShell({
@@ -110,7 +112,7 @@ export function EngineShell({
                   active === item.id ? "bg-white/10 text-white" : "text-[#9CA3AF]"
                 )}
               >
-                {item.label === "Performance Engine" ? "Engine" : item.label}
+                {item.short}
               </a>
             ))}
           </nav>

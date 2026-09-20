@@ -119,7 +119,7 @@ export function findDuplicate(
 }
 
 export function inferIndustry(input: LeadIngestInput): string {
-  const blob = `${input.message ?? ""} ${input.source ?? ""} ${input.email} ${input.company ?? ""}`;
+  const blob = `${input.message ?? ""} ${input.source ?? ""} ${input.email} ${input.company ?? ""} ${input.trade ?? ""}`;
   if (/\bhvac|heating|cooling|air\b/i.test(blob)) return "hvac";
   if (/\bhealth|clinic|hospital|dental\b/i.test(blob)) return "healthcare";
   if (/\bretail|ecommerce|store\b/i.test(blob)) return "retail";

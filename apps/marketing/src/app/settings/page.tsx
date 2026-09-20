@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { EngineShell } from "@/components/engine-shell";
+import { KEYS_MARKETING } from "@helix/core/secret-fields";
+import { DeskOpsForm } from "@helix/help/desk-form";
+import { ApiKeysForm } from "@helix/help/keys-form";
 
-type Status = { meta: boolean; google: boolean; csv: boolean };
+type Status = { meta: boolean; google: boolean; csv: boolean; store?: string; unmatched?: number };
 
-const ROWS: { key: keyof Status; label: string; hint: string }[] = [
+const ROWS: { key: "csv" | "meta" | "google"; label: string; hint: string }[] = [
   {
     key: "csv",
     label: "CSV / JSON spend",
@@ -38,8 +41,14 @@ export default function SettingsPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8 lg:px-8">
         <div>
           <h1 className="text-2xl font-medium text-white">Settings</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">Nothing here claims Ads Manager is connected.</p>
+          <p className="mt-2 text-sm text-[#9CA3AF]">Paste keys here. Nothing claims Ads Manager is connected.</p>
         </div>
+        <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
+          <ApiKeysForm initialFields={KEYS_MARKETING} />
+        </section>
+        <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
+          <DeskOpsForm />
+        </section>
         <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
           <h2 className="text-sm font-semibold text-white">Integrations</h2>
           <p className="mt-1 text-xs text-[#6B7280]">CSV is real. Ad APIs are stubs.</p>
@@ -67,6 +76,24 @@ export default function SettingsPage() {
               );
             })}
           </div>
+        </section>
+        <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
+          <h2 className="text-sm font-semibold text-white">Desk store</h2>
+          <p className="mt-1 text-xs text-[#6B7280]">
+            Spend events, scored leads, and HITL decisions. Memory dies between Vercel instances unless
+            Supabase is configured (<span className="font-mono">supabase/schemas/marketing.sql</span>).
+          </p>
+          <p className="mt-3 text-sm text-white">
+            {status == null ? "Checking…" : status.store === "supabase" ? "Supabase" : status.store === "file" ? "Local file" : "In-memory (ephemeral)"}
+          </p>
+          {status?.unmatched != null ? (
+            <p className="mt-2 text-xs text-[#9CA3AF]">
+              {status.unmatched} unmatched campaign_id(s) in 30d.{" "}
+              <a className="text-[#F97316]" href="/unmatched">
+                Join queue
+              </a>
+            </p>
+          ) : null}
         </section>
       </div>
     </EngineShell>

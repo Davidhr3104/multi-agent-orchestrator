@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, HelpCircle, RefreshCw, Search } from "lucide-react";
@@ -19,6 +20,22 @@ const LABELS: Record<string, string> = {
 export function AppHeader() {
   const pathname = usePathname();
   const label = LABELS[pathname] ?? "Dashboard";
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
+
+  async function syncShopify() {
+    setSyncing(true);
+    setSyncNote(null);
+    const res = await fetch("/api/shopify/sync", { method: "POST" });
+    const data = (await res.json()) as { error?: string };
+    setSyncing(false);
+    if (!res.ok) {
+      setSyncNote(data.error || `Sync failed (${res.status})`);
+      return;
+    }
+    setSyncNote("Shopify catalog refreshed.");
+    window.location.reload();
+  }
 
   return (
     <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/90 px-6 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md">
@@ -50,9 +67,14 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98]">
+        <button
+          type="button"
+          disabled={syncing}
+          onClick={() => void syncShopify()}
+          className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98] disabled:opacity-50"
+        >
           <RefreshCw className="size-3.5 text-primary" />
-          Sync Shopify
+          {syncing ? "Syncing…" : "Sync Shopify"}
         </button>
         <button
           className="relative rounded-lg p-2 text-foreground transition hover:bg-black/[0.04] active:scale-95 dark:hover:bg-white/[0.08]"

@@ -1,166 +1,344 @@
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import {
+  autoSeedEnabled,
+  buildMarketingSeed,
+  dailySpendSeries,
+  inWindow,
+  parseMarketingWindow,
   runCampaignPipeline,
+  splitJoinedAndUnmatched,
+  utcDay,
+  windowBounds,
   type AttributedLead,
-  type CampaignStatus,
+  type CampaignAction,
+  type CampaignRemap,
+  type HitlDecision,
+  type MarketingWindow,
+  type SpendEvent,
   type SpendRowInput,
   type StoredCampaign,
 } from "@helix/core";
+import {
+  isSupabaseConfigured,
+  supabaseBootstrap,
+  supabaseLoadDesk,
+  supabaseSaveDecision,
+  supabaseSaveLeads,
+  supabaseSaveSpend,
+} from "@/lib/supabase-desk";
 
-const campaigns = new Map<string, StoredCampaign>();
-const leads: AttributedLead[] = [];
-let seeded = false;
+type DeskState = {
+  spend: SpendEvent[];
+  leads: AttributedLead[];
+  decisions: Map<string, HitlDecision>;
+  remaps: CampaignRemap[];
+  ready: boolean;
+  remoteBootstrapped: boolean;
+};
 
-const SAMPLE_SPEND: SpendRowInput[] = [
-  {
-    campaignId: "ad-a-volume",
-    name: "Ad A — volume HVAC",
-    platform: "meta",
-    spend: 2400,
-    impressions: 180000,
-    clicks: 4200,
-    formLeads: 120,
-  },
-  {
-    campaignId: "ad-b-quality",
-    name: "Ad B — quality HVAC",
-    platform: "meta",
-    spend: 380,
-    impressions: 22000,
-    clicks: 640,
-    formLeads: 22,
-  },
-  {
-    campaignId: "ad-c-mid",
-    name: "Ad C — search mix",
-    platform: "google",
-    spend: 910,
-    impressions: 41000,
-    clicks: 980,
-    formLeads: 34,
-  },
-  {
-    campaignId: "ad-d-thin",
-    name: "Ad D — new creative",
-    platform: "other",
-    spend: 90,
-    impressions: 4000,
-    clicks: 80,
-    formLeads: 3,
-  },
-];
+type FileShape = {
+  spend: SpendEvent[];
+  leads: AttributedLead[];
+  decisions: HitlDecision[];
+  remaps?: CampaignRemap[];
+};
 
-function makeLeads(): AttributedLead[] {
-  const rows: AttributedLead[] = [];
-  for (let i = 0; i < 20; i += 1) {
-    rows.push({
-      id: `lead-a-${i}`,
-      campaignId: "ad-a-volume",
-      name: `Form ${i + 1}`,
-      email: `volume${i}@spam.example`,
-      classification: i < 9 ? "spam" : "info",
-      score: 18 + (i % 10),
-      tier: "cold",
-      confidence: 0.74,
-    });
+function getDesk(): DeskState {
+  const g = globalThis as { __helixMarketing?: DeskState };
+  if (!g.__helixMarketing) {
+    g.__helixMarketing = {
+      spend: [],
+      leads: [],
+      decisions: new Map(),
+      remaps: [],
+      ready: false,
+      remoteBootstrapped: false,
+    };
   }
-  for (let i = 0; i < 8; i += 1) {
-    rows.push({
-      id: `lead-b-${i}`,
-      campaignId: "ad-b-quality",
-      name: `Maya ${i + 1}`,
-      email: `hot${i}@northwindhvac.example`,
-      classification: "lead",
-      score: 78 + i,
-      tier: "hot",
-      confidence: 0.84,
-    });
-  }
-  for (let i = 0; i < 10; i += 1) {
-    const score = 48 + i * 2;
-    rows.push({
-      id: `lead-c-${i}`,
-      campaignId: "ad-c-mid",
-      name: `Mix ${i + 1}`,
-      email: `mix${i}@example.com`,
-      classification: score >= 75 ? "lead" : "info",
-      score,
-      tier: score >= 75 ? "hot" : score >= 50 ? "warm" : "cold",
-      confidence: 0.6,
-    });
-  }
-  rows.push({
-    id: "lead-d-1",
-    campaignId: "ad-d-thin",
-    name: "Jordan",
-    email: "jordan@bookedjobs.example",
-    classification: "lead",
-    score: 71,
-    tier: "warm",
-    confidence: 0.55,
-  });
-  return rows;
+  if (!g.__helixMarketing.remaps) g.__helixMarketing.remaps = [];
+  return g.__helixMarketing;
 }
 
-function seedIfNeeded() {
-  if (seeded) return;
-  seeded = true;
-  leads.splice(0, leads.length, ...makeLeads());
-  for (const spend of SAMPLE_SPEND) {
-    const campaign = runCampaignPipeline(spend, leads);
-    campaign.id = `seed-${spend.campaignId}`;
-    campaigns.set(campaign.id, campaign);
+function dataPath(): string {
+  if (process.env.VERCEL) return "/tmp/helix-marketing-desk.json";
+  const cwd = process.cwd();
+  if (cwd.replace(/\\/g, "/").endsWith("/marketing")) {
+    return path.join(cwd, ".data", "desk.json");
+  }
+  return path.join(cwd, "apps", "marketing", ".data", "desk.json");
+}
+
+function loadFile(): FileShape | null {
+  try {
+    const raw = readFileSync(dataPath(), "utf8");
+    const parsed = JSON.parse(raw) as FileShape;
+    if (!Array.isArray(parsed.spend) || !Array.isArray(parsed.leads)) return null;
+    return parsed;
+  } catch {
+    return null;
   }
 }
 
-export function listCampaigns(): StoredCampaign[] {
-  seedIfNeeded();
-  return [...campaigns.values()].sort((a, b) => a.name.localeCompare(b.name));
+function saveFile(desk: DeskState) {
+  try {
+    const file = dataPath();
+    mkdirSync(path.dirname(file), { recursive: true });
+    const payload: FileShape = {
+      spend: desk.spend,
+      leads: desk.leads,
+      decisions: [...desk.decisions.values()],
+      remaps: desk.remaps,
+    };
+    writeFileSync(file, JSON.stringify(payload));
+  } catch (err) {
+    console.warn("[helix-marketing] file persist skipped:", err instanceof Error ? err.message : err);
+  }
 }
 
-export function listLeads(): AttributedLead[] {
-  seedIfNeeded();
-  return [...leads];
+function seedDesk(desk: DeskState) {
+  const seeded = buildMarketingSeed();
+  desk.spend = seeded.spend;
+  desk.leads = seeded.leads;
 }
 
-export function getCampaign(id: string): StoredCampaign | null {
-  seedIfNeeded();
-  return campaigns.get(id) ?? null;
-}
-
-export function ingestSpend(rows: SpendRowInput[]): StoredCampaign[] {
-  seedIfNeeded();
-  const created: StoredCampaign[] = [];
-  for (const row of rows) {
-    const existing = [...campaigns.values()].find((c) => c.campaignId === row.campaignId);
-    const next = runCampaignPipeline(row, leads);
-    if (existing) {
-      next.id = existing.id;
-      next.status = existing.status.startsWith("pause") || existing.status === "paused"
-        ? existing.status
-        : next.status;
+async function hydrate(): Promise<DeskState> {
+  const desk = getDesk();
+  if (!desk.ready) {
+    const file = loadFile();
+    if (file && (file.spend.length > 0 || file.leads.length > 0)) {
+      desk.spend = file.spend;
+      desk.leads = file.leads;
+      desk.decisions = new Map(file.decisions.map((d) => [d.campaignId, d]));
+      desk.remaps = file.remaps ?? [];
+    } else if (autoSeedEnabled()) {
+      seedDesk(desk);
+      saveFile(desk);
     }
-    campaigns.set(next.id, next);
-    created.push(next);
+    desk.ready = true;
   }
-  return created;
+  if (!desk.remoteBootstrapped && isSupabaseConfigured()) {
+    desk.remoteBootstrapped = true;
+    const remote = await supabaseLoadDesk();
+    if (remote && remote.spend.length > 0) {
+      desk.spend = remote.spend;
+      desk.leads = remote.leads;
+      desk.decisions = new Map(remote.decisions.map((d) => [d.campaignId, d]));
+      saveFile(desk);
+    } else if (desk.spend.length > 0) {
+      await supabaseBootstrap({
+        spend: desk.spend,
+        leads: desk.leads,
+        decisions: [...desk.decisions.values()],
+      });
+    }
+  }
+  return desk;
 }
 
-export function reviewCampaign(
-  id: string,
-  action: "pause" | "scale" | "keep",
-  note?: string
-): StoredCampaign | null {
-  const current = getCampaign(id);
-  if (!current) return null;
-  const status: CampaignStatus =
-    action === "pause" ? "paused" : action === "scale" ? "scale_recommended" : "active";
-  const next: StoredCampaign = {
-    ...current,
-    action,
-    status,
+function applyDecision(campaign: StoredCampaign, decision?: HitlDecision): StoredCampaign {
+  if (!decision) return campaign;
+  return {
+    ...campaign,
+    action: decision.action,
+    status:
+      decision.action === "pause" ? "paused" : decision.action === "scale" ? "scale_recommended" : "active",
     needsReview: false,
-    hitlNote: note?.trim() || current.hitlNote,
+    hitlNote: decision.note,
   };
-  campaigns.set(id, next);
-  return next;
 }
+
+export type DeskSnapshot = {
+  window: MarketingWindow;
+  from: string;
+  to: string;
+  store: "supabase" | "file" | "memory";
+  campaigns: StoredCampaign[];
+  leads: AttributedLead[];
+  unmatched: SpendEvent[];
+  series: { day: string; spend: number }[];
+};
+
+export function storeKind(): DeskSnapshot["store"] {
+  if (isSupabaseConfigured()) return "supabase";
+  try {
+    readFileSync(dataPath());
+    return "file";
+  } catch {
+    return "memory";
+  }
+}
+
+function applyRemaps(leads: AttributedLead[], remaps: CampaignRemap[] | undefined): AttributedLead[] {
+  if (!remaps?.length) return leads;
+  const extra: AttributedLead[] = [];
+  for (const remap of remaps) {
+    for (const lead of leads) {
+      if (lead.campaignId === remap.leadCampaignId) {
+        extra.push({ ...lead, id: `${lead.id}::${remap.spendCampaignId}`, campaignId: remap.spendCampaignId });
+      }
+    }
+  }
+  return extra.length ? [...leads, ...extra] : leads;
+}
+
+function snapshotFrom(desk: DeskState, window: MarketingWindow): DeskSnapshot {
+  const { from, to } = windowBounds(window);
+  const joinLeads = applyRemaps(desk.leads, desk.remaps);
+  const { joined, unmatched } = splitJoinedAndUnmatched(desk.spend, joinLeads, from, to);
+  const windowLeads = joinLeads.filter((l) => inWindow(l.createdAt, from, to));
+  const campaigns = joined
+    .map((spend) => {
+      const scored = runCampaignPipeline(spend, windowLeads);
+      scored.id = `camp-${spend.campaignId}`;
+      return applyDecision(scored, desk.decisions.get(spend.campaignId));
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return {
+    window,
+    from,
+    to,
+    store: storeKind(),
+    campaigns,
+    leads: windowLeads,
+    unmatched,
+    series: dailySpendSeries(desk.spend, from, to),
+  };
+}
+
+export async function getSnapshot(window: MarketingWindow | string | null = "7d"): Promise<DeskSnapshot> {
+  const desk = await hydrate();
+  return snapshotFrom(desk, parseMarketingWindow(window));
+}
+
+export async function ingestSpend(rows: SpendRowInput[]): Promise<DeskSnapshot> {
+  const desk = await hydrate();
+  const today = utcDay();
+  const events: SpendEvent[] = rows.map((row, i) => ({
+    ...row,
+    id: `ing-${row.campaignId}-${row.occurredAt ?? today}-${i}-${Date.now().toString(36)}`,
+    occurredAt: row.occurredAt ?? today,
+  }));
+  desk.spend.push(...events);
+  saveFile(desk);
+  await supabaseSaveSpend(events);
+  return snapshotFrom(desk, "7d");
+}
+
+export async function reviewCampaign(
+  id: string,
+  action: CampaignAction,
+  note?: string,
+  actor?: string
+): Promise<StoredCampaign | null> {
+  const desk = await hydrate();
+  const campaignId = id.startsWith("camp-") ? id.slice(5) : id;
+  const decision: HitlDecision = {
+    campaignId,
+    action,
+    note: note?.trim() || undefined,
+    at: new Date().toISOString(),
+    actor,
+  };
+  desk.decisions.set(campaignId, decision);
+  saveFile(desk);
+  await supabaseSaveDecision(decision);
+  const snap = snapshotFrom(desk, "90d");
+  return snap.campaigns.find((c) => c.campaignId === campaignId || c.id === id) ?? null;
+}
+
+export type DeskModeStatus = {
+  empty: boolean;
+  demo: boolean;
+  store: DeskSnapshot["store"];
+  count: number;
+};
+
+export async function deskStatus(): Promise<DeskModeStatus> {
+  const desk = await hydrate();
+  return {
+    empty: desk.spend.length === 0 && desk.leads.length === 0,
+    demo: desk.spend.some((s) => s.campaignId.startsWith("ad-a-volume") || s.campaignId.startsWith("ad-b-quality")),
+    store: storeKind(),
+    count: desk.spend.length + desk.leads.length,
+  };
+}
+
+export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  const desk = await hydrate();
+  seedDesk(desk);
+  desk.decisions = new Map();
+  saveFile(desk);
+  return deskStatus();
+}
+
+export async function clearDesk(): Promise<DeskModeStatus> {
+  const g = globalThis as { __helixMarketing?: DeskState };
+  g.__helixMarketing = {
+    spend: [],
+    leads: [],
+    decisions: new Map(),
+    remaps: [],
+    ready: true,
+    remoteBootstrapped: true,
+  };
+  try {
+    unlinkSync(dataPath());
+  } catch {
+    /* missing file is fine */
+  }
+  return deskStatus();
+}
+
+export function attributedFromStored(row: {
+  id: string;
+  campaignId?: string;
+  name: string;
+  email: string;
+  classification: AttributedLead["classification"];
+  score: number;
+  tier: AttributedLead["tier"];
+  confidence: number;
+  createdAt: string;
+}): AttributedLead | null {
+  const campaignId = row.campaignId?.trim();
+  if (!campaignId) return null;
+  return {
+    id: row.id,
+    campaignId,
+    name: row.name,
+    email: row.email,
+    classification: row.classification,
+    score: row.score,
+    tier: row.tier,
+    confidence: row.confidence,
+    createdAt: row.createdAt,
+  };
+}
+
+export async function upsertAttributedLeads(incoming: AttributedLead[]): Promise<DeskSnapshot> {
+  const desk = await hydrate();
+  const byId = new Map(desk.leads.map((l) => [l.id, l]));
+  for (const lead of incoming) byId.set(lead.id, lead);
+  desk.leads = [...byId.values()];
+  saveFile(desk);
+  await supabaseSaveLeads(incoming);
+  return snapshotFrom(desk, "90d");
+}
+
+export async function remapCampaign(spendCampaignId: string, leadCampaignId: string): Promise<DeskSnapshot> {
+  const desk = await hydrate();
+  const spendId = spendCampaignId.trim();
+  const leadId = leadCampaignId.trim();
+  if (!spendId || !leadId) return snapshotFrom(desk, "90d");
+  desk.remaps = [...desk.remaps.filter((r) => r.spendCampaignId !== spendId), { spendCampaignId: spendId, leadCampaignId: leadId }];
+  saveFile(desk);
+  return snapshotFrom(desk, "90d");
+}
+
+export async function listRemaps(): Promise<CampaignRemap[]> {
+  const desk = await hydrate();
+  return [...desk.remaps];
+}
+
+export { parseMarketingWindow };

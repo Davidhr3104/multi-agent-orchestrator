@@ -141,7 +141,7 @@ export function InboxDashboard() {
     return messages.filter((m) => {
       if (filter === "urgent" && !(m.priority === "urgent" || m.sentiment === "urgent")) return false;
       if (filter === "review" && !m.needsReview) return false;
-      if (filter === "routed" && m.status !== "routed") return false;
+      if (filter === "routed" && m.status !== "routed" && m.status !== "sent") return false;
       if (filter === "blocked" && !(m.status === "blocked" || m.category === "spam")) return false;
       if (!query.trim()) return true;
       const q = query.toLowerCase();
@@ -176,6 +176,22 @@ export function InboxDashboard() {
     }
   }
 
+  async function syncGmail() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/messages/sync", { method: "POST" });
+      const data = (await res.json()) as { imported?: number; scanned?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      flash(`Gmail sync · ${data.imported ?? 0} new of ${data.scanned ?? 0}`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function act(
     id: string,
     action: "approve" | "route" | "block" | "snooze" | "smart_reply" | "star"
@@ -195,9 +211,9 @@ export function InboxDashboard() {
     }
     flash(
       action === "approve"
-        ? "Draft approved"
+        ? "Reply sent"
         : action === "route"
-          ? "Routed"
+          ? "Marked routed (not sent)"
           : action === "block"
             ? "Blocked"
             : action === "snooze"
@@ -444,7 +460,7 @@ export function InboxDashboard() {
                   className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground"
                   onClick={() => void bulk("approve")}
                 >
-                  Approve
+                  Approve / send
                 </button>
                 <button
                   type="button"
@@ -600,7 +616,19 @@ export function InboxDashboard() {
                 Clear
               </button>
             </div>
-            <p className="mb-4 text-[13px] text-muted-foreground">Paste an email to score and draft automatically</p>
+            <p className="mb-4 text-[13px] text-muted-foreground">
+              Paste an email, or Sync Gmail when a token is saved in Settings.
+            </p>
+            <div className="mb-3">
+              <button
+                type="button"
+                disabled={busy}
+                className="rounded-md border border-border px-3 py-1.5 text-[11px] text-foreground disabled:opacity-50"
+                onClick={() => void syncGmail()}
+              >
+                Sync Gmail
+              </button>
+            </div>
             <form className="space-y-3" onSubmit={(e) => void ingest(e)}>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -754,7 +782,7 @@ export function InboxDashboard() {
                   className="btn-tactile h-8 rounded-md bg-gradient-to-r from-[#4E5FF7] to-[#8B5CF6] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
                   onClick={() => void act(selected.id, "approve")}
                 >
-                  {actionBusy === "approve" ? "…" : "Approve draft"}
+                  {actionBusy === "approve" ? "…" : "Send reply"}
                 </button>
                 <button
                   type="button"
@@ -762,7 +790,7 @@ export function InboxDashboard() {
                   className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] text-foreground disabled:opacity-50"
                   onClick={() => void act(selected.id, "route")}
                 >
-                  {actionBusy === "route" ? "…" : "Route"}
+                  {actionBusy === "route" ? "…" : "Mark routed"}
                 </button>
                 <button
                   type="button"

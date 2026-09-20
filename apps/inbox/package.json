@@ -12,6 +12,7 @@
     "@base-ui/react": "^1.8.0",
     "@helix/core": "*",
     "@helix/help": "^0.1.0",
+    "@supabase/supabase-js": "^2.112.4",
     "clsx": "^2.1.1",
     "driver.js": "^1.8.0",
     "lucide-react": "^1.38.0",

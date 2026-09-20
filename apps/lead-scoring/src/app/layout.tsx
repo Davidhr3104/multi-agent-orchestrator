@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Helix for Leads",
   description:
-    "Classify inbound contacts, score fit, human review, mock CRM handoff.",
+    "Classify inbound contacts, score fit, human review, send to CRM when GHL keys exist.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

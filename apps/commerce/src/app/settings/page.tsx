@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { KEYS_COMMERCE } from "@helix/core/secret-fields";
+import { DeskOpsForm } from "@helix/help/desk-form";
+import { ApiKeysForm } from "@helix/help/keys-form";
 
 type Status = { shopify: boolean; claude: boolean; supabase: boolean };
 
@@ -10,7 +13,7 @@ const ROWS: { key: keyof Status; label: string; hint: string }[] = [
   {
     key: "shopify",
     label: "Shopify Admin API",
-    hint: "SHOPIFY_STORE_DOMAIN / SHOPIFY_ACCESS_TOKEN — mock data is used until configured.",
+    hint: "SHOPIFY_STORE_DOMAIN / SHOPIFY_ACCESS_TOKEN — live Admin API when both are set. Load demo otherwise.",
   },
   {
     key: "claude",
@@ -39,8 +42,16 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          Integration status — reflects actual environment configuration, not a form.
+          Paste keys below. Status reflects saved keys. Sync Shopify uses the Admin API when both fields are set.
         </p>
+      </div>
+
+      <div className="glass-panel glass-panel-glow rounded-xl p-5">
+        <ApiKeysForm initialFields={KEYS_COMMERCE} />
+      </div>
+
+      <div className="glass-panel glass-panel-glow rounded-xl p-5">
+        <DeskOpsForm />
       </div>
 
       <div className="glass-panel glass-panel-glow space-y-3 rounded-xl p-5">

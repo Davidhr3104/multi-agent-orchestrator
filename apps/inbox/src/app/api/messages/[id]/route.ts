@@ -12,6 +12,8 @@ import {
   readDeskCookie,
   upsertDeskPatch,
 } from "@/lib/desk-state-cookie";
+import { operatorActor, requireOperator } from "@helix/core/operator";
+import { sendReply } from "@/lib/send";
 
 export const runtime = "nodejs";
 
@@ -29,6 +31,8 @@ export async function GET(req: Request, ctx: Ctx) {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
+  const denied = requireOperator(req);
+  if (denied) return denied;
   const { id } = await ctx.params;
   let body: unknown;
   try {
@@ -48,22 +52,31 @@ export async function PATCH(req: Request, ctx: Ctx) {
   applyDeskPatches(state.patches);
 
   try {
-    if (payload.action === "approve") {
-      // Approve draft = send/handoff → routed (product copy: appears on Routed)
+    if (payload.action === "approve" || payload.action === "send") {
+      const current = await getMessage(id);
+      if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+      const sent = await sendReply({
+        to: current.fromEmail,
+        subject: current.subject,
+        text: current.draftReply || current.body,
+      });
+      if ("error" in sent) {
+        return Response.json({ error: sent.error }, { status: sent.status });
+      }
       const message = await patchMessage(
         id,
-        { status: "routed", needsReview: false, isRead: true },
-        { actionType: "approve", humanOverride: true }
+        { status: "sent", needsReview: false, isRead: true },
+        { actionType: `send:${operatorActor(req)}`, humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
       state = upsertDeskPatch(state, id, patchFromThread(message));
-      return jsonWithDeskCookie({ message }, state);
+      return jsonWithDeskCookie({ message, resendId: sent.id }, state);
     }
     if (payload.action === "route") {
       const message = await patchMessage(
         id,
         { status: "routed", needsReview: false, isRead: true },
-        { actionType: "route", humanOverride: true }
+        { actionType: `route:${operatorActor(req)}`, humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
       state = upsertDeskPatch(state, id, patchFromThread(message));
@@ -79,7 +92,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
           category: "spam",
           isRead: true,
         },
-        { actionType: "block", humanOverride: true }
+        { actionType: `block:${operatorActor(req)}`, humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
       state = upsertDeskPatch(state, id, patchFromThread(message));

@@ -235,6 +235,18 @@ export function complianceGaps(rfp: StoredRfp): ComplianceGap[] {
 }
 
 export function goNoGo(rfp: StoredRfp): { verdict: "GO" | "CONDITIONAL" | "NO-GO"; score: number; why: string } {
+  if (rfp.partnerDecision) {
+    const d = rfp.partnerDecision;
+    const score = d.verdict === "GO" ? 90 : d.verdict === "NO-GO" ? 12 : 58;
+    const coi = d.coiCleared ? "COI cleared" : "COI not cleared";
+    const bid = d.bidAmount ? ` · bid ${d.bidAmount}` : "";
+    const notes = d.notes ? ` — ${d.notes}` : "";
+    return {
+      verdict: d.verdict,
+      score,
+      why: `Partner ${d.decidedBy} (${d.decidedAt.slice(0, 16)}) · ${coi}${bid}${notes}`,
+    };
+  }
   const gaps = complianceGaps(rfp);
   const red = gaps.filter((g) => g.severity === "red").length;
   if (red >= 2 || rfp.tier === "cold") {

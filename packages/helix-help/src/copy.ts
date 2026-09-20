@@ -75,7 +75,7 @@ export const HOW_TO_USE_COMMERCE: HowToUseGuide = {
   product: "Helix for Commerce",
   title: "How to use",
   overview:
-    "Score orders for fraud, flag restock risks, and keep high-risk fulfillment decisions in human review before Shopify sync.",
+    "Score orders for fraud, flag restock risks, and fulfill or cancel on Shopify after human review when Admin keys are set.",
   videoSrc: "/help/helix-commerce-howto.mp4",
   videoTitle: "Product walkthrough (~1m 45s)",
   steps: [
@@ -97,7 +97,7 @@ export const HOW_TO_USE_COMMERCE: HowToUseGuide = {
     },
     {
       title: "5. Settings and Sync",
-      body: "Confirm Shopify, Claude, and Supabase status. Use Sync Shopify when credentials are configured; otherwise the desk runs on mock + heuristics.",
+      body: "Confirm Shopify, Claude, and Supabase in Settings. Paste API keys there instead of editing .env. Desks start empty — Load demo catalog for the mock store. Use Sync Shopify when credentials are configured; HITL approve fulfills, cancel voids the order on Shopify.",
     },
   ],
   hitlTip:
@@ -117,23 +117,27 @@ export const HOW_TO_USE_MARKETING: HowToUseGuide = {
   steps: [
     {
       title: "1. Read the table",
-      body: "Each row is a campaign: spend, form volume, average score, cost per hot lead, and the REC action.",
+      body: "Each row is a campaign in the selected window (7d / 30d / 90d): spend, form volume, average score, cost per hot lead, and the REC action. Windows cut dated spend and leads — they are not the same snapshot.",
     },
     {
       title: "2. Check the catalog example",
-      body: "Ad A (120 forms, score ~24) should recommend pause. Ad B (22 forms, score ~79) should recommend scale.",
+      body: "Ad A (volume, low score) should recommend pause. Ad B (quality, affordable hot leads) should recommend scale. Ad C may drop out of 7d if its scored leads sit outside that window.",
     },
     {
       title: "3. HITL",
-      body: "Open a campaign and Confirm pause, Confirm scale, or Keep. Status is local only — Meta/Google stay stubs.",
+      body: "Open HITL or a campaign and Confirm pause, Confirm scale, or Keep. Status is local only — Meta/Google stay stubs. Decisions persist in the desk file (and Supabase when configured).",
     },
     {
-      title: "4. Ingest CSV",
-      body: "Paste spend with campaign_id, name, platform, spend, form_leads. Joins against the demo scored leads by campaign_id.",
+      title: "4. Join queue",
+      body: "Spend whose campaign_id has no scored leads does not get a fake score. It lands on Join queue as unmatched.",
     },
     {
-      title: "5. Settings",
-      body: "CSV is connected. Meta and Google are explicitly not connected.",
+      title: "5. Ingest CSV",
+      body: "Paste spend with campaign_id, name, platform, spend, form_leads. Optional date column (YYYY-MM-DD). Joins against scored leads by campaign_id.",
+    },
+    {
+      title: "6. Settings",
+      body: "Paste Anthropic and Supabase keys in Settings. Desks start empty — Load demo catalog there if you want Ad A–E. CSV is the live spend path. Meta and Google tokens can be saved as stubs — they do not write to Ads Manager.",
     },
   ],
   hitlTip:
@@ -166,11 +170,11 @@ export const HOW_TO_USE_INBOX: HowToUseGuide = {
     },
     {
       title: "4. Act in the inspector",
-      body: "Approve the draft, route to the owner, regenerate the reply, snooze, or block spam. Every action is audited.",
+      body: "Send reply uses Resend (fails without keys). Mark routed is a local handoff only. Sync Gmail when a token is pasted in Settings.",
     },
     {
       title: "5. Tune preferences",
-      body: "In Settings, set reply tone, VIP senders, and theme. Routed and Blocked views keep a clean history.",
+      body: "In Settings, paste Claude / Resend keys, then set reply tone, VIP senders, and theme. Desks start empty — Load demo catalog for Northwind samples. Routed and Blocked views keep a clean history.",
     },
   ],
   hitlTip:
@@ -208,7 +212,7 @@ export const HOW_TO_USE_LEGAL: HowToUseGuide = {
     },
     {
       title: "5. Settings and Audit",
-      body: "Keep the client profile accurate in Settings. Audit Log records AI decisions and human overrides.",
+      body: "Paste Anthropic and Supabase keys in Settings, then keep the client profile accurate. Desks start empty — Load demo catalog for sample RFPs. Audit Log records AI decisions and human overrides.",
     },
   ],
   hitlTip:
@@ -244,7 +248,7 @@ export const HOW_TO_USE_LEADS: HowToUseGuide = {
     },
     {
       title: "5. Connect and measure",
-      body: "Integrations for GHL/CRM, Analytics for source quality, Audit for score history.",
+      body: "Settings → paste GHL/CRM keys. Load demo catalog if you want sample HVAC leads. Analytics for source quality, Audit for score history.",
     },
   ],
   hitlTip:

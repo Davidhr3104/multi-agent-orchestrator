@@ -452,7 +452,7 @@ export function LeadDashboard() {
               <br />
               Send to GHL upserts the contact when GHL_API_KEY and GHL_LOCATION_ID are set;
               <br />
-              otherwise crm_status stays mocked.
+              otherwise the request errors and the lead stays not_sent.
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -503,7 +503,7 @@ export function LeadDashboard() {
               </div>
             </div>
             <span className="text-[11px] text-slate-500">
-              {ghlConfigured ? "GHL connected" : "GHL keys missing · mock"}
+              {ghlConfigured ? "GHL connected" : "GHL keys missing"}
             </span>
             <button
               type="button"
@@ -1361,7 +1361,7 @@ function LeadDetail({
               ? "Sent to GHL"
               : ghlConfigured
                 ? "Send to GHL"
-                : "Send to GHL (mock)"}
+                : "Send to GHL (needs keys)"}
           </Button>
           <Button
             variant="secondary"

@@ -1,5 +1,22 @@
 export { completeWithClaude, isClaudeConfigured, parseJsonObject } from "./claude";
+export {
+  getSecret,
+  isGhlConfigured,
+  keysGetResponse,
+  keysPostResponse,
+  onSecretsChanged,
+  KEYS_COMMERCE,
+  KEYS_INBOX,
+  KEYS_LEADS,
+  KEYS_LEGAL,
+  KEYS_MARKETING,
+  listSecretStatus,
+  setSecrets,
+  type SecretField,
+  type SecretStatus,
+} from "./secrets";
 export { citeSpan, hydrateScoredField, missingCite } from "./fact";
+export { autoSeedEnabled } from "./desk-mode";
 export { encodeSse } from "./sse";
 export { scoreLeadHeuristic } from "./lead/heuristic";
 export {
@@ -19,7 +36,7 @@ export {
   roiMetrics,
   zombieLeads,
 } from "./lead/growth";
-export { parseLeadIngest, runLeadPipeline } from "./lead/pipeline";
+export { parseGhlWebhook, parseLeadIngest, runLeadPipeline } from "./lead/pipeline";
 export { leadScoringPrompt } from "./lead/prompts";
 export { scoreRfpHeuristic, profileOverlap } from "./rfp/heuristic";
 export { parseRfpIngest, runRfpPipeline } from "./rfp/pipeline";
@@ -52,15 +69,31 @@ export type {
 export { parseSpendCsv } from "./marketing/spendCsv";
 export { joinCampaignMetrics, scoreCampaignHeuristic } from "./marketing/heuristic";
 export { runCampaignPipeline } from "./marketing/pipeline";
+export { buildMarketingSeed } from "./marketing/seed";
+export {
+  addUtcDays,
+  dailySpendSeries,
+  inWindow,
+  parseMarketingWindow,
+  splitJoinedAndUnmatched,
+  utcDay,
+  windowBounds,
+  WINDOW_DAYS,
+} from "./marketing/window";
 export type {
   AdPlatform,
   AttributedLead,
+  CampaignRemap,
   CampaignAction,
   CampaignMetrics,
   CampaignScoreResult,
   CampaignStatus,
+  HitlDecision,
+  MarketingWindow,
+  SpendEvent,
   SpendRowInput,
   StoredCampaign,
+  UnmatchedSpend,
 } from "./marketing/types";
 export type {
   AgentDecision,
@@ -76,6 +109,8 @@ export type {
   LeadStreamEvent,
   LeadTier,
   PipelineLog,
+  PartnerDecision,
+  PartnerVerdict,
   PipelineStage,
   RfpEmit,
   RfpIngestInput,

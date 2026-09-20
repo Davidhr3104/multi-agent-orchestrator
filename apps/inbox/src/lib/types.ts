@@ -1,6 +1,6 @@
 export type ThreadCategory = "action_required" | "fyi" | "meeting" | "spam";
 export type ThreadSentiment = "positive" | "neutral" | "negative" | "urgent";
-export type ThreadStatus = "open" | "review" | "routed" | "blocked" | "archived";
+export type ThreadStatus = "open" | "review" | "routed" | "sent" | "blocked" | "archived";
 export type DraftTone = "professional" | "friendly" | "concise" | "formal";
 export type DeskTheme = "dark" | "light";
 

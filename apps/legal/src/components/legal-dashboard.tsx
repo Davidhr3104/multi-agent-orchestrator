@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
+import type { PartnerVerdict, PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -389,9 +389,16 @@ export function LegalDashboard() {
     }
   }
 
-  async function clearReview(id: string) {
-    const res = await fetch(`/api/rfps/${id}/review`, { method: "POST" });
-    const data = (await res.json()) as { rfp?: StoredRfp };
+  async function clearReview(
+    id: string,
+    payload: { verdict: PartnerVerdict; coiCleared: boolean; bidAmount: string; notes: string }
+  ) {
+    const res = await fetch(`/api/rfps/${id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = (await res.json()) as { rfp?: StoredRfp; error?: string };
     if (data.rfp) {
       setRfps((prev) => prev.map((r) => (r.id === id ? data.rfp! : r)));
       setSelected(data.rfp);
@@ -1228,7 +1235,7 @@ export function LegalDashboard() {
               conflict={conflicts[selected.id]}
               quote={pricing[selected.id]}
               profile={serializeProfile(structured)}
-              onReview={() => void clearReview(selected.id)}
+              onReview={(payload) => void clearReview(selected.id, payload)}
               onCorpus={() => void askCorpus(selected.id)}
               onProposal={() => downloadProposal(selected)}
             />
@@ -1260,7 +1267,7 @@ function RfpSheet({
   conflict?: ConflictReport;
   quote?: PricingQuote;
   profile: string;
-  onReview: () => void;
+  onReview: (payload: { verdict: PartnerVerdict; coiCleared: boolean; bidAmount: string; notes: string }) => void;
   onCorpus: () => void;
   onProposal: () => void;
 }) {
@@ -1275,6 +1282,11 @@ function RfpSheet({
   const [events, setEvents] = useState<{ id: string; at: string; kind: string; text: string }[]>([]);
   const [note, setNote] = useState("");
   const [kind, setKind] = useState("note");
+  const heuristic = goNoGo({ ...selected, partnerDecision: undefined });
+  const [verdict, setVerdict] = useState<PartnerVerdict>(selected.partnerDecision?.verdict ?? heuristic.verdict);
+  const [coiCleared, setCoiCleared] = useState(Boolean(selected.partnerDecision?.coiCleared));
+  const [bidAmount, setBidAmount] = useState(selected.partnerDecision?.bidAmount ?? selected.amount ?? "");
+  const [partnerNotes, setPartnerNotes] = useState(selected.partnerDecision?.notes ?? "");
 
   useEffect(() => {
     void fetch(`/api/rfps/${selected.id}/comms`)
@@ -1423,6 +1435,24 @@ function RfpSheet({
                 <InfoTooltip content={LEGAL_HELP.goNoGo} side="top" label="About Go/No-Go" />
               </p>
               <p className="text-xs text-muted-foreground">{go.why}</p>
+            </div>
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <p className="text-xs font-semibold">Partner sign-off</p>
+              <select
+                className="h-8 w-full rounded-lg border border-input bg-background px-2 text-xs"
+                value={verdict}
+                onChange={(e) => setVerdict(e.target.value as PartnerVerdict)}
+              >
+                <option value="GO">GO</option>
+                <option value="CONDITIONAL">CONDITIONAL</option>
+                <option value="NO-GO">NO-GO</option>
+              </select>
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={coiCleared} onChange={(e) => setCoiCleared(e.target.checked)} />
+                COI cleared
+              </label>
+              <Input value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} placeholder="Bid amount" />
+              <Textarea rows={2} value={partnerNotes} onChange={(e) => setPartnerNotes(e.target.value)} placeholder="Partner notes" />
             </div>
             <ul className="space-y-2">
               {gaps.length === 0 ? (
@@ -1664,9 +1694,12 @@ function RfpSheet({
         ) : null}
       </div>
       <SheetFooter>
-        {selected.needsReview ? (
-          <Button variant="secondary" onClick={onReview}>
-            Mark reviewed
+        {selected.needsReview || !selected.partnerDecision ? (
+          <Button
+            variant="secondary"
+            onClick={() => onReview({ verdict, coiCleared, bidAmount, notes: partnerNotes })}
+          >
+            Partner {verdict}
           </Button>
         ) : null}
         <Button variant="outline" onClick={onProposal}>

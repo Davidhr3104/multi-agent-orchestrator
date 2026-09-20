@@ -11,6 +11,9 @@ import {
 } from "@/lib/client-profile";
 import { formatUsdAmount } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { KEYS_LEGAL } from "@helix/core/secret-fields";
+import { DeskOpsForm } from "@helix/help/desk-form";
+import { ApiKeysForm } from "@helix/help/keys-form";
 
 export default function SettingsPage() {
   const [structured, setStructured] = useState<StructuredProfile>(DEFAULT_STRUCTURED);
@@ -47,8 +50,16 @@ export default function SettingsPage() {
     <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-6 py-7 lg:px-8">
       <div>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-white">Settings</h1>
-        <p className="mt-1 text-sm text-slate-400">Client profile feeds match scoring, Go/No-Go, and proposal drafts.</p>
+        <p className="mt-1 text-sm text-slate-400">
+          Paste API keys, then keep the client profile that feeds match scoring, Go/No-Go, and proposal drafts.
+        </p>
       </div>
+      <section className="glass-card rounded-2xl p-6">
+        <ApiKeysForm initialFields={KEYS_LEGAL} />
+      </section>
+      <section className="glass-card rounded-2xl p-6">
+        <DeskOpsForm />
+      </section>
       <form className="glass-card space-y-5 rounded-2xl p-6" onSubmit={(e) => void save(e)}>
         <div>
           <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">Practice areas</p>

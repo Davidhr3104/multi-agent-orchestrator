@@ -1,22 +1,25 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { StoredRfp } from "@helix/core";
+import { getSecret, onSecretsChanged, type StoredRfp } from "@helix/core";
 import type { AuditEvent } from "@/lib/audit-types";
 
 type Client = SupabaseClient;
 
 let cached: Client | null | undefined;
+onSecretsChanged(() => {
+  cached = undefined;
+});
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    getSecret("NEXT_PUBLIC_SUPABASE_URL") &&
+      (getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY"))
   );
 }
 
 export function getSupabase(): Client | null {
   if (cached !== undefined) return cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSecret("NEXT_PUBLIC_SUPABASE_URL");
+  const key = getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!url || !key) {
     cached = null;
     return null;
@@ -77,6 +80,7 @@ function toRfpRow(rfp: StoredRfp) {
     needs_review: rfp.needsReview,
     corpus_status: rfp.corpusStatus,
     engine: rfp.engine,
+    partner_decision: rfp.partnerDecision ?? null,
   };
 }
 
@@ -104,6 +108,22 @@ function fromRfpRow(row: Record<string, unknown>): StoredRfp {
     needsReview: Boolean(row.needs_review),
     corpusStatus,
     engine: row.engine === "claude" ? "claude" : "heuristic",
+    partnerDecision: parsePartner(row.partner_decision),
+  };
+}
+
+function parsePartner(raw: unknown): StoredRfp["partnerDecision"] {
+  if (!raw || typeof raw !== "object") return undefined;
+  const row = raw as Record<string, unknown>;
+  const verdict = row.verdict;
+  if (verdict !== "GO" && verdict !== "CONDITIONAL" && verdict !== "NO-GO") return undefined;
+  return {
+    verdict,
+    coiCleared: Boolean(row.coiCleared ?? row.coi_cleared),
+    bidAmount: row.bidAmount != null ? String(row.bidAmount) : row.bid_amount != null ? String(row.bid_amount) : undefined,
+    notes: row.notes != null ? String(row.notes) : undefined,
+    decidedBy: String(row.decidedBy ?? row.decided_by ?? "operator"),
+    decidedAt: String(row.decidedAt ?? row.decided_at ?? new Date().toISOString()),
   };
 }
 
@@ -206,4 +226,71 @@ export async function supabaseUpsertAudits(events: AuditEvent[]): Promise<boolea
     return false;
   }
   return true;
+}
+
+function kv(db: Client, table: "conflicts" | "quotes" | "desk_meta") {
+  return (
+    db as unknown as { schema: (name: string) => { from: (t: string) => DeskQuery } }
+  )
+    .schema("legal")
+    .from(table);
+}
+
+export async function supabaseGetProfile(): Promise<string | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await kv(db, "desk_meta").select("*").eq("id", "profile").maybeSingle();
+  if (error) {
+    console.warn("[helix-legal] profile skipped:", error.message);
+    return null;
+  }
+  if (!data) return null;
+  const body = (data as Record<string, unknown>).body;
+  return body != null ? String(body) : null;
+}
+
+export async function supabaseUpsertProfile(profile: string): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  const { error } = await kv(db, "desk_meta").upsert({ id: "profile", body: profile });
+  if (error) {
+    console.warn("[helix-legal] profile upsert skipped:", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function supabaseUpsertJson(
+  table: "conflicts" | "quotes",
+  rfpId: string,
+  payload: unknown
+): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  const row = table === "conflicts" ? { rfp_id: rfpId, report: payload } : { rfp_id: rfpId, quote: payload };
+  const { error } = await kv(db, table).upsert(row);
+  if (error) {
+    console.warn(`[helix-legal] ${table} upsert skipped:`, error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function supabaseLoadJsonMap(
+  table: "conflicts" | "quotes"
+): Promise<Record<string, unknown> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await kv(db, table).select("*").order("rfp_id", { ascending: true });
+  if (error) {
+    console.warn(`[helix-legal] ${table} list skipped:`, error.message);
+    return null;
+  }
+  const out: Record<string, unknown> = {};
+  for (const raw of data ?? []) {
+    const row = raw as Record<string, unknown>;
+    const id = String(row.rfp_id);
+    out[id] = table === "conflicts" ? row.report : row.quote;
+  }
+  return out;
 }

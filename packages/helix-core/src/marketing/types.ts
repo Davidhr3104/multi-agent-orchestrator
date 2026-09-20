@@ -8,6 +8,8 @@ export type CampaignStatus =
   | "paused"
   | "scale_recommended";
 
+export type MarketingWindow = "7d" | "30d" | "90d";
+
 export type SpendRowInput = {
   campaignId: string;
   name: string;
@@ -16,6 +18,12 @@ export type SpendRowInput = {
   impressions?: number;
   clicks?: number;
   formLeads?: number;
+  occurredAt?: string;
+};
+
+export type SpendEvent = SpendRowInput & {
+  id: string;
+  occurredAt: string;
 };
 
 export type AttributedLead = {
@@ -27,6 +35,24 @@ export type AttributedLead = {
   score: number;
   tier: LeadTier;
   confidence: number;
+  createdAt: string;
+};
+
+export type HitlDecision = {
+  campaignId: string;
+  action: CampaignAction;
+  note?: string;
+  at: string;
+  actor?: string;
+};
+
+export type CampaignRemap = {
+  spendCampaignId: string;
+  leadCampaignId: string;
+};
+
+export type UnmatchedSpend = SpendEvent & {
+  reason: "no_scored_leads";
 };
 
 export type CampaignMetrics = {

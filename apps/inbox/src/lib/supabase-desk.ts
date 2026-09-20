@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getSecret, onSecretsChanged } from "@helix/core";
 import type {
   AiActionLog,
   DraftTone,
@@ -12,18 +13,21 @@ import type {
 
 type Client = SupabaseClient;
 let cached: Client | null | undefined;
+onSecretsChanged(() => {
+  cached = undefined;
+});
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    getSecret("NEXT_PUBLIC_SUPABASE_URL") &&
+      (getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY"))
   );
 }
 
 export function getSupabase(): Client | null {
   if (cached !== undefined) return cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSecret("NEXT_PUBLIC_SUPABASE_URL");
+  const key = getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!url || !key) {
     cached = null;
     return null;

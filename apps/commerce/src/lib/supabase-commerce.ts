@@ -1,22 +1,25 @@
 import { createClient } from "@supabase/supabase-js";
-import type { StoredInquiry, StoredOrder, StoredProduct } from "@helix/core";
+import { getSecret, onSecretsChanged, type StoredInquiry, type StoredOrder, type StoredProduct } from "@helix/core";
 
 type Client = ReturnType<typeof createClient>;
 
 let cached: Client | null | undefined;
+onSecretsChanged(() => {
+  cached = undefined;
+});
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    getSecret("NEXT_PUBLIC_SUPABASE_URL") &&
+      (getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY"))
   );
 }
 
 export function getSupabase(): Client | null {
   if (cached !== undefined) return cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = getSecret("NEXT_PUBLIC_SUPABASE_URL");
   const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!url || !key) {
     cached = null;
     return null;

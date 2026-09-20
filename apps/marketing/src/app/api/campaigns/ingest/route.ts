@@ -26,6 +26,10 @@ export async function POST(req: Request) {
   if (typeof parsed === "string") {
     return Response.json({ error: parsed }, { status: 400 });
   }
-  const campaigns = ingestSpend(parsed);
-  return Response.json({ campaigns });
+  const snap = await ingestSpend(parsed);
+  return Response.json({
+    campaigns: snap.campaigns,
+    unmatched: snap.unmatched,
+    unmatchedCount: new Set(snap.unmatched.map((u) => u.campaignId)).size,
+  });
 }

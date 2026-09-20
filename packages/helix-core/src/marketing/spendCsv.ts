@@ -57,6 +57,9 @@ export function parseSpendCsv(text: string): SpendRowInput[] | string {
   const impIdx = headers.findIndex((h) => h === "impressions" || h === "imps");
   const clickIdx = headers.findIndex((h) => h === "clicks");
   const formIdx = headers.findIndex((h) => h === "formleads" || h === "leads" || h === "forms");
+  const dateIdx = headers.findIndex(
+    (h) => h === "date" || h === "day" || h === "occurredat" || h === "occurred_at"
+  );
 
   if (idIdx < 0) return "CSV must include a campaign_id column.";
   if (spendIdx < 0) return "CSV must include a spend column.";
@@ -67,6 +70,8 @@ export function parseSpendCsv(text: string): SpendRowInput[] | string {
     const campaignId = cells[idIdx] ?? "";
     if (!campaignId) continue;
     const spend = Number(String(cells[spendIdx] ?? "").replace(/[^0-9.]/g, ""));
+    const occurredRaw = dateIdx >= 0 ? cells[dateIdx] ?? "" : "";
+    const occurredAt = /^\d{4}-\d{2}-\d{2}/.test(occurredRaw) ? occurredRaw.slice(0, 10) : undefined;
     rows.push({
       campaignId,
       name: nameIdx >= 0 ? cells[nameIdx] || campaignId : campaignId,
@@ -75,6 +80,7 @@ export function parseSpendCsv(text: string): SpendRowInput[] | string {
       impressions: impIdx >= 0 ? Number(cells[impIdx]) || undefined : undefined,
       clicks: clickIdx >= 0 ? Number(cells[clickIdx]) || undefined : undefined,
       formLeads: formIdx >= 0 ? Number(cells[formIdx]) || undefined : undefined,
+      occurredAt,
     });
   }
   return rows;

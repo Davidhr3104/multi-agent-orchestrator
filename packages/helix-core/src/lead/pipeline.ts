@@ -247,6 +247,11 @@ export async function runLeadPipeline(
     company: input.company?.trim(),
     country: input.country?.trim(),
     region: input.region?.trim(),
+    trade: input.trade?.trim(),
+    zip: input.zip?.trim(),
+    campaignId: input.campaignId?.trim(),
+    utmSource: input.utmSource?.trim(),
+    utmCampaign: input.utmCampaign?.trim(),
     competitors: claudeCompetitors.map((name) => ({ name, talkingPoints: [] })),
     battleCard: battleCard || undefined,
     agentTrace: trace,
@@ -273,6 +278,16 @@ export async function runLeadPipeline(
   return lead;
 }
 
+function field(row: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = row[key];
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return undefined;
+}
+
 export function parseLeadIngest(body: unknown): LeadIngestInput | string {
   if (!body || typeof body !== "object") return "JSON object required.";
   const row = body as Record<string, unknown>;
@@ -283,13 +298,53 @@ export function parseLeadIngest(body: unknown): LeadIngestInput | string {
   return {
     name,
     email,
-    source: row.source != null ? String(row.source) : undefined,
-    message: row.message != null ? String(row.message) : undefined,
-    budget: row.budget != null ? String(row.budget) : undefined,
-    timeline: row.timeline != null ? String(row.timeline) : undefined,
-    phone: row.phone != null ? String(row.phone) : undefined,
-    company: row.company != null ? String(row.company) : undefined,
-    country: row.country != null ? String(row.country) : undefined,
-    region: row.region != null ? String(row.region) : undefined,
+    source: field(row, "source"),
+    message: field(row, "message"),
+    budget: field(row, "budget"),
+    timeline: field(row, "timeline"),
+    phone: field(row, "phone"),
+    company: field(row, "company"),
+    country: field(row, "country"),
+    region: field(row, "region"),
+    trade: field(row, "trade"),
+    zip: field(row, "zip", "postal_code", "postalCode"),
+    campaignId: field(row, "campaignId", "campaign_id"),
+    utmSource: field(row, "utmSource", "utm_source"),
+    utmCampaign: field(row, "utmCampaign", "utm_campaign"),
   };
 }
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+export function parseGhlWebhook(body: unknown): LeadIngestInput | string {
+  if (!body || typeof body !== "object") return "JSON object required.";
+  const raw = body as Record<string, unknown>;
+  const contact = asRecord(raw.contact) ?? raw;
+  const custom = asRecord(contact.customData) ?? asRecord(contact.custom_data) ?? {};
+  const campaign = asRecord(contact.campaign) ?? asRecord(raw.campaign);
+  const first = field(contact, "first_name", "firstName") ?? "";
+  const last = field(contact, "last_name", "lastName") ?? "";
+  const combined = `${first} ${last}`.trim();
+  return parseLeadIngest({
+    name: field(contact, "name", "full_name", "fullName") ?? combined,
+    email: field(contact, "email") ?? "",
+    phone: field(contact, "phone", "phone_number"),
+    source: field(contact, "source") ?? field(raw, "source"),
+    company: field(contact, "company", "companyName"),
+    message: field(custom, "message") ?? field(contact, "message") ?? field(raw, "message"),
+    trade: field(custom, "trade") ?? field(contact, "trade"),
+    zip: field(custom, "zip") ?? field(contact, "zip", "postal_code"),
+    campaign_id:
+      field(contact, "campaignId", "campaign_id") ??
+      (campaign ? field(campaign, "id", "campaignId") : undefined),
+    utm_source: field(custom, "utm_source", "utmSource") ?? field(contact, "utm_source", "utmSource"),
+    utm_campaign:
+      field(custom, "utm_campaign", "utmCampaign") ?? field(contact, "utm_campaign", "utmCampaign"),
+  });
+}
+
+export { tierFromScore } from "./intelligence";

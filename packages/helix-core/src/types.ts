@@ -57,6 +57,11 @@ export type LeadIngestInput = {
   company?: string;
   country?: string;
   region?: string;
+  trade?: string;
+  zip?: string;
+  campaignId?: string;
+  utmSource?: string;
+  utmCampaign?: string;
 };
 
 export type SentimentLabel = "positive" | "neutral" | "negative";
@@ -153,6 +158,8 @@ export type StoredLead = LeadScoreResult &
     enrichedCountry?: string | null;
     assignedRepId?: string;
     battleCard?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
   };
 
 export type LeadStreamEvent =
@@ -188,6 +195,17 @@ export type RfpScoreResult = {
   engine: "claude" | "heuristic";
 };
 
+export type PartnerVerdict = "GO" | "CONDITIONAL" | "NO-GO";
+
+export type PartnerDecision = {
+  verdict: PartnerVerdict;
+  coiCleared: boolean;
+  bidAmount?: string;
+  notes?: string;
+  decidedBy: string;
+  decidedAt: string;
+};
+
 export type StoredRfp = RfpScoreResult & {
   id: string;
   createdAt: string;
@@ -197,6 +215,7 @@ export type StoredRfp = RfpScoreResult & {
   body: string;
   clientProfile: string;
   corpusStatus: CorpusStatus;
+  partnerDecision?: PartnerDecision;
 };
 
 export type RfpStreamEvent =

@@ -19,7 +19,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
         const rows = d.messages ?? [];
         setQueueCount(rows.filter((m) => m.status === "open" || m.status === "review").length);
         setReviewCount(rows.filter((m) => m.needsReview).length);
-        setRoutedCount(rows.filter((m) => m.status === "routed").length);
+        setRoutedCount(rows.filter((m) => m.status === "routed" || m.status === "sent").length);
         setBlockedCount(rows.filter((m) => m.status === "blocked" || m.category === "spam").length);
       })
       .catch(() => undefined);

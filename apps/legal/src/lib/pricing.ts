@@ -11,8 +11,6 @@ import type {
 } from "@/lib/pricing-types";
 import { isPracticeArea } from "@/lib/pricing-types";
 
-const HAIKU = "claude-3-5-haiku-20241022";
-
 export function parseBudget(amount: string): number | null {
   const t = amount.trim();
   if (!t || /unspecified|tbd|n\/a|not stated/i.test(t)) return null;
@@ -157,8 +155,7 @@ export async function runPricingQuote(rfp: StoredRfp, overrides?: PricingOverrid
       `Comps: ${JSON.stringify(book.historical)}`,
       `Rules: ${JSON.stringify(book.rules)}`,
     ].join("\n"),
-    500,
-    HAIKU
+    500
   );
   const parsed = raw ? parseJsonObject<ClaudePayload>(raw) : null;
   if (!raw || !parsed) {

@@ -166,8 +166,7 @@ export async function runConflictCheck(rfp: StoredRfp): Promise<ConflictReport> 
         `Heuristic hits already found: ${JSON.stringify(hits)}`,
         `If unsure, stay CONDITIONAL. Never invent clients that are not in the firm lists.`,
       ].join("\n"),
-      700,
-      "claude-3-5-haiku-20241022"
+      700
     );
     const parsed = raw ? parseJsonObject<ClaudePayload>(raw) : null;
     if (!raw || !parsed) {

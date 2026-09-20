@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import type { AttributedLead, CampaignAction, StoredCampaign } from "@helix/core";
+import type { AttributedLead, CampaignAction, SpendEvent, StoredCampaign } from "@helix/core";
 import { ScatterPlot } from "@/components/scatter-plot";
 import { SAMPLE_CSV } from "@/lib/sample-csv";
 import {
@@ -77,6 +77,9 @@ export function MarketingDashboard() {
   const [hideEmpty, setHideEmpty] = useState(false);
   const [ingestOpen, setIngestOpen] = useState(true);
   const [range, setRange] = useState<Range>("7d");
+  const [unmatched, setUnmatched] = useState<SpendEvent[]>([]);
+  const [series, setSeries] = useState<{ day: string; spend: number }[]>([]);
+  const [bounds, setBounds] = useState<{ from: string; to: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -85,16 +88,28 @@ export function MarketingDashboard() {
     window.setTimeout(() => setToast(null), 2800);
   }
 
-  async function refresh() {
-    const res = await fetch("/api/campaigns");
-    const data = (await res.json()) as { campaigns: StoredCampaign[]; leads: AttributedLead[] };
+  async function refresh(nextRange: Range = range) {
+    const res = await fetch(`/api/campaigns?window=${nextRange}`);
+    const data = (await res.json()) as {
+      campaigns: StoredCampaign[];
+      leads: AttributedLead[];
+      unmatched: SpendEvent[];
+      series: { day: string; spend: number }[];
+      from: string;
+      to: string;
+    };
     setCampaigns(data.campaigns ?? []);
     setLeads(data.leads ?? []);
+    setUnmatched(data.unmatched ?? []);
+    setSeries(data.series ?? []);
+    if (data.from && data.to) setBounds({ from: data.from, to: data.to });
   }
 
   useEffect(() => {
-    void refresh();
-  }, []);
+    void refresh(range);
+    // range is the window key; refresh closes over it on purpose
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
 
   const metrics = useMemo(() => {
     const spend = campaigns.reduce((s, c) => s + c.spend, 0);
@@ -133,8 +148,9 @@ export function MarketingDashboard() {
     });
   }, [campaigns, filter]);
 
-  const spendSpark = sparkPath(campaigns.map((c) => c.spend));
+  const spendSpark = sparkPath(series.map((s) => s.spend));
   const costSpark = sparkPath(campaigns.map((c) => c.metrics.costPerHot ?? 0));
+  const unmatchedIds = new Set(unmatched.map((u) => u.campaignId)).size;
 
   async function ingest(e?: FormEvent) {
     e?.preventDefault();
@@ -146,10 +162,14 @@ export function MarketingDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; unmatchedCount?: number };
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       await refresh();
-      showToast("Scored campaigns with heuristic REC. Status is local only.");
+      showToast(
+        data.unmatchedCount
+          ? `Joined what we could. ${data.unmatchedCount} campaign_id(s) have no scored leads — see Join queue.`
+          : "Scored campaigns with heuristic REC. Status is local only."
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
@@ -253,7 +273,13 @@ export function MarketingDashboard() {
           <button
             className="flex items-center gap-1.5 self-end rounded-lg border border-white/[0.12] bg-[#10131a]/85 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md hover:bg-[#181d28] sm:self-auto"
             onClick={() => {
-              void refresh().then(() => showToast("Scores refreshed from the heuristic model."));
+              void refresh().then(() =>
+                showToast(
+                  bounds
+                    ? `Rescored ${range} (${bounds.from} → ${bounds.to}).`
+                    : "Scores refreshed from the heuristic model."
+                )
+              );
             }}
             type="button"
           >
@@ -261,6 +287,18 @@ export function MarketingDashboard() {
             Recalculate
           </button>
         </div>
+        {unmatchedIds > 0 ? (
+          <a
+            className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-[#F97316]/30 bg-[#F97316]/10 px-4 py-3 text-xs text-[#FDBA74] hover:border-[#F97316]/60"
+            href="/unmatched"
+          >
+            <span>
+              {unmatchedIds} campaign_id{unmatchedIds === 1 ? "" : "s"} in this window have spend and no scored
+              leads. Helix will not invent a quality score.
+            </span>
+            <span className="shrink-0 font-medium text-[#F97316]">Join queue →</span>
+          </a>
+        ) : null}
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
@@ -364,7 +402,8 @@ export function MarketingDashboard() {
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-[#6B7280]">
-                    Correlation between budget deployment and heuristic score. Bubble radius = form volume.
+                    Correlation between budget deployment and heuristic score
+                    {bounds ? ` · ${bounds.from} → ${bounds.to}` : ""}. Bubble radius = form volume.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 rounded-lg border border-white/[0.06] bg-[#08090d] p-1">
@@ -375,10 +414,7 @@ export function MarketingDashboard() {
                         "rounded px-2.5 py-0.5 text-xs font-medium",
                         range === id ? "bg-white/[0.12] text-white" : "text-[#9CA3AF] hover:text-white"
                       )}
-                      onClick={() => {
-                        setRange(id);
-                        if (id !== "7d") showToast("Demo seed is one snapshot — 7d / 30d / 90d share the same rows.");
-                      }}
+                      onClick={() => setRange(id)}
                       type="button"
                     >
                       {id}
@@ -722,7 +758,13 @@ function CampaignBlock({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-medium text-white">{c.name}</span>
+                <a
+                  className="font-medium text-white hover:text-[#F97316]"
+                  href={`/campaigns/${c.campaignId}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {c.name}
+                </a>
                 <span
                   className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
@@ -832,6 +874,13 @@ function CampaignBlock({
                 />
               </div>
               <p className="mb-3 text-[#9CA3AF]">{c.reasoning}</p>
+              <a
+                className="mb-3 inline-block text-xs text-[#F97316]"
+                href={`/campaigns/${c.campaignId}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Open campaign evidence →
+              </a>
               {related.length > 0 ? (
                 <p className="mb-3 text-[#6B7280]">
                   Sample: {related.slice(0, 4).map((l) => `${l.name} ${l.score}`).join(" · ")}

@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
-import type { CustomRule, DeskTheme, DraftTone, EmailTemplate, UserPreferences } from "@/lib/types";
+import type { CustomRule, DraftTone, EmailTemplate, UserPreferences } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { KEYS_INBOX } from "@helix/core/secret-fields";
+import { DeskOpsForm } from "@helix/help/desk-form";
+import { ApiKeysForm } from "@helix/help/keys-form";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -69,10 +72,16 @@ export default function SettingsPage() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">Configure your inbox preferences</p>
+        <p className="text-sm text-muted-foreground">Paste API keys, then configure inbox preferences</p>
       </div>
 
       <div className="max-w-2xl space-y-6">
+        <div className="glass-panel rounded-xl p-6">
+          <ApiKeysForm initialFields={KEYS_INBOX} />
+        </div>
+        <div className="glass-panel rounded-xl p-6">
+          <DeskOpsForm />
+        </div>
         <div className="glass-panel rounded-xl p-6">
           <h2 className="mb-4 text-base font-semibold text-foreground">Appearance</h2>
           <div className="grid grid-cols-2 gap-3">

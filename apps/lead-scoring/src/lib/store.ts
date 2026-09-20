@@ -1,4 +1,4 @@
-import { attachIntelligence, scoreLeadHeuristic, type LeadIngestInput, type StoredLead } from "@helix/core";
+import { attachIntelligence, autoSeedEnabled, scoreLeadHeuristic, type LeadIngestInput, type StoredLead } from "@helix/core";
 import { supabaseListLeads, supabaseUpsertLead } from "./supabase-leads";
 
 const memory = new Map<string, StoredLead>();
@@ -45,9 +45,8 @@ const SAMPLES: LeadIngestInput[] = [
   },
 ];
 
-function seedIfNeeded() {
-  if (seeded) return;
-  seeded = true;
+function applyDemoCatalog() {
+  memory.clear();
   for (const sample of SAMPLES) {
     const scored = scoreLeadHeuristic(sample);
     const lead: StoredLead = attachIntelligence(
@@ -82,6 +81,16 @@ function seedIfNeeded() {
     );
     memory.set(lead.id, lead);
   }
+  seeded = true;
+}
+
+function seedIfNeeded() {
+  if (seeded) return;
+  if (!autoSeedEnabled()) {
+    seeded = true;
+    return;
+  }
+  applyDemoCatalog();
 }
 
 export async function listLeads(): Promise<StoredLead[]> {
@@ -129,7 +138,7 @@ export async function deleteLeads(ids: string[]): Promise<number> {
 
 export async function patchLeads(
   ids: string[],
-  patch: Partial<Pick<StoredLead, "crmStatus" | "needsReview" | "pipelineStage">>
+  patch: Partial<Pick<StoredLead, "crmStatus" | "needsReview" | "pipelineStage" | "reviewedBy" | "reviewedAt">>
 ): Promise<StoredLead[]> {
   const out: StoredLead[] = [];
   for (const id of ids) {
@@ -137,4 +146,32 @@ export async function patchLeads(
     if (next) out.push(next);
   }
   return out;
+}
+
+export type DeskModeStatus = {
+  empty: boolean;
+  demo: boolean;
+  store: "supabase" | "memory";
+  count: number;
+};
+
+export async function deskStatus(): Promise<DeskModeStatus> {
+  const leads = await listLeads();
+  return {
+    empty: leads.length === 0,
+    demo: leads.some((l) => l.id.startsWith("seed-")),
+    store: process.env.NEXT_PUBLIC_SUPABASE_URL ? "supabase" : "memory",
+    count: leads.length,
+  };
+}
+
+export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  applyDemoCatalog();
+  return deskStatus();
+}
+
+export async function clearDesk(): Promise<DeskModeStatus> {
+  memory.clear();
+  seeded = true;
+  return deskStatus();
 }

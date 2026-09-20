@@ -24,7 +24,24 @@ create table if not exists lead_scoring.leads (
   fields jsonb not null default '[]'::jsonb,
   needs_review boolean not null default false,
   crm_status text not null default 'not_sent',
-  engine text not null default 'heuristic'
+  engine text not null default 'heuristic',
+  phone text,
+  company text,
+  country text,
+  region text,
+  trade text,
+  zip text,
+  campaign_id text,
+  utm_source text,
+  utm_campaign text,
+  ghl_contact_id text,
+  pipeline_stage text not null default 'new',
+  assignee text,
+  notes jsonb not null default '[]'::jsonb,
+  score_history jsonb not null default '[]'::jsonb,
+  behaviors jsonb not null default '[]'::jsonb,
+  reviewed_by text,
+  reviewed_at timestamptz
 );
 
 create index if not exists leads_created_at_idx on lead_scoring.leads (created_at desc);

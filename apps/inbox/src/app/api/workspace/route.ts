@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     counts: {
       open: threads.filter((t) => t.status === "open" || t.status === "review").length,
       review: threads.filter((t) => t.needsReview).length,
-      routed: threads.filter((t) => t.status === "routed").length,
+      routed: threads.filter((t) => t.status === "routed" || t.status === "sent").length,
       blocked: threads.filter((t) => t.status === "blocked").length,
       starred: threads.filter((t) => t.isStarred).length,
     },

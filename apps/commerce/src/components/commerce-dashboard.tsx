@@ -92,7 +92,7 @@ export function CommerceDashboard() {
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Mock Shopify feed seeded on load · Agent pipeline automated
+            Empty until you Sync Shopify or Load demo in Settings · Agent pipeline automated
           </p>
         </div>
       </div>

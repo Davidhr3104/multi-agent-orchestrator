@@ -20,6 +20,11 @@ export function ActiveInspector({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
       });
       onUpdate();
     } finally {
@@ -76,7 +81,7 @@ export function ActiveInspector({
           className="btn-tactile h-8 rounded-md bg-gradient-to-r from-[#4E5FF7] to-[#8B5CF6] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
           onClick={() => void act("approve")}
         >
-          {busy === "approve" ? "…" : "Approve draft"}
+          {busy === "approve" ? "…" : "Send reply"}
         </button>
         <button
           type="button"
@@ -84,7 +89,7 @@ export function ActiveInspector({
           className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] text-foreground disabled:opacity-50"
           onClick={() => void act("route")}
         >
-          {busy === "route" ? "…" : "Route"}
+          {busy === "route" ? "…" : "Mark routed"}
         </button>
         <button
           type="button"

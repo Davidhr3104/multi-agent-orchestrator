@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@helix/core"],
+  transpilePackages: ["@helix/core", "@helix/help"],
 };
 
 export default nextConfig;
