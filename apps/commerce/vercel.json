@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../.. && npm install",
-  "buildCommand": "cd ../.. && npm run build --workspace=helix-commerce",
-  "outputDirectory": ".next"
+  "installCommand": "npm install",
+  "buildCommand": "npm run build --workspace=helix-commerce",
+  "outputDirectory": "apps/commerce/.next"
 }
