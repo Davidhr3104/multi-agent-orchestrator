@@ -341,6 +341,21 @@ export function draftProposal(
     : assign.conflict
       ? `Conflict flag: ${assign.conflict}`
       : `No issuer conflict flagged.`;
+  const corpusLines =
+    rfp.corpusHits && rfp.corpusHits.length
+      ? [
+          `2b. Firm corpus cites (${rfp.corpusStatus})`,
+          ...rfp.corpusHits.slice(0, 5).map(
+            (h, i) =>
+              `${i + 1}. [${h.docTitle}] “${h.quote}” (${h.verified ? `chars ${h.spanStart}-${h.spanEnd}` : "unverified"})`
+          ),
+          ``,
+        ]
+      : rfp.corpusStatus === "unavailable"
+        ? [`2b. Firm corpus: no overlapping precedents (status unavailable).`, ``]
+        : rfp.corpusStatus === "not_asked"
+          ? [`2b. Firm corpus: not queried yet — run Ask corpus before partner pack.`, ``]
+          : [];
   return [
     `HELIX FOR LEGAL — proposal pack (partner review required)`,
     `${rfp.title}`,
@@ -356,6 +371,9 @@ export function draftProposal(
       ? gaps.map((g) => `[ ] Compliance: ${g.label}`).join("\n")
       : `[ ] Compliance: no eliminators flagged`,
     `[ ] Proposal Word pack attached`,
+    rfp.corpusHits?.length
+      ? `[ ] Firm corpus cites reviewed (${rfp.corpusHits.length})`
+      : `[ ] Firm corpus queried`,
     ``,
     `1. Executive summary`,
     `We propose a ${rfp.method} response for ${rfp.issuer}. Desk match ${rfp.matchScore} (${rfp.tier}). Lead ${assign.attorney} (${assign.role}), ~${assign.hours}h.`,
@@ -364,6 +382,7 @@ export function draftProposal(
     rfp.reasoning,
     prior ? `Prior similar matter used as template: ${prior.title}.` : `No prior twin on the desk — write Approach from the RFP body.`,
     ``,
+    ...corpusLines,
     `3. Team qualifications`,
     `Lead: ${assign.attorney}, ${assign.role}. ${assign.reason}. Capacity ${assign.workload}h / ${assign.capacity}h this week.`,
     coiLine,

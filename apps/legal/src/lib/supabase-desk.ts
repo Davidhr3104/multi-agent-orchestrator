@@ -79,15 +79,24 @@ function toRfpRow(rfp: StoredRfp) {
     unverified_count: rfp.unverifiedCount,
     needs_review: rfp.needsReview,
     corpus_status: rfp.corpusStatus,
+    corpus_hits: rfp.corpusHits ?? [],
     engine: rfp.engine,
     partner_decision: rfp.partnerDecision ?? null,
   };
 }
 
+function parseCorpusStatus(raw: unknown): StoredRfp["corpusStatus"] {
+  if (raw === "live" || raw === "unavailable" || raw === "mocked" || raw === "not_asked") return raw;
+  return "not_asked";
+}
+
 function fromRfpRow(row: Record<string, unknown>): StoredRfp {
   const tier = row.tier === "hot" || row.tier === "warm" || row.tier === "cold" ? row.tier : "cold";
   const method = row.method === "BEAR" || row.method === "SPI" || row.method === "other" ? row.method : "other";
-  const corpusStatus = row.corpus_status === "mocked" ? "mocked" : "not_asked";
+  const corpusStatus = parseCorpusStatus(row.corpus_status);
+  const corpusHits = Array.isArray(row.corpus_hits)
+    ? (row.corpus_hits as StoredRfp["corpusHits"])
+    : undefined;
   return {
     id: String(row.id),
     createdAt: String(row.created_at),
@@ -107,6 +116,7 @@ function fromRfpRow(row: Record<string, unknown>): StoredRfp {
     unverifiedCount: Number(row.unverified_count ?? 0),
     needsReview: Boolean(row.needs_review),
     corpusStatus,
+    corpusHits,
     engine: row.engine === "claude" ? "claude" : "heuristic",
     partnerDecision: parsePartner(row.partner_decision),
   };

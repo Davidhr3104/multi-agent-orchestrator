@@ -4,6 +4,7 @@ import {
   runInquiryClassification,
   runInventoryPrediction,
   type InquiryInput,
+  type OrderInput,
   type StoredInquiry,
   type StoredOrder,
   type StoredProduct,
@@ -243,6 +244,26 @@ export async function loadDemoCatalog(): Promise<DeskModeStatus> {
   return deskStatus();
 }
 
+/**
+ * Scores + upserts a single order (fraud heuristic/Claude re-run every time,
+ * same as the bulk sync path) — shared by syncShopifyLive's loop and the
+ * live webhook handler, which ingests one order per call.
+ */
+export async function upsertOrderFromInput(input: OrderInput): Promise<StoredOrder> {
+  await seedIfNeeded();
+  const scored = await runFraudScoring(input);
+  const existing = [...orders.values()].find((o) => o.shopifyOrderId === input.shopifyOrderId);
+  const order: StoredOrder = {
+    ...(existing ?? { id: id("order", input.shopifyOrderId) }),
+    ...input,
+    ...scored,
+    id: existing?.id ?? id("order", input.shopifyOrderId),
+  };
+  orders.set(order.id, order);
+  await supabaseUpsertOrder(order);
+  return order;
+}
+
 export async function syncShopifyLive(): Promise<{ ok: true } | { ok: false; error: string }> {
   const client = getLiveShopifyClient();
   if (!client) {
@@ -251,16 +272,7 @@ export async function syncShopifyLive(): Promise<{ ok: true } | { ok: false; err
   await seedIfNeeded();
   const [orderInputs, productInputs] = await Promise.all([client.fetchOrders(), client.fetchProducts()]);
   for (const input of orderInputs) {
-    const scored = await runFraudScoring(input);
-    const existing = [...orders.values()].find((o) => o.shopifyOrderId === input.shopifyOrderId);
-    const order: StoredOrder = {
-      ...(existing ?? { id: id("order", input.shopifyOrderId) }),
-      ...input,
-      ...scored,
-      id: existing?.id ?? id("order", input.shopifyOrderId),
-    };
-    orders.set(order.id, order);
-    await supabaseUpsertOrder(order);
+    await upsertOrderFromInput(input);
   }
   for (const input of productInputs) {
     const predicted = await runInventoryPrediction(input);

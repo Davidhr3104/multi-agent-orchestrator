@@ -1,13 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CircleHelp, Gauge, Gavel, Settings, Unlink } from "lucide-react";
+import { CircleHelp, Flame, Gauge, Gavel, Settings, Unlink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Nav = "engine" | "unmatched" | "review" | "help" | "settings";
+type Nav = "engine" | "waste" | "unmatched" | "review" | "help" | "settings";
 
 const ITEMS: { id: Nav; href: string; label: string; short: string; icon: typeof Gauge }[] = [
   { id: "engine", href: "/", label: "Performance Engine", short: "Engine", icon: Gauge },
+  { id: "waste", href: "/waste", label: "$ on spam", short: "Waste", icon: Flame },
   { id: "unmatched", href: "/unmatched", label: "Join queue", short: "Join", icon: Unlink },
   { id: "review", href: "/review", label: "HITL", short: "HITL", icon: Gavel },
   { id: "help", href: "/help", label: "How to use", short: "Help", icon: CircleHelp },
@@ -78,7 +79,7 @@ export function EngineShell({
           <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#12151e]/90 px-2.5 py-2">
             <span className="size-2 shrink-0 rounded-full bg-[#3BAF7E]" />
             <span className="text-[11px] leading-snug font-medium text-[#9CA3AF]">
-              Engine nominal · heuristic · ads APIs locked
+              Engine nominal · heuristic · Meta Insights + HITL write
             </span>
           </div>
           <div className="flex items-center gap-2.5 px-1">

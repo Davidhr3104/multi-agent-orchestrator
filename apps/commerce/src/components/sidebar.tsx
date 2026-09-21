@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Package,
   Settings,
+  ShieldAlert,
   ShoppingCart,
   Users,
 } from "lucide-react";
@@ -34,6 +35,7 @@ export function Sidebar({
   const nav: NavItem[] = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/orders", label: "Orders", icon: ShoppingCart, badge: ordersNeedingReview },
+    { href: "/risk", label: "$ at risk", icon: ShieldAlert, badge: ordersNeedingReview || undefined },
     { href: "/products", label: "Products", icon: Boxes },
     { href: "/inventory", label: "Inventory", icon: Package, badge: inventoryAlerts },
     { href: "/customers", label: "Customers", icon: Users },

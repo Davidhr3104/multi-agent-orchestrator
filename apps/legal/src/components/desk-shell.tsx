@@ -62,6 +62,7 @@ export function DeskShell({
         onNav?.(id);
         if (
           id === "analytics" ||
+          id === "outcomes" ||
           id === "settings" ||
           id === "audit" ||
           id === "dashboard" ||

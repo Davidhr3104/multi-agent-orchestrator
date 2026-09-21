@@ -6,10 +6,18 @@ import { EngineShell } from "@/components/engine-shell";
 import { money, recLabel, recTone } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+type AdsWrite = {
+  attempted: boolean;
+  ok: boolean;
+  detail: string;
+};
+
 export default function ReviewPage() {
   const [campaigns, setCampaigns] = useState<StoredCampaign[]>([]);
   const [note, setNote] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
+  const [metaReady, setMetaReady] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/campaigns?window=30d");
@@ -19,20 +27,40 @@ export default function ReviewPage() {
 
   useEffect(() => {
     void refresh();
+    void fetch("/api/ads/sync")
+      .then((r) => r.json())
+      .then((d: { metaConfigured?: boolean; writesEnabled?: boolean }) => {
+        setMetaReady(Boolean(d.metaConfigured));
+      })
+      .catch(() => setMetaReady(false));
   }, []);
 
   async function review(id: string, action: CampaignAction) {
+    setBusyId(id);
     const res = await fetch(`/api/campaigns/${id}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, note }),
     });
+    const data = (await res.json()) as {
+      campaign?: StoredCampaign;
+      error?: string;
+      adsWrite?: AdsWrite;
+    };
+    setBusyId(null);
     if (!res.ok) {
-      setToast("Review failed");
+      setToast({ msg: data.error || "Review failed", err: true });
       return;
     }
     setNote("");
-    setToast("Confirmed locally. Meta and Google were not written.");
+    const write = data.adsWrite;
+    if (write?.attempted && write.ok) {
+      setToast({ msg: `Local + Ads Manager: ${write.detail}` });
+    } else if (write?.attempted && !write.ok) {
+      setToast({ msg: `Saved locally, but Ads write failed: ${write.detail}`, err: true });
+    } else {
+      setToast({ msg: write?.detail || "Confirmed locally." });
+    }
     await refresh();
   }
 
@@ -42,10 +70,16 @@ export default function ReviewPage() {
         <div>
           <h1 className="text-2xl font-medium text-white">HITL</h1>
           <p className="mt-2 text-sm text-[#9CA3AF]">
-            Confirm pause / scale / keep. Status stays in this desk. This is not Ads Manager.
+            Confirm pause / scale / keep. Pause and scale write to Meta Ads Manager when keys are set
+            (numeric campaign ids). Keep stays local. Google Ads write is not live.
+          </p>
+          <p className="mt-2 text-[11px] text-[#6B7280]">
+            Meta write: {metaReady ? "configured (ads_management token required)" : "needs keys in Settings"}
           </p>
         </div>
-        {toast ? <p className="text-sm text-[#FBBF24]">{toast}</p> : null}
+        {toast ? (
+          <p className={cn("text-sm", toast.err ? "text-[#FB7185]" : "text-[#FBBF24]")}>{toast.msg}</p>
+        ) : null}
         {campaigns.length === 0 ? (
           <p className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 text-sm text-[#9CA3AF]">
             No campaigns need review in the 30d window.
@@ -61,11 +95,15 @@ export default function ReviewPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <a className="text-sm font-semibold text-white hover:text-[#F97316]" href={`/campaigns/${c.campaignId}`}>
+                      <a
+                        className="text-sm font-semibold text-white hover:text-[#F97316]"
+                        href={`/campaigns/${c.campaignId}`}
+                      >
                         {c.name}
                       </a>
                       <p className="mt-1 text-xs text-[#6B7280]">
-                        {money(c.spend)} · avg {c.metrics.avgScore} · {c.metrics.nLeads} scored leads
+                        {money(c.spend)} · avg {c.metrics.avgScore} · {c.metrics.nLeads} scored ·{" "}
+                        {c.platform}
                       </p>
                     </div>
                     <span className={cn("text-xs font-medium", tone.text)}>{recLabel(c)}</span>
@@ -82,11 +120,13 @@ export default function ReviewPage() {
                     {(["pause", "scale", "keep"] as const).map((action) => (
                       <button
                         key={action}
-                        className="rounded-md border border-white/[0.12] px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                        disabled={busyId === c.id}
+                        className="rounded-md border border-white/[0.12] px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10 disabled:opacity-50"
                         onClick={() => void review(c.id, action)}
                         type="button"
                       >
                         Confirm {action}
+                        {action !== "keep" && c.platform === "meta" ? " → Meta" : ""}
                       </button>
                     ))}
                   </div>

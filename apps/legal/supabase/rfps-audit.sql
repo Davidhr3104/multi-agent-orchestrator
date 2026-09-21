@@ -33,6 +33,7 @@ create index if not exists rfps_needs_review_idx on legal.rfps (needs_review);
 alter table legal.rfps enable row level security;
 
 alter table legal.rfps add column if not exists partner_decision jsonb;
+alter table legal.rfps add column if not exists corpus_hits jsonb default '[]'::jsonb;
 
 create table if not exists legal.desk_meta (
   id text primary key,

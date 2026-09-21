@@ -382,7 +382,11 @@ export function LegalDashboard() {
 
   async function askCorpus(id: string) {
     const res = await fetch(`/api/rfps/${id}/corpus`, { method: "POST" });
-    const data = (await res.json()) as { rfp?: StoredRfp };
+    const data = (await res.json()) as { rfp?: StoredRfp; note?: string; error?: string };
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
     if (data.rfp) {
       setRfps((prev) => prev.map((r) => (r.id === id ? data.rfp! : r)));
       setSelected(data.rfp);
@@ -1356,6 +1360,34 @@ function RfpSheet({
               {assign.reason} · {assign.workload}h / {assign.capacity}h this week
               {assign.conflict ? ` · ${assign.conflict}` : ""}
             </p>
+            {selected.corpusHits && selected.corpusHits.length > 0 ? (
+              <div className="space-y-2 rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-3">
+                <p className="text-xs font-semibold text-[#F59E0B]">
+                  Firm corpus · {selected.corpusStatus} · {selected.corpusHits.length} cite
+                  {selected.corpusHits.length === 1 ? "" : "s"}
+                </p>
+                <ul className="space-y-2">
+                  {selected.corpusHits.map((hit) => (
+                    <li key={hit.chunkId} className="rounded-lg bg-[#0B0F19]/60 p-2 text-xs">
+                      <p className="font-medium text-[#F3F4F6]">{hit.docTitle}</p>
+                      <p className="mt-1 text-[#9CA3AF]">“{hit.quote}”</p>
+                      <p className="mt-1 font-mono text-[10px] text-[#6B7280]">
+                        {hit.verified ? `chars ${hit.spanStart}–${hit.spanEnd}` : "unverified"} · score{" "}
+                        {hit.score}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : selected.corpusStatus === "unavailable" ? (
+              <p className="rounded-lg border border-[#374151] px-3 py-2 text-xs text-[#9CA3AF]">
+                Corpus queried — no firm precedents matched. Ingest a closer playbook under Documents.
+              </p>
+            ) : selected.corpusStatus === "live" ? null : (
+              <p className="text-[11px] text-[#6B7280]">
+                Corpus not asked yet. Use Ask corpus for live firm cites (not mock).
+              </p>
+            )}
             <ul className="space-y-2">
               {selected.fields.map((field) => (
                 <li key={field.key} className="rounded-lg bg-muted/40 p-2">
@@ -1708,7 +1740,11 @@ function RfpSheet({
         </Button>
         <Button onClick={onCorpus}>
           <Database className="size-4" />
-          Ask corpus
+          {selected.corpusStatus === "live"
+            ? "Refresh corpus"
+            : selected.corpusStatus === "unavailable"
+              ? "Retry corpus"
+              : "Ask corpus"}
         </Button>
       </SheetFooter>
     </>

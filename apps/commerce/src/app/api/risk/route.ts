@@ -5,5 +5,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const orders = await listOrders();
-  return Response.json({ orders, risk: summarizeDeskRisk(orders) });
+  return Response.json({
+    orders,
+    risk: summarizeDeskRisk(orders),
+  });
 }

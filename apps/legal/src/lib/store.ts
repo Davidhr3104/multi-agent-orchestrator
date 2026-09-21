@@ -116,6 +116,72 @@ function applyDemoCatalog() {
     };
     d.memory.set(rfp.id, rfp);
   });
+
+  // Closed-loop demo outcomes for /outcomes win-rate story
+  const now = new Date().toISOString();
+  const byTitle = [...d.memory.values()];
+  const medical = byTitle.find((r) => r.title.startsWith("Medical record"));
+  const spi = byTitle.find((r) => r.title.startsWith("SPI coding"));
+  const county = byTitle.find((r) => r.title.startsWith("County IT"));
+  const nlp = byTitle.find((r) => r.title.startsWith("Clinical NLP"));
+  if (medical) {
+    medical.needsReview = false;
+    medical.partnerDecision = {
+      verdict: "GO",
+      coiCleared: true,
+      bidAmount: "$85,000",
+      notes: "Strong BEAR fit — clinical chart review core practice.",
+      decidedBy: "Maya Chen",
+      decidedAt: now,
+      outcome: "won",
+      outcomeAt: now,
+      wonAmount: "$92,000",
+    };
+    d.memory.set(medical.id, medical);
+  }
+  if (spi) {
+    spi.needsReview = false;
+    spi.partnerDecision = {
+      verdict: "GO",
+      coiCleared: true,
+      bidAmount: "$42,000",
+      notes: "SPI preferred — pursued.",
+      decidedBy: "Luis Ortega",
+      decidedAt: now,
+      outcome: "lost",
+      outcomeAt: now,
+      outcomeNotes: "Incumbent retained on price.",
+    };
+    d.memory.set(spi.id, spi);
+  }
+  if (county) {
+    county.needsReview = false;
+    county.partnerDecision = {
+      verdict: "NO-GO",
+      coiCleared: true,
+      bidAmount: "$210,000",
+      notes: "No medical records — outside practice.",
+      decidedBy: "Priya Shah",
+      decidedAt: now,
+      outcome: "no_bid",
+      outcomeAt: now,
+    };
+    d.memory.set(county.id, county);
+  }
+  if (nlp) {
+    nlp.needsReview = true;
+    nlp.partnerDecision = {
+      verdict: "CONDITIONAL",
+      coiCleared: false,
+      bidAmount: "Unspecified",
+      notes: "Thin posting — need clearer scope before GO.",
+      decidedBy: "Luis Ortega",
+      decidedAt: now,
+      outcome: "pending",
+      outcomeAt: now,
+    };
+    d.memory.set(nlp.id, nlp);
+  }
   d.comms.set("seed-Medicalrecord", [
     {
       id: "c1",
@@ -140,6 +206,9 @@ function applyDemoCatalog() {
   pushAuditSync("Priya Shah", "compliance", "Lake County Kubernetes posting flagged SOC2 + IP assignment");
   pushAuditSync("ethics", "coi", "County IT — Kubernetes refresh: GO (88) via heuristic");
   pushAuditSync("pricing", "quote", "County IT — Kubernetes refresh: $288,000 other via heuristic");
+  pushAuditSync("Maya Chen", "outcome", "Medical record abstraction — mass tort docket: won");
+  pushAuditSync("Luis Ortega", "outcome", "SPI coding for workers' compensation clinic: lost");
+  pushAuditSync("Priya Shah", "partner", "County IT — Kubernetes refresh: NO-GO · capacity avoided");
   d.seeded = true;
 }
 
@@ -251,7 +320,7 @@ export async function getRfp(id: string): Promise<StoredRfp | null> {
 
 export async function patchRfp(
   id: string,
-  patch: Partial<Pick<StoredRfp, "needsReview" | "corpusStatus" | "partnerDecision">>
+  patch: Partial<Pick<StoredRfp, "needsReview" | "corpusStatus" | "partnerDecision" | "corpusHits">>
 ): Promise<StoredRfp | null> {
   const current = await getRfp(id);
   if (!current) return null;

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { StoredOrder, StoredProduct } from "@helix/core";
-import { Boxes, ShoppingCart, TrendingUp, Truck } from "lucide-react";
+import { Boxes, ShieldAlert, ShoppingCart, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import { MetricCard } from "@/components/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { LiveOrdersTable } from "@/components/live-orders-table";
@@ -11,9 +12,36 @@ import { ReorderQueue } from "@/components/reorder-queue";
 import { RevenueTrendChart } from "@/components/revenue-trend-chart";
 import { formatCurrency } from "@/lib/format";
 
+type RiskSummary = {
+  atRiskUsd: number;
+  pendingReviewCount: number;
+  savedUsd: number;
+  cancelledCount: number;
+  flaggedCount: number;
+  approvedHighRiskUsd: number;
+  approvedHighRiskCount: number;
+  worstOrderLabel: string | null;
+  worstOrderUsd: number;
+  worstFraudScore: number;
+};
+
+const EMPTY_RISK: RiskSummary = {
+  atRiskUsd: 0,
+  pendingReviewCount: 0,
+  savedUsd: 0,
+  cancelledCount: 0,
+  flaggedCount: 0,
+  approvedHighRiskUsd: 0,
+  approvedHighRiskCount: 0,
+  worstOrderLabel: null,
+  worstOrderUsd: 0,
+  worstFraudScore: 0,
+};
+
 export function CommerceDashboard() {
   const [orders, setOrders] = useState<StoredOrder[]>([]);
   const [products, setProducts] = useState<StoredProduct[]>([]);
+  const [risk, setRisk] = useState<RiskSummary>(EMPTY_RISK);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   async function refresh() {
@@ -21,9 +49,13 @@ export function CommerceDashboard() {
       fetch("/api/orders"),
       fetch("/api/products"),
     ]);
-    const ordersData = (await ordersRes.json()) as { orders: StoredOrder[] };
+    const ordersData = (await ordersRes.json()) as {
+      orders: StoredOrder[];
+      risk?: RiskSummary;
+    };
     const productsData = (await productsRes.json()) as { products: StoredProduct[] };
     setOrders(ordersData.orders);
+    setRisk(ordersData.risk ?? EMPTY_RISK);
     setProducts(productsData.products);
   }
 
@@ -63,11 +95,8 @@ export function CommerceDashboard() {
       .slice(0, 2)
       .map((p) => p.title)
       .join(" · ");
-    const inTransit = orders.filter(
-      (o) => o.fulfillmentStatus !== "fulfilled" && !o.requiresReview
-    ).length;
-    return { revenue, fulfilled, pending, restockCount, restockTitles, inTransit };
-  }, [orders, products]);
+    return { revenue, fulfilled, pending, restockCount, restockTitles, risk };
+  }, [orders, products, risk]);
 
   const revenueSpark = useMemo(() => {
     const now = Date.now();
@@ -128,15 +157,28 @@ export function CommerceDashboard() {
           hint={metrics.restockTitles || "None"}
         />
         <MetricCard
-          icon={<Truck className="size-4" />}
-          label="Fulfillment"
-          tone="cyan"
-          statusBadge="Action Required"
-          attention
-          value={`${metrics.inTransit} in transit`}
-          hint="Awaiting carrier update"
+          icon={<ShieldAlert className="size-4" />}
+          label="$ at Risk"
+          tone="amber"
+          statusBadge={metrics.risk.pendingReviewCount > 0 ? "HITL" : "Clear"}
+          attention={metrics.risk.atRiskUsd > 0}
+          value={formatCurrency(metrics.risk.atRiskUsd)}
+          hint={`Saved ${formatCurrency(metrics.risk.savedUsd)} · open /risk`}
         />
       </section>
+
+      {metrics.risk.atRiskUsd > 0 ? (
+        <Link
+          href="/risk"
+          className="flex items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200 hover:border-rose-500/50"
+        >
+          <span>
+            {formatCurrency(metrics.risk.atRiskUsd)} in high-risk orders still open
+            {metrics.risk.worstOrderLabel ? ` — worst: ${metrics.risk.worstOrderLabel}` : ""}.
+          </span>
+          <span className="shrink-0 font-medium text-rose-300">$ at risk →</span>
+        </Link>
+      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-6 pt-2 lg:grid-cols-12">
         <div className="animate-enter delay-3 space-y-4 lg:col-span-8">

@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { getSecret, type OrderInput, type ProductInput } from "@helix/core";
 
 /**
@@ -12,6 +13,27 @@ export interface ShopifyClient {
 
 export function isShopifyConfigured(): boolean {
   return Boolean(getSecret("SHOPIFY_STORE_DOMAIN") && getSecret("SHOPIFY_ACCESS_TOKEN"));
+}
+
+export function isShopifyWebhookConfigured(): boolean {
+  return Boolean(getSecret("SHOPIFY_WEBHOOK_SECRET"));
+}
+
+/**
+ * Verifies Shopify's X-Shopify-Hmac-Sha256 header against the raw request
+ * body — the standard Shopify webhook auth: base64(HMAC-SHA256(rawBody,
+ * webhookSecret)), compared with a constant-time equality check. rawBody
+ * MUST be the exact bytes Shopify sent (read before any JSON.parse), or the
+ * signature will never match.
+ */
+export function verifyShopifyWebhook(rawBody: string, hmacHeader: string | null): boolean {
+  const secret = getSecret("SHOPIFY_WEBHOOK_SECRET");
+  if (!secret || !hmacHeader) return false;
+  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
+  const a = Buffer.from(expected);
+  const b = Buffer.from(hmacHeader);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 const MOCK_CUSTOMERS = [
@@ -207,6 +229,47 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+/**
+ * Maps one raw Shopify order object (same shape whether it came from
+ * GET /orders.json's `orders[]` array or a webhook body for orders/create,
+ * orders/updated, fulfillments/update, refunds/create — Shopify sends the
+ * full order resource for all of those) into Helix's OrderInput.
+ */
+export function mapShopifyOrderRow(raw: unknown): OrderInput {
+  const order = asRecord(raw) ?? {};
+  const customer = asRecord(order.customer) ?? {};
+  const shipping = asRecord(order.shipping_address) ?? {};
+  const items = Array.isArray(order.line_items) ? order.line_items : [];
+  return {
+    shopifyOrderId: `gid://shopify/Order/${order.id}`,
+    customerName: String(customer.first_name || shipping.name || "Customer"),
+    customerEmail: String(order.email || customer.email || ""),
+    totalPrice: Number(order.total_price || 0),
+    currency: String(order.currency || "USD"),
+    financialStatus: String(order.financial_status || ""),
+    fulfillmentStatus: String(order.fulfillment_status || "unfulfilled"),
+    items: items.map((item) => {
+      const row = asRecord(item) ?? {};
+      return {
+        title: String(row.title || "Item"),
+        sku: row.sku != null ? String(row.sku) : undefined,
+        quantity: Number(row.quantity || 1),
+        price: Number(row.price || 0),
+      };
+    }),
+    shippingAddress: {
+      name: shipping.name != null ? String(shipping.name) : undefined,
+      address1: shipping.address1 != null ? String(shipping.address1) : undefined,
+      city: shipping.city != null ? String(shipping.city) : undefined,
+      province: shipping.province != null ? String(shipping.province) : undefined,
+      country: shipping.country != null ? String(shipping.country) : undefined,
+      zip: shipping.zip != null ? String(shipping.zip) : undefined,
+    },
+    createdAt: String(order.created_at || new Date().toISOString()),
+    customerOrderCount: Number(customer.orders_count || 0),
+  };
+}
+
 class LiveShopifyClient implements ShopifyWriteClient {
   private async admin(path: string, init?: RequestInit): Promise<Response> {
     const domain = shopDomain();
@@ -227,40 +290,21 @@ class LiveShopifyClient implements ShopifyWriteClient {
     const res = await this.admin("orders.json?status=any&limit=50");
     if (!res.ok) throw new Error(`Shopify orders HTTP ${res.status}`);
     const payload = (await res.json()) as { orders?: unknown[] };
-    return (payload.orders ?? []).map((raw) => {
-      const order = asRecord(raw) ?? {};
-      const customer = asRecord(order.customer) ?? {};
-      const shipping = asRecord(order.shipping_address) ?? {};
-      const items = Array.isArray(order.line_items) ? order.line_items : [];
-      return {
-        shopifyOrderId: `gid://shopify/Order/${order.id}`,
-        customerName: String(customer.first_name || shipping.name || "Customer"),
-        customerEmail: String(order.email || customer.email || ""),
-        totalPrice: Number(order.total_price || 0),
-        currency: String(order.currency || "USD"),
-        financialStatus: String(order.financial_status || ""),
-        fulfillmentStatus: String(order.fulfillment_status || "unfulfilled"),
-        items: items.map((item) => {
-          const row = asRecord(item) ?? {};
-          return {
-            title: String(row.title || "Item"),
-            sku: row.sku != null ? String(row.sku) : undefined,
-            quantity: Number(row.quantity || 1),
-            price: Number(row.price || 0),
-          };
-        }),
-        shippingAddress: {
-          name: shipping.name != null ? String(shipping.name) : undefined,
-          address1: shipping.address1 != null ? String(shipping.address1) : undefined,
-          city: shipping.city != null ? String(shipping.city) : undefined,
-          province: shipping.province != null ? String(shipping.province) : undefined,
-          country: shipping.country != null ? String(shipping.country) : undefined,
-          zip: shipping.zip != null ? String(shipping.zip) : undefined,
-        },
-        createdAt: String(order.created_at || new Date().toISOString()),
-        customerOrderCount: Number(customer.orders_count || 0),
-      };
-    });
+    return (payload.orders ?? []).map(mapShopifyOrderRow);
+  }
+
+  /**
+   * Fetches one order by its numeric Shopify id — used by the webhook
+   * handler for topics that don't carry the full order (fulfillments/*,
+   * refunds/*), where the payload only has order_id and we need the current
+   * order state to re-score/persist it.
+   */
+  async fetchOrderById(numericOrderId: string): Promise<OrderInput | null> {
+    const res = await this.admin(`orders/${numericOrderId}.json`);
+    if (!res.ok) return null;
+    const payload = (await res.json()) as { order?: unknown };
+    if (!payload.order) return null;
+    return mapShopifyOrderRow(payload.order);
   }
 
   async fetchProducts(): Promise<ProductInput[]> {
@@ -322,6 +366,7 @@ class LiveShopifyClient implements ShopifyWriteClient {
 export interface ShopifyWriteClient extends ShopifyClient {
   fulfillOrder(shopifyOrderId: string): Promise<void>;
   cancelOrder(shopifyOrderId: string): Promise<void>;
+  fetchOrderById(numericOrderId: string): Promise<OrderInput | null>;
 }
 
 export function getMockShopifyClient(): ShopifyClient {

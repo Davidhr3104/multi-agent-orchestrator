@@ -13,7 +13,7 @@ npm run dev:legal
 
 Open [http://127.0.0.1:43149](http://127.0.0.1:43149).
 
-Paste RFP text or drop a PDF. Edit the client profile used for match scoring. Demo seeds four opportunities. Heuristic scoring if `ANTHROPIC_API_KEY` is missing. “Ask corpus” is mocked (no pgvector this sprint).
+Paste RFP text or drop a PDF. Edit the client profile used for match scoring. Demo seeds four opportunities. Heuristic scoring if `ANTHROPIC_API_KEY` is missing. **Ask corpus** retrieves keyword cites from the firm playbook store (RAG-lite — no pgvector required).
 
 FACT cites character spans from the document (`quote` + `spanStart`/`spanEnd`).
 

@@ -11,6 +11,7 @@ export type LegalNavId =
   | "opportunities"
   | "documents"
   | "deadlines"
+  | "outcomes"
   | "analytics"
   | "settings"
   | "audit"
@@ -22,6 +23,7 @@ export const LEGAL_HREF: Record<LegalNavId, string> = {
   opportunities: "/#legal-opportunities",
   documents: "/documents",
   deadlines: "/deadlines",
+  outcomes: "/outcomes",
   analytics: "/analytics",
   settings: "/settings",
   audit: "/audit",
@@ -37,6 +39,7 @@ const NAV: { id: LegalNavId; label: string; icon: string }[] = [
   { id: "documents", label: "Documents", icon: "doc" },
   { id: "deadlines", label: "Deadlines", icon: "cal" },
   { id: "pricing", label: "Pricing", icon: "coin" },
+  { id: "outcomes", label: "Outcomes", icon: "trophy" },
   { id: "analytics", label: "Analytics", icon: "chart" },
   { id: "settings", label: "Settings", icon: "gear" },
   { id: "audit", label: "Audit Log", icon: "clip" },
@@ -79,6 +82,14 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
         <line x1="16" x2="16" y1="2" y2="6" />
         <line x1="8" x2="8" y1="2" y2="6" />
         <line x1="3" x2="21" y1="10" y2="10" />
+      </svg>
+    );
+  }
+  if (name === "trophy") {
+    return (
+      <svg className={c} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+        <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z" />
+        <path d="M7 6H4a2 2 0 002 4h1M17 6h3a2 2 0 01-2 4h-1" />
       </svg>
     );
   }
@@ -190,7 +201,9 @@ export function LegalChrome({
   const pathname = usePathname();
   const routeActive: LegalNavId | null = pathname.startsWith("/analytics")
     ? "analytics"
-    : pathname.startsWith("/settings")
+    : pathname.startsWith("/outcomes")
+      ? "outcomes"
+      : pathname.startsWith("/settings")
       ? "settings"
       : pathname.startsWith("/audit")
         ? "audit"
@@ -222,6 +235,8 @@ export function LegalChrome({
               ? "Pricing"
               : pathname.startsWith("/analytics")
                 ? "Analytics"
+                : pathname.startsWith("/outcomes")
+                  ? "Outcomes"
                 : pathname.startsWith("/settings")
                   ? "Settings"
                   : pathname.startsWith("/audit")
@@ -437,6 +452,7 @@ export function LegalChrome({
             {(
               [
                 ["/pricing", "Pricing"],
+                ["/outcomes", "Outcomes"],
                 ["/notifications", "Notifications"],
                 ["/profile", "Profile"],
                 ["/documents", "Documents"],

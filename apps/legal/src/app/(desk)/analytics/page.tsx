@@ -23,7 +23,10 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-white">Analytics</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Modeled win/loss on this desk. Hot = modeled win — not a closed-file archive.
+          Modeled win/loss on this desk. Hot = modeled win — not a closed-file archive.{" "}
+          <a href="/outcomes" className="text-[#F59E0B] hover:underline">
+            Recorded outcomes →
+          </a>
         </p>
       </div>
       <section className="grid gap-4 sm:grid-cols-3">

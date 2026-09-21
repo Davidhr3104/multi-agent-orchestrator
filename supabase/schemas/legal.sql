@@ -54,3 +54,4 @@ create table if not exists legal.quotes (
 );
 
 alter table legal.rfps add column if not exists partner_decision jsonb;
+alter table legal.rfps add column if not exists corpus_hits jsonb default '[]'::jsonb;

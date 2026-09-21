@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import type { AttributedLead, CampaignAction, SpendEvent, StoredCampaign } from "@helix/core";
+import type { AttributedLead, CampaignAction, DeskWasteSummary, SpendEvent, StoredCampaign } from "@helix/core";
 import { ScatterPlot } from "@/components/scatter-plot";
 import { SAMPLE_CSV } from "@/lib/sample-csv";
 import {
@@ -80,6 +80,7 @@ export function MarketingDashboard() {
   const [unmatched, setUnmatched] = useState<SpendEvent[]>([]);
   const [series, setSeries] = useState<{ day: string; spend: number }[]>([]);
   const [bounds, setBounds] = useState<{ from: string; to: string } | null>(null);
+  const [waste, setWaste] = useState<DeskWasteSummary | null>(null);
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -95,6 +96,7 @@ export function MarketingDashboard() {
       leads: AttributedLead[];
       unmatched: SpendEvent[];
       series: { day: string; spend: number }[];
+      waste?: DeskWasteSummary;
       from: string;
       to: string;
     };
@@ -102,6 +104,7 @@ export function MarketingDashboard() {
     setLeads(data.leads ?? []);
     setUnmatched(data.unmatched ?? []);
     setSeries(data.series ?? []);
+    setWaste(data.waste ?? null);
     if (data.from && data.to) setBounds({ from: data.from, to: data.to });
   }
 
@@ -185,7 +188,11 @@ export function MarketingDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, note }),
     });
-    const data = (await res.json()) as { campaign?: StoredCampaign; error?: string };
+    const data = (await res.json()) as {
+      campaign?: StoredCampaign;
+      error?: string;
+      adsWrite?: { attempted: boolean; ok: boolean; detail: string };
+    };
     if (!res.ok) {
       showToast(data.error || "Review failed", true);
       return;
@@ -193,12 +200,16 @@ export function MarketingDashboard() {
     if (data.campaign) {
       setCampaigns((prev) => prev.map((c) => (c.id === id ? data.campaign! : c)));
       setNote("");
-      showToast("Decision confirmed in the local buffer. Meta and Google were not written.");
+      const w = data.adsWrite;
+      if (w?.attempted && w.ok) showToast(`Local + Ads Manager: ${w.detail}`);
+      else if (w?.attempted && !w.ok) showToast(`Saved locally; Ads write failed: ${w.detail}`, true);
+      else showToast(w?.detail || "Confirmed locally.");
     }
   }
 
   function exportCsv() {
-    const header = "campaign_id,name,platform,spend,impressions,clicks,form_leads,avg_score,cost_per_hot,action,needs_review";
+    const header =
+      "campaign_id,name,platform,spend,impressions,clicks,form_leads,avg_score,cost_per_hot,spend_on_spam,spam_rate,action,needs_review";
     const rows = campaigns.map((c) =>
       [
         c.campaignId,
@@ -210,6 +221,8 @@ export function MarketingDashboard() {
         c.metrics.formLeads,
         c.metrics.avgScore,
         c.metrics.costPerHot ?? "",
+        c.metrics.spendOnSpam,
+        c.metrics.spamRate,
         c.action,
         c.needsReview,
       ].join(",")
@@ -267,7 +280,7 @@ export function MarketingDashboard() {
                 <span className="size-1.5 rounded-full bg-[#D9A441]" />
                 keep
               </span>
-              . A human confirms locally — Meta and Google stay disconnected this sprint.
+              . A human confirms pause/scale — Meta Ads Manager is written when keys + numeric campaign ids are set; Google stays local.
             </span>
           </div>
           <button
@@ -299,6 +312,19 @@ export function MarketingDashboard() {
             <span className="shrink-0 font-medium text-[#F97316]">Join queue →</span>
           </a>
         ) : null}
+        {waste && waste.spendOnSpam > 0 ? (
+          <a
+            className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-[#D9605F]/35 bg-[#D9605F]/10 px-4 py-3 text-xs text-[#FDA4AF] hover:border-[#D9605F]/60"
+            href="/waste"
+          >
+            <span>
+              About {money(waste.spendOnSpam)} ({Math.round(waste.wastePct * 100)}%) of joined spend is attributed to
+              spam leads
+              {waste.worstCampaignName ? ` — worst: ${waste.worstCampaignName}` : ""}.
+            </span>
+            <span className="shrink-0 font-medium text-[#FB7185]">$ on spam →</span>
+          </a>
+        ) : null}
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
@@ -307,7 +333,7 @@ export function MarketingDashboard() {
             badge="Mix"
             value={money(metrics.spend)}
             left={`${campaigns.length} active ads`}
-            right="Seed + ingested CSV"
+            right={waste ? `${money(waste.spendOnSpam)} on spam` : "Seed + ingested CSV"}
             chart={
               <svg className="h-7 w-20" fill="none" viewBox="0 0 70 24">
                 <path d={spendSpark.line} stroke="#F97316" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
@@ -870,7 +896,7 @@ function CampaignBlock({
                 />
                 <AuditCell
                   label="Local budget"
-                  value={`${money(c.spend)} in this desk — Ads Manager is not written`}
+                  value={`${money(c.spend)} in this desk — pause/scale can write Meta when configured`}
                 />
               </div>
               <p className="mb-3 text-[#9CA3AF]">{c.reasoning}</p>

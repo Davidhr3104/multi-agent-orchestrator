@@ -24,6 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return Response.json({ error: "verdict must be GO, CONDITIONAL, or NO-GO." }, { status: 400 });
   }
   const actor = operatorActor(req);
+  const now = new Date().toISOString();
   const rfp = await patchRfp(id, {
     needsReview: false,
     partnerDecision: {
@@ -32,7 +33,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       bidAmount: body.bidAmount?.trim() || undefined,
       notes: body.notes?.trim() || undefined,
       decidedBy: actor,
-      decidedAt: new Date().toISOString(),
+      decidedAt: now,
+      outcome: verdict === "NO-GO" ? "no_bid" : "pending",
+      outcomeAt: now,
     },
   });
   if (!rfp) return Response.json({ error: "RFP not found" }, { status: 404 });

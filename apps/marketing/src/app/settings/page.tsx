@@ -13,17 +13,17 @@ const ROWS: { key: "csv" | "meta" | "google"; label: string; hint: string }[] = 
   {
     key: "csv",
     label: "CSV / JSON spend",
-    hint: "POST /api/campaigns/ingest. This is the live path for the MVP.",
+    hint: "POST /api/campaigns/ingest — always available.",
   },
   {
     key: "meta",
     label: "Meta Ads",
-    hint: "Stub. Confirm pause/scale only changes local campaign status.",
+    hint: "Insights sync + HITL pause/scale write-back when token has ads_management and campaign_id is numeric.",
   },
   {
     key: "google",
     label: "Google Ads",
-    hint: "Stub. Same as Meta — no Ads Manager writes this sprint.",
+    hint: "Stub this sprint — use CSV. No Ads Manager writes.",
   },
 ];
 
@@ -41,7 +41,9 @@ export default function SettingsPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8 lg:px-8">
         <div>
           <h1 className="text-2xl font-medium text-white">Settings</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">Paste keys here. Nothing claims Ads Manager is connected.</p>
+          <p className="mt-2 text-sm text-[#9CA3AF]">
+            Paste Meta token + ad account for Insights sync and HITL write-back. Google stays stub.
+          </p>
         </div>
         <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
           <ApiKeysForm initialFields={KEYS_MARKETING} />
@@ -51,7 +53,7 @@ export default function SettingsPage() {
         </section>
         <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
           <h2 className="text-sm font-semibold text-white">Integrations</h2>
-          <p className="mt-1 text-xs text-[#6B7280]">CSV is real. Ad APIs are stubs.</p>
+          <p className="mt-1 text-xs text-[#6B7280]">CSV + Meta Insights/HITL write. Google stub.</p>
           <div className="mt-4 flex flex-col gap-4">
             {ROWS.map((row) => {
               const connected = status?.[row.key];

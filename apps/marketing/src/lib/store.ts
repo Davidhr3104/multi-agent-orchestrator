@@ -8,11 +8,13 @@ import {
   parseMarketingWindow,
   runCampaignPipeline,
   splitJoinedAndUnmatched,
+  summarizeDeskWaste,
   utcDay,
   windowBounds,
   type AttributedLead,
   type CampaignAction,
   type CampaignRemap,
+  type DeskWasteSummary,
   type HitlDecision,
   type MarketingWindow,
   type SpendEvent,
@@ -157,6 +159,7 @@ export type DeskSnapshot = {
   leads: AttributedLead[];
   unmatched: SpendEvent[];
   series: { day: string; spend: number }[];
+  waste: DeskWasteSummary;
 };
 
 export function storeKind(): DeskSnapshot["store"] {
@@ -203,6 +206,7 @@ function snapshotFrom(desk: DeskState, window: MarketingWindow): DeskSnapshot {
     leads: windowLeads,
     unmatched,
     series: dailySpendSeries(desk.spend, from, to),
+    waste: summarizeDeskWaste(campaigns),
   };
 }
 
