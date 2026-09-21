@@ -121,7 +121,9 @@ export function CommerceDashboard() {
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Empty until you Sync Shopify or Load demo in Settings · Agent pipeline automated
+            {orders.length === 0
+              ? "Empty until you Sync Shopify or Load demo in Settings · Agent pipeline automated"
+              : `${orders.length} live orders · demo seed or Shopify · Agent pipeline automated`}
           </p>
         </div>
       </div>
