@@ -58,7 +58,9 @@ export default function InboxPage() {
   const [note, setNote] = useState("");
   const [owner, setOwner] = useState("");
   const [undo, setUndo] = useState<{ id: string; secondsLeft: number } | null>(null);
+  const [undoLostId, setUndoLostId] = useState<string | null>(null);
   const undoTimerRef = useRef<{ interval: number; timeout: number } | null>(null);
+  const undoLostTimerRef = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -111,7 +113,13 @@ export default function InboxPage() {
   }, [leads, selectedId, undo]);
 
   useEffect(() => {
-    return () => clearUndoTimer();
+    return () => {
+      clearUndoTimer();
+      if (undoLostTimerRef.current) {
+        window.clearTimeout(undoLostTimerRef.current);
+        undoLostTimerRef.current = null;
+      }
+    };
   }, []);
 
   const visible = useMemo(() => {
@@ -186,6 +194,20 @@ export default function InboxPage() {
   }
 
   function startUndoWindow(id: string) {
+    setUndo((cur) => {
+      if (cur && cur.id !== id) {
+        // A different lead's undo window was still active — replacing it here would
+        // silently strand it (CRM push already confirmed, no way back). Surface it
+        // instead of failing silently.
+        setUndoLostId(cur.id);
+        if (undoLostTimerRef.current) window.clearTimeout(undoLostTimerRef.current);
+        undoLostTimerRef.current = window.setTimeout(() => {
+          setUndoLostId(null);
+          undoLostTimerRef.current = null;
+        }, 6000);
+      }
+      return cur;
+    });
     clearUndoTimer();
     setUndo({ id, secondsLeft: 5 });
     const interval = window.setInterval(() => {
@@ -304,6 +326,22 @@ export default function InboxPage() {
       </div>
 
       {error ? <p className="text-sm text-error">{error}</p> : null}
+
+      {undoLostId ? (
+        <div className="fixed right-4 bottom-[3.75rem] z-50 flex items-center gap-3 rounded-lg border border-error/40 bg-error-container/30 px-4 py-2 text-sm text-error shadow-lg">
+          <span>
+            Undo window for lead {undoLostId} closed early (another approve started) — that
+            CRM push can no longer be undone.
+          </span>
+          <button
+            type="button"
+            onClick={() => setUndoLostId(null)}
+            className="rounded bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {undo ? (
         <div className="fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm text-on-surface shadow-lg">
