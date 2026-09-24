@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StoredLead } from "@helix/core";
 import {
   initials,
@@ -57,6 +57,8 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [owner, setOwner] = useState("");
+  const [undo, setUndo] = useState<{ id: string; secondsLeft: number } | null>(null);
+  const undoTimerRef = useRef<{ interval: number; timeout: number } | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -75,6 +77,11 @@ export default function InboxPage() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && undo) {
+        e.preventDefault();
+        void undoApprove(undo.id);
+        return;
+      }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement)
         return;
       const sel = leads.find((l) => l.id === selectedId);
@@ -101,7 +108,11 @@ export default function InboxPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, selectedId]);
+  }, [leads, selectedId, undo]);
+
+  useEffect(() => {
+    return () => clearUndoTimer();
+  }, []);
 
   const visible = useMemo(() => {
     return leads.filter((l) => {
@@ -138,6 +149,7 @@ export default function InboxPage() {
             body: JSON.stringify(noteBody),
           });
           setNote("");
+          startUndoWindow(id);
         }
       } else if (path === "crm") {
         const res = await fetch(`/api/leads/${id}/crm`, {
@@ -163,6 +175,39 @@ export default function InboxPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function clearUndoTimer() {
+    if (undoTimerRef.current) {
+      window.clearInterval(undoTimerRef.current.interval);
+      window.clearTimeout(undoTimerRef.current.timeout);
+      undoTimerRef.current = null;
+    }
+  }
+
+  function startUndoWindow(id: string) {
+    clearUndoTimer();
+    setUndo({ id, secondsLeft: 5 });
+    const interval = window.setInterval(() => {
+      setUndo((cur) => {
+        if (!cur || cur.id !== id) return cur;
+        const next = cur.secondsLeft - 1;
+        return next > 0 ? { id, secondsLeft: next } : cur;
+      });
+    }, 1000);
+    const timeout = window.setTimeout(() => {
+      clearUndoTimer();
+      setUndo(null);
+    }, 5000);
+    undoTimerRef.current = { interval, timeout };
+  }
+
+  async function undoApprove(id: string) {
+    clearUndoTimer();
+    setUndo(null);
+    await fetch(`/api/leads/${id}/review`, { method: "DELETE" }).catch(() => null);
+    await refresh();
+    window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
   }
 
   async function assign(id: string, repId: string) {
@@ -259,6 +304,19 @@ export default function InboxPage() {
       </div>
 
       {error ? <p className="text-sm text-error">{error}</p> : null}
+
+      {undo ? (
+        <div className="fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm text-on-surface shadow-lg">
+          <span>Approved & pushed to CRM — undo reopens HITL only, not the CRM push ({undo.secondsLeft}s)</span>
+          <button
+            type="button"
+            onClick={() => void undoApprove(undo.id)}
+            className="rounded bg-primary-container px-2 py-1 text-xs font-semibold text-on-primary-container"
+          >
+            Undo (Ctrl+Z)
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-12">
         {/* Stack */}

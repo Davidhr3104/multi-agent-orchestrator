@@ -45,6 +45,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   });
 }
 
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = requireOperator(req);
+  if (denied) return denied;
+  const { id } = await params;
+  return withOrgScope(async (orgId) => {
+    const lead = await patchLead(id, { needsReview: true }, orgId);
+    if (!lead) return Response.json({ error: "Lead not found" }, { status: 404 });
+    return Response.json({ lead });
+  });
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const tokenCheck = checkActionToken(req, id, "review");
