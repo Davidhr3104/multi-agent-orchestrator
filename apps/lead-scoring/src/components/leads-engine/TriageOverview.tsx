@@ -110,13 +110,22 @@ export function TriageOverview() {
   async function markSpam(id: string) {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/leads/${id}/archive`, { method: "POST" });
-      if (!res.ok) {
+      const res = await fetch(`/api/leads/${id}/archive`, { method: "POST" }).catch(() => null);
+      let ok = Boolean(res?.ok);
+      let label = "Archived";
+      if (!ok) {
         // fallback: review clear only
-        await fetch(`/api/leads/${id}/review`, { method: "POST" });
+        const reviewRes = await fetch(`/api/leads/${id}/review`, { method: "POST" }).catch(() => null);
+        ok = Boolean(reviewRes?.ok);
+        label = "Archive failed — HITL cleared instead";
+        if (!ok) {
+          const status = reviewRes ? reviewRes.status : res ? res.status : "network error";
+          showToast(`Mark spam failed (${status}). Lead unchanged.`);
+        }
       }
-      showToast("Marked / archived");
+      if (ok) showToast(label);
       await refresh();
+      if (ok) window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
     } finally {
       setBusyId(null);
     }

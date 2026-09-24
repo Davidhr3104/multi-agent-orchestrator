@@ -459,6 +459,7 @@ function LeadsRoster() {
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
         showToast(data.mode === "pipeline" ? "Re-scored via pipeline" : "Re-scored");
+        window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
       } else {
         showToast(data.error || `Score ${res.status}`);
       }
@@ -490,6 +491,7 @@ function LeadsRoster() {
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
         showToast(`Stage → ${pipelineStage}`);
+        window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
       } else {
         showToast(data.error || `Stage ${res.status}`);
       }
@@ -507,6 +509,7 @@ function LeadsRoster() {
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
         showToast("Archived");
+        window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
       } else {
         showToast(data.error || `Archive ${res.status}`);
       }
@@ -524,6 +527,7 @@ function LeadsRoster() {
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
         showToast("HITL cleared");
+        window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
       } else {
         showToast(data.error || `Review ${res.status}`);
       }
