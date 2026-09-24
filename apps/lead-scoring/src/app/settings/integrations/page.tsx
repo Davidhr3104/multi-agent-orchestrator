@@ -294,7 +294,7 @@ export default function IntegrationsPage() {
             <span className="material-symbols-outlined text-[18px] text-primary">alt_route</span>
             <h2 className="text-sm font-semibold text-on-surface">CRM &amp; Pipeline Destinations</h2>
             <span className="rounded-full bg-surface-container px-2 py-0.5 font-mono text-[10px] text-on-surface-variant">
-              1 CRM live
+              {ghl ? "1 CRM live" : "0 CRM live"}
             </span>
           </div>
         </div>
