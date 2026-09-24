@@ -261,6 +261,14 @@ export default function AuditPage() {
     return () => window.clearInterval(t);
   }, [streaming, refresh]);
 
+  useEffect(() => {
+    function onLeadsRefresh() {
+      void refresh();
+    }
+    window.addEventListener("helix:leads-refresh", onLeadsRefresh);
+    return () => window.removeEventListener("helix:leads-refresh", onLeadsRefresh);
+  }, [refresh]);
+
   const events = useMemo(() => buildEvents(leads), [leads]);
 
   const visible = useMemo(() => {

@@ -325,9 +325,10 @@ export function LeadDashboard() {
     if (data.lead) {
       setLeads((prev) => prev.map((l) => (l.id === id ? data.lead! : l)));
       setSelected(data.lead);
-      showToast("Lead sent to CRM");
+      if (res.ok) showToast("Lead sent to CRM");
     }
     if (!res.ok) setError(data.error || `GHL ${res.status}`);
+    window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
   }
 
   async function trackBehavior(id: string, kind: string) {
@@ -350,6 +351,7 @@ export function LeadDashboard() {
       setLeads((prev) => prev.map((l) => (l.id === id ? data.lead! : l)));
       setSelected(data.lead);
     }
+    window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
   }
 
   async function setStage(id: string, pipelineStage: PipelineStage, dealValue?: number) {

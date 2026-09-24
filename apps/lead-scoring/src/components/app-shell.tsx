@@ -87,21 +87,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void Promise.all([
-      fetch("/api/status").then((r) => r.json()).catch(() => ({})),
-      fetch("/api/leads").then((r) => r.json()).catch(() => ({ leads: [] })),
-    ]).then(([status, leadsRes]) => {
-      setGhlConnected(Boolean((status as { ghl?: boolean }).ghl));
-      const leads = ((leadsRes as { leads?: StoredLead[] }).leads ?? []) as StoredLead[];
-      setHotCount(leads.filter((l) => l.tier === "hot" && l.classification === "lead").length);
-      setReviewCount(leads.filter((l) => l.needsReview).length);
-      if (leads.length === 0) {
-        setSlaPct(null);
-      } else {
-        const clear = leads.filter((l) => !l.needsReview).length;
-        setSlaPct(Math.round((clear / leads.length) * 1000) / 10);
-      }
-    });
+    function loadBadgeState() {
+      void Promise.all([
+        fetch("/api/status").then((r) => r.json()).catch(() => ({})),
+        fetch("/api/leads").then((r) => r.json()).catch(() => ({ leads: [] })),
+      ]).then(([status, leadsRes]) => {
+        setGhlConnected(Boolean((status as { ghl?: boolean }).ghl));
+        const leads = ((leadsRes as { leads?: StoredLead[] }).leads ?? []) as StoredLead[];
+        setHotCount(leads.filter((l) => l.tier === "hot" && l.classification === "lead").length);
+        setReviewCount(leads.filter((l) => l.needsReview).length);
+        if (leads.length === 0) {
+          setSlaPct(null);
+        } else {
+          const clear = leads.filter((l) => !l.needsReview).length;
+          setSlaPct(Math.round((clear / leads.length) * 1000) / 10);
+        }
+      });
+    }
+    loadBadgeState();
+    window.addEventListener("helix:leads-refresh", loadBadgeState);
+    return () => window.removeEventListener("helix:leads-refresh", loadBadgeState);
   }, [pathname]);
 
   useEffect(() => {

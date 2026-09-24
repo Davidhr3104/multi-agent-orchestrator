@@ -11,13 +11,18 @@ export default function AnalyticsPage() {
   const [ghl, setGhl] = useState(false);
 
   useEffect(() => {
-    void Promise.all([
-      fetch("/api/leads").then((r) => r.json()),
-      fetch("/api/status").then((r) => r.json()).catch(() => ({})),
-    ]).then(([leadsRes, status]) => {
-      setLeads(((leadsRes as { leads?: StoredLead[] }).leads ?? []) as StoredLead[]);
-      setGhl(Boolean((status as { ghl?: boolean }).ghl));
-    });
+    function loadAnalytics() {
+      void Promise.all([
+        fetch("/api/leads").then((r) => r.json()),
+        fetch("/api/status").then((r) => r.json()).catch(() => ({})),
+      ]).then(([leadsRes, status]) => {
+        setLeads(((leadsRes as { leads?: StoredLead[] }).leads ?? []) as StoredLead[]);
+        setGhl(Boolean((status as { ghl?: boolean }).ghl));
+      });
+    }
+    loadAnalytics();
+    window.addEventListener("helix:leads-refresh", loadAnalytics);
+    return () => window.removeEventListener("helix:leads-refresh", loadAnalytics);
   }, []);
 
   const stats = useMemo(() => {
