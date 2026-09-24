@@ -93,8 +93,9 @@ function normalizeClaude(
       ? raw.fields.map((f, i) => hydrateScoredField(document, f, i))
       : fallback.fields;
 
-  const needsReview =
-    confidence < hitl || (score > thresholds.dqScore && score < thresholds.autoQualifyScore);
+  // Same rule as the heuristic: score band first; low confidence only forces review once score >= dqScore.
+  const inHitlBand = score > thresholds.dqScore && score < thresholds.autoQualifyScore;
+  const needsReview = inHitlBand || (confidence < hitl && score >= thresholds.dqScore);
 
   return {
     classification,

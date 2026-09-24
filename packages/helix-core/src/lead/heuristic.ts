@@ -164,8 +164,12 @@ export function scoreLeadHeuristic(
     ),
   ];
 
-  const needsReview =
-    confidence < hitl || (score > thresholds.dqScore && score < thresholds.autoQualifyScore);
+  // Score band decides first: a lead clearly under dqScore is disqualified and never enters HITL
+  // just because the generic heuristic confidence is low (LEADS-P1-1 acceptance criterion).
+  // Low confidence only forces review once the score has cleared the DQ threshold, so high-score
+  // leads with weak evidence are not silently auto-approved.
+  const inHitlBand = score > thresholds.dqScore && score < thresholds.autoQualifyScore;
+  const needsReview = inHitlBand || (confidence < hitl && score >= thresholds.dqScore);
 
   const reasoning = [
     `Heuristic engine classified this as ${classification} (score ${score}, ${tier}).`,
