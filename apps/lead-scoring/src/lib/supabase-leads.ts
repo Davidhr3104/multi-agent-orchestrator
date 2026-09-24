@@ -82,6 +82,7 @@ function toRow(lead: StoredLead, orgId: string) {
     fields: lead.fields,
     needs_review: lead.needsReview,
     crm_status: lead.crmStatus,
+    crm_error: lead.crmError ?? null,
     ghl_contact_id: lead.ghlContactId ?? null,
     ghl_opportunity_id: lead.ghlOpportunityId ?? null,
     ghl_opportunity_error: lead.ghlOpportunityError ?? null,
@@ -135,6 +136,7 @@ function fromRow(row: Record<string, unknown>): StoredLead {
     fields: (row.fields as StoredLead["fields"]) ?? [],
     needsReview: Boolean(row.needs_review),
     crmStatus: (row.crm_status as StoredLead["crmStatus"]) ?? "not_sent",
+    crmError: row.crm_error != null ? String(row.crm_error) : undefined,
     ghlContactId: row.ghl_contact_id != null ? String(row.ghl_contact_id) : undefined,
     ghlOpportunityId: row.ghl_opportunity_id != null ? String(row.ghl_opportunity_id) : undefined,
     ghlOpportunityError:
