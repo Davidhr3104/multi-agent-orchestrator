@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Helix for Commerce — Protect the order.</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: local("Inter");
+      }
+      @font-face {
+        font-family: "Geist Mono";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: local("Geist Mono"), local("JetBrains Mono"), local("Consolas");
+      }
+
+      :root {
+        --bg: #05070c;
+        --ink: #ffffff;
+        --muted: #8b95a7;
+        --primary: #059669;
+        --primary-text: #1da077;
+        --critical: #dc2626;
+        --critical-text: #e35353;
+        --amber: #f59e0b;
+        --surface: #0d1420;
+        --surface-2: #0a0f18;
+        --border: rgba(255, 255, 255, 0.07);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      .center {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Ambient vignette + grain-free depth wash, present under every beat */
+      .ambient-wash {
+        background: radial-gradient(ellipse at 50% 40%, rgba(5, 150, 105, 0.06), transparent 60%),
+          radial-gradient(ellipse at 80% 90%, rgba(5, 150, 105, 0.04), transparent 55%);
+      }
+
+      /* ---------- Brand type-card beats (Hook / Promise / Human line / Land) ---------- */
+      .type-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 28px;
+      }
+      .type-card .line {
+        font-size: 84px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        color: var(--ink);
+        opacity: 0;
+        max-width: 1400px;
+      }
+      .type-card .line .accent {
+        color: var(--primary-text);
+      }
+      .type-card .kicker {
+        font-family: "Geist Mono", monospace;
+        font-size: 22px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+        opacity: 0;
+      }
+
+      /* ---------- Proof beat: Dashboard ---------- */
+      #proof-dashboard .panel {
+        width: 1500px;
+        opacity: 0;
+      }
+      #proof-dashboard .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+      #proof-dashboard .kpi-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 32px;
+      }
+      #proof-dashboard .kpi-label {
+        font-family: "Geist Mono", monospace;
+        font-size: 16px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      #proof-dashboard .kpi-value {
+        font-size: 52px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      #proof-dashboard .kpi-sub {
+        font-size: 18px;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+
+      /* ---------- Proof beat: Orders queue ---------- */
+      #proof-orders .panel {
+        width: 1500px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 40px 0 8px;
+        opacity: 0;
+      }
+      #proof-orders .panel-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 40px 28px;
+        font-family: "Geist Mono", monospace;
+        font-size: 20px;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        color: var(--primary-text);
+        text-transform: uppercase;
+      }
+      #proof-orders .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--primary);
+      }
+      #proof-orders .row {
+        display: grid;
+        grid-template-columns: 160px 1fr 220px 200px 140px;
+        align-items: center;
+        padding: 22px 40px;
+        border-top: 1px solid var(--border);
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      #proof-orders .row.flagged {
+        background: rgba(220, 38, 38, 0.07);
+        border-left: 4px solid var(--critical);
+        padding-left: 36px;
+      }
+      #proof-orders .order-id {
+        font-family: "Geist Mono", monospace;
+        font-size: 24px;
+        color: var(--ink);
+      }
+      #proof-orders .customer {
+        font-size: 24px;
+        color: var(--ink);
+        font-weight: 500;
+      }
+      #proof-orders .amount {
+        font-family: "Geist Mono", monospace;
+        font-size: 24px;
+        color: var(--ink);
+        justify-self: start;
+      }
+      #proof-orders .amount.boxed {
+        color: var(--critical-text);
+        border: 2px solid var(--critical);
+        border-radius: 6px;
+        padding: 4px 12px;
+        width: fit-content;
+      }
+      #proof-orders .status {
+        font-family: "Geist Mono", monospace;
+        font-size: 18px;
+        font-weight: 600;
+        padding: 6px 16px;
+        border-radius: 9999px;
+        width: fit-content;
+        text-transform: uppercase;
+      }
+      #proof-orders .status.review {
+        color: var(--amber);
+        background: rgba(245, 158, 11, 0.14);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+      }
+      #proof-orders .score-chip {
+        font-family: "Geist Mono", monospace;
+        font-size: 22px;
+        font-weight: 700;
+        justify-self: end;
+        color: var(--critical-text);
+      }
+
+      /* ---------- Human beat: HITL decision ---------- */
+      #proof-hitl .decision-card {
+        width: 1200px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 48px;
+        opacity: 0;
+      }
+      #proof-hitl .decision-eyebrow {
+        font-family: "Geist Mono", monospace;
+        font-size: 17px;
+        letter-spacing: 0.16em;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+      #proof-hitl .decision-title {
+        font-size: 38px;
+        font-weight: 600;
+        color: var(--ink);
+        margin-bottom: 8px;
+      }
+      #proof-hitl .decision-sub {
+        font-size: 22px;
+        color: var(--muted);
+        margin-bottom: 36px;
+      }
+      #proof-hitl .button-row {
+        display: flex;
+        gap: 24px;
+      }
+      #proof-hitl .btn {
+        flex: 1;
+        padding: 24px;
+        border-radius: 12px;
+        font-size: 26px;
+        font-weight: 600;
+        text-align: center;
+      }
+      #proof-hitl .btn-approve {
+        border: 2px solid rgba(255, 255, 255, 0.12);
+        color: var(--muted);
+        background: transparent;
+      }
+      #proof-hitl .btn-refund {
+        border: 2px solid var(--critical);
+        color: var(--critical-text);
+        background: transparent;
+      }
+      #proof-hitl .btn-refund.confirmed {
+        border-color: var(--primary);
+        color: #ffffff;
+        background: var(--primary);
+      }
+
+      /* ---------- Proof beat: Inventory ---------- */
+      #proof-inventory .panel {
+        width: 1500px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 40px;
+        opacity: 0;
+      }
+      #proof-inventory .panel-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+      }
+      #proof-inventory .panel-title .h {
+        font-size: 28px;
+        font-weight: 600;
+      }
+      #proof-inventory .badge-urgent {
+        font-family: "Geist Mono", monospace;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--amber);
+        background: rgba(245, 158, 11, 0.14);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        padding: 6px 16px;
+        border-radius: 9999px;
+        text-transform: uppercase;
+      }
+      #proof-inventory .sku-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 18px 0;
+        border-top: 1px solid var(--border);
+        font-size: 22px;
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      #proof-inventory .sku-name {
+        color: var(--ink);
+      }
+      #proof-inventory .sku-days {
+        font-family: "Geist Mono", monospace;
+        color: var(--amber);
+      }
+
+      /* ---------- Land: outro ---------- */
+      #land .outro {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        opacity: 0;
+      }
+      #land .wordmark {
+        font-size: 76px;
+        font-weight: 700;
+        color: var(--ink);
+        margin: 0;
+      }
+      #land .wordmark span {
+        color: var(--primary-text);
+      }
+      #land .tagline {
+        font-size: 28px;
+        color: var(--muted);
+        margin-top: 18px;
+      }
+      #land .url {
+        font-family: "Geist Mono", monospace;
+        font-size: 24px;
+        color: var(--primary-text);
+        margin-top: 44px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-width="1920"
+      data-height="1080"
+      data-duration="68"
+    >
+      <!-- Ambient wash under everything -->
+      <div class="clip ambient-wash" data-start="0" data-duration="68" data-track-index="0"></div>
+
+      <!-- HOOK (0-6s): "One bad order can wipe a good day." -->
+      <section id="hook" class="clip center" data-start="0" data-duration="6" data-track-index="1">
+        <div class="type-card">
+          <div class="line" id="hook-line">One bad order<br />can wipe a good day.</div>
+        </div>
+      </section>
+
+      <!-- PROMISE (6-12s): "Helix for Commerce is the ops desk that catches risk before it ships." -->
+      <section id="promise" class="clip center" data-start="6" data-duration="6" data-track-index="1">
+        <div class="type-card">
+          <div class="kicker" id="promise-kicker">HELIX FOR COMMERCE</div>
+          <div class="line" id="promise-line">The ops desk that catches<br /><span class="accent">risk before it ships.</span></div>
+        </div>
+      </section>
+
+      <!-- PROOF 1 (12-22s): Live dashboard -->
+      <section id="proof-dashboard" class="clip center" data-start="12" data-duration="10" data-track-index="1">
+        <div class="panel" id="dash-panel">
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-label">Total Revenue</div>
+              <div class="kpi-value">$5,865.50</div>
+              <div class="kpi-sub">From seeded mock orders</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Total Orders</div>
+              <div class="kpi-value">5</div>
+              <div class="kpi-sub">2 fulfilled · 3 pending</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Inventory Alerts</div>
+              <div class="kpi-value">3 items</div>
+              <div class="kpi-sub">Low stock</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROOF 2 (22-38s): Orders -> #1003 flagged -->
+      <section id="proof-orders" class="clip center" data-start="22" data-duration="16" data-track-index="1">
+        <div class="panel" id="orders-panel">
+          <div class="panel-header"><span class="dot"></span> LIVE ORDERS STREAM</div>
+          <div class="row" id="orders-row-1">
+            <div class="order-id">#1001</div>
+            <div class="customer">Priya Nair</div>
+            <div class="amount">$64.50</div>
+            <div class="status" style="color: var(--primary-text); background: rgba(5,150,105,0.14); border: 1px solid rgba(5,150,105,0.4);">Fulfilled</div>
+            <div class="score-chip" style="color: var(--primary-text);">08</div>
+          </div>
+          <div class="row" id="orders-row-2">
+            <div class="order-id">#1002</div>
+            <div class="customer">Marcus Webb</div>
+            <div class="amount">$189.00</div>
+            <div class="status" style="color: var(--primary-text); background: rgba(5,150,105,0.14); border: 1px solid rgba(5,150,105,0.4);">In Transit</div>
+            <div class="score-chip" style="color: var(--primary-text);">08</div>
+          </div>
+          <div class="row flagged" id="orders-row-3">
+            <div class="order-id">#1003</div>
+            <div class="customer">Sofia Reyes</div>
+            <div class="amount boxed">$2,450.00</div>
+            <div class="status review">Review Needed</div>
+            <div class="score-chip">93</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HUMAN (38-52s): HITL decision -> Refund & Cancel confirmed -->
+      <section id="proof-hitl" class="clip center" data-start="38" data-duration="14" data-track-index="1">
+        <div class="decision-card" id="hitl-card">
+          <div class="decision-eyebrow">HITL Decision</div>
+          <div class="decision-title">Order #1003 — Sofia Reyes</div>
+          <div class="decision-sub">$2,450.00 · AI Fraud Score 93/100 · Review Needed</div>
+          <div class="button-row">
+            <div class="btn btn-approve">Approve</div>
+            <div class="btn btn-refund" id="hitl-refund-btn">Refund &amp; Cancel</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROOF 3 (52-60s): Inventory -->
+      <section id="proof-inventory" class="clip center" data-start="52" data-duration="8" data-track-index="1">
+        <div class="panel" id="inv-panel">
+          <div class="panel-title">
+            <div class="h">Critical Low Stock Reorder Queue</div>
+            <div class="badge-urgent">3 Urgent</div>
+          </div>
+          <div class="sku-row" id="inv-row-1">
+            <div class="sku-name">Wool Blanket Throw</div>
+            <div class="sku-days">Stock out in 6 days</div>
+          </div>
+          <div class="sku-row" id="inv-row-2">
+            <div class="sku-name">4K Drone Kit</div>
+            <div class="sku-days">Stock out in 9 days</div>
+          </div>
+          <div class="sku-row" id="inv-row-3">
+            <div class="sku-name">Studio Monitor Speakers</div>
+            <div class="sku-days">Stock out in 12 days</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LAND (60-68s): logo + tagline + URL -->
+      <section id="land" class="clip center" data-start="60" data-duration="8" data-track-index="1">
+        <div class="outro" id="land-outro">
+          <h1 class="wordmark">Helix <span>for Commerce</span></h1>
+          <div class="tagline">Protect the order.</div>
+          <div class="url">helix-for-commerce.vercel.app</div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+
+      // ===== HOOK (0-6s) =====
+      tl.fromTo("#hook-line", { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8 }, 0.3);
+      // hold to 6s
+
+      // ===== PROMISE (6-12s) =====
+      tl.to("#promise-kicker", { opacity: 1, duration: 0.5 }, 6.2);
+      tl.fromTo("#promise-line", { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7 }, 6.6);
+      // hold to 12s
+
+      // ===== PROOF 1: Dashboard (12-22s) =====
+      tl.to("#dash-panel", { opacity: 1, duration: 0.4 }, 12.2);
+      // subtle push-in on the whole panel, calm
+      tl.fromTo("#dash-panel", { scale: 0.97 }, { scale: 1, duration: 1.4, ease: "power2.out" }, 12.2);
+      // hold static to 22s
+
+      // ===== PROOF 2: Orders -> #1003 (22-38s) =====
+      tl.to("#orders-panel", { opacity: 1, duration: 0.35 }, 22.2);
+      tl.to("#orders-row-1", { opacity: 1, y: 0, duration: 0.4 }, 22.6);
+      tl.to("#orders-row-2", { opacity: 1, y: 0, duration: 0.4 }, 23.2);
+      tl.to("#orders-row-3", { opacity: 1, y: 0, duration: 0.45 }, 23.9);
+      // hold on the flagged row through the rest of the beat (to 38s)
+
+      // ===== HUMAN: HITL decision (38-52s) =====
+      tl.to("#hitl-card", { opacity: 1, duration: 0.4 }, 38.2);
+      // The safe-path payoff: Refund & Cancel becomes filled/confirmed.
+      // Approve is never touched, filled, or emphasized anywhere in this timeline.
+      tl.to(
+        "#hitl-refund-btn",
+        {
+          duration: 0.3,
+          onStart: function () {
+            document.getElementById("hitl-refund-btn").classList.add("confirmed");
+          },
+        },
+        41.5
+      );
+      // hold the confirmed decision to 52s
+
+      // ===== PROOF 3: Inventory (52-60s) =====
+      tl.to("#inv-panel", { opacity: 1, duration: 0.35 }, 52.2);
+      tl.to("#inv-row-1", { opacity: 1, y: 0, duration: 0.35 }, 52.6);
+      tl.to("#inv-row-2", { opacity: 1, y: 0, duration: 0.35 }, 53.1);
+      tl.to("#inv-row-3", { opacity: 1, y: 0, duration: 0.35 }, 53.6);
+      // hold to 60s
+
+      // ===== LAND: outro (60-68s) =====
+      tl.to("#land-outro", { opacity: 1, duration: 0.5 }, 60.3);
+      // static hold to 68s, no exit (final beat)
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

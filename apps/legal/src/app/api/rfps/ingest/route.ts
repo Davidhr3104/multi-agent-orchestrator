@@ -1,5 +1,12 @@
 import { encodeSse, parseRfpIngest, runRfpPipeline, type RfpStreamEvent } from "@helix/core";
-import { getClientProfile, recordAudit, saveRfp, checkAndStoreConflict, checkAndStorePricing } from "@/lib/store";
+import {
+  getClientProfile,
+  recordAudit,
+  saveRfp,
+  checkAndStoreConflict,
+  checkAndStorePricing,
+  checkAndStoreNoBid,
+} from "@/lib/store";
 import { formatUsdNumber } from "@/lib/money";
 
 export const runtime = "nodejs";
@@ -26,6 +33,19 @@ export async function POST(req: Request) {
       try {
         const rfp = await runRfpPipeline(parsed, send);
         await saveRfp(rfp);
+        const noBid = await checkAndStoreNoBid(rfp);
+        if (noBid.blocked) {
+          send({
+            type: "log",
+            log: {
+              id: `nobid-${rfp.id}`,
+              ts: new Date().toISOString(),
+              agent: "reviewer",
+              level: "warn",
+              message: `Auto NO-GO — no-bid rule matched: ${noBid.reason}`,
+            },
+          });
+        }
         const coi = await checkAndStoreConflict(rfp);
         send({
           type: "log",

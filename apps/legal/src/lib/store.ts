@@ -8,6 +8,7 @@ import {
 import type { AuditEvent } from "@/lib/audit-types";
 import type { ConflictReport } from "@/lib/conflict-types";
 import { heuristicConflictReport, runConflictCheck } from "@/lib/conflicts";
+import { checkNoBidRules, loadNoBidRules } from "@/lib/no-bid-rules";
 import type { PricingOverrides, PricingQuote } from "@/lib/pricing-types";
 import { heuristicPricingQuote, runPricingQuote } from "@/lib/pricing";
 import {
@@ -326,6 +327,32 @@ export async function patchRfp(
   if (!current) return null;
   const next = { ...current, ...patch };
   return saveRfp(next);
+}
+
+/**
+ * Runs the firm's structured no-bid rules against the RFP text at ingest.
+ * On a match, writes a system partnerDecision of NO-GO up front — goNoGo()
+ * already treats partnerDecision as authoritative, so this makes the rule a
+ * real gate on the verdict instead of just descriptive corpus text a human
+ * has to remember to check. A later real partner decision overwrites it.
+ */
+export async function checkAndStoreNoBid(rfp: StoredRfp): Promise<{ blocked: boolean; reason?: string }> {
+  const { rules } = await loadNoBidRules();
+  const hit = checkNoBidRules(`${rfp.title} ${rfp.body}`, rules);
+  if (!hit.blocked) return { blocked: false };
+  await patchRfp(rfp.id, {
+    partnerDecision: {
+      verdict: "NO-GO",
+      coiCleared: false,
+      decidedBy: "no-bid rule",
+      decidedAt: new Date().toISOString(),
+      notes: `Auto no-bid: "${hit.rule.pattern}" — ${hit.rule.reason}`,
+      outcome: "no_bid",
+      outcomeAt: new Date().toISOString(),
+    },
+  });
+  await pushAudit("intake", "no-bid", `${rfp.title}: auto NO-GO via rule "${hit.rule.pattern}" — ${hit.rule.reason}`);
+  return { blocked: true, reason: hit.rule.reason };
 }
 
 export async function listComms(id: string): Promise<CommEvent[]> {

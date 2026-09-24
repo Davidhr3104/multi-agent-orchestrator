@@ -134,9 +134,9 @@ export async function sendLeadToGhl(lead: StoredLead): Promise<{
   return { ok: true, contactId, opportunityId: opp.opportunityId };
 }
 
-export async function addGhlReingestNote(contactId: string, score: number): Promise<void> {
+export async function addGhlNote(contactId: string, body: string): Promise<void> {
   const key = getSecret("GHL_API_KEY");
-  if (!key) return;
+  if (!key || !body.trim()) return;
   await fetch(`${GHL_BASE}/contacts/${contactId}/notes`, {
     method: "POST",
     headers: {
@@ -145,9 +145,11 @@ export async function addGhlReingestNote(contactId: string, score: number): Prom
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({
-      body: `Lead re-ingested. Score updated to ${score}.`,
-    }),
+    body: JSON.stringify({ body: body.trim() }),
     signal: AbortSignal.timeout(10_000),
   }).catch(() => undefined);
+}
+
+export async function addGhlReingestNote(contactId: string, score: number): Promise<void> {
+  await addGhlNote(contactId, `Lead re-ingested. Score updated to ${score}.`);
 }

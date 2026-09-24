@@ -1,13 +1,48 @@
 "use client";
 
-import type { StoredProduct } from "@helix/core";
+import { useState } from "react";
+import type { ReorderRequest, StoredProduct } from "@helix/core";
 import { cn } from "@/lib/utils";
 
-export function ReorderQueue({ products }: { products: StoredProduct[] }) {
+export function ReorderQueue({
+  products,
+  reorders,
+  onReorderCreated,
+}: {
+  products: StoredProduct[];
+  reorders: ReorderRequest[];
+  onReorderCreated: (reorder: ReorderRequest) => void;
+}) {
+  const [busyProductId, setBusyProductId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const urgent = products
     .filter((p) => p.restockRecommended)
     .sort((a, b) => a.predictedStockoutDays - b.predictedStockoutDays)
     .slice(0, 4);
+
+  const openReorderFor = (productId: string) =>
+    reorders.find((r) => r.productId === productId && r.status !== "cancelled" && r.status !== "received");
+
+  async function createReorder(productId: string) {
+    setBusyProductId(productId);
+    setError(null);
+    try {
+      const res = await fetch("/api/reorders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId }),
+      });
+      const data = (await res.json()) as { reorder?: ReorderRequest; error?: string };
+      if (!res.ok || !data.reorder) {
+        setError(data.error ?? "Could not create reorder");
+        return;
+      }
+      onReorderCreated(data.reorder);
+    } finally {
+      setBusyProductId(null);
+    }
+  }
 
   return (
     <div className="glass-panel space-y-4 rounded-xl p-5">
@@ -23,6 +58,8 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
         </span>
       </div>
 
+      {error ? <p className="text-xs text-[#dc2626]">{error}</p> : null}
+
       <div className="space-y-3">
         {urgent.map((product) => {
           const pct = Math.min(
@@ -30,6 +67,7 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
             Math.round((product.currentInventory / Math.max(product.reorderPoint * 2, 1)) * 100)
           );
           const critical = product.currentInventory <= product.reorderPoint / 2;
+          const existing = openReorderFor(product.id);
           return (
             <div
               key={product.id}
@@ -41,6 +79,18 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
                   <span className="rounded bg-black/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-white/[0.04]">
                     SKU: {product.sku}
                   </span>
+                  {existing ? (
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        existing.status === "ordered"
+                          ? "bg-blue-500/10 text-blue-400"
+                          : "bg-amber-500/10 text-amber-400"
+                      )}
+                    >
+                      {existing.status === "ordered" ? "Ordered" : "Draft PO"} · {existing.quantitySuggested} units
+                    </span>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="h-1 w-36 rounded-full bg-black/[0.06] dark:bg-white/[0.06]">
@@ -59,8 +109,12 @@ export function ReorderQueue({ products }: { products: StoredProduct[] }) {
                   </span>
                 </div>
               </div>
-              <button className="rounded bg-[#059669] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#059669]/85">
-                Quick Restock PO
+              <button
+                disabled={Boolean(existing) || busyProductId === product.id}
+                onClick={() => void createReorder(product.id)}
+                className="rounded bg-[#059669] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#059669]/85 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busyProductId === product.id ? "…" : existing ? "PO Created" : "Quick Restock PO"}
               </button>
             </div>
           );

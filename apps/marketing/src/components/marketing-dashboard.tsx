@@ -83,10 +83,66 @@ export function MarketingDashboard() {
   const [waste, setWaste] = useState<DeskWasteSummary | null>(null);
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [syncing, setSyncing] = useState<"meta" | "leads" | null>(null);
+  const [metaReady, setMetaReady] = useState(false);
 
   function showToast(msg: string, err = false) {
     setToast({ msg, err });
     window.setTimeout(() => setToast(null), 2800);
+  }
+
+  async function syncMeta() {
+    setSyncing("meta");
+    try {
+      const res = await fetch("/api/ads/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ window: range }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        imported?: number;
+        message?: string;
+        unmatchedCount?: number;
+      };
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await refresh();
+      showToast(
+        data.imported
+          ? `Meta Insights: imported ${data.imported} rows${
+              data.unmatchedCount ? ` · ${data.unmatchedCount} unmatched` : ""
+            }`
+          : data.message || "Meta sync complete (0 rows)"
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Meta sync failed", true);
+    } finally {
+      setSyncing(null);
+    }
+  }
+
+  async function syncLeads() {
+    setSyncing("leads");
+    try {
+      const res = await fetch("/api/leads/sync", { method: "POST" });
+      const data = (await res.json()) as {
+        error?: string;
+        imported?: number;
+        skipped?: number;
+        unmatched?: number;
+      };
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await refresh();
+      showToast(
+        `Leads sync: ${data.imported ?? 0} imported${
+          data.skipped ? `, ${data.skipped} skipped` : ""
+        }${data.unmatched != null ? ` · ${data.unmatched} unmatched` : ""}`
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Leads sync failed", true);
+    } finally {
+      setSyncing(null);
+    }
   }
 
   async function refresh(nextRange: Range = range) {
@@ -113,6 +169,13 @@ export function MarketingDashboard() {
     // range is the window key; refresh closes over it on purpose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range]);
+
+  useEffect(() => {
+    void fetch("/api/ads/sync")
+      .then((r) => r.json())
+      .then((d: { metaConfigured?: boolean }) => setMetaReady(Boolean(d.metaConfigured)))
+      .catch(() => setMetaReady(false));
+  }, []);
 
   const metrics = useMemo(() => {
     const spend = campaigns.reduce((s, c) => s + c.spend, 0);
@@ -259,62 +322,95 @@ export function MarketingDashboard() {
   const hideHot = hideEmpty && visible.every((c) => c.metrics.costPerHot == null);
 
   return (
-    <main className="w-full bg-transparent pb-12">
-      <div className="mx-auto max-w-[1680px] px-6 pt-6 lg:px-8">
-        <div className="mb-6 flex flex-col items-start justify-between gap-3 border-b border-white/[0.08] pb-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 text-xs text-[#9CA3AF]">
-            <Info className="size-[18px] shrink-0 text-[#6B7280]" />
-            <span>
-              Join campaign spend to scored leads. REC synthesizes{" "}
-              <span className="inline-flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-[#D9605F]" />
+    <div className="w-full pb-8">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5">
+        <div className="flex flex-col items-start justify-between gap-3 rounded-xl bg-surface-container-low p-3 shadow-sm md:flex-row md:items-center">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-container/15">
+              <Info className="size-[18px] text-primary-container" />
+            </div>
+            <p className="text-[13px] leading-relaxed text-on-surface-variant">
+              <span className="font-medium text-on-surface">Join campaign spend to scored leads.</span> REC
+              synthesizes{" "}
+              <span className="inline-flex items-center gap-1 font-medium text-alert-rose">
+                <span className="size-1.5 rounded-full bg-alert-rose" />
                 pause
               </span>{" "}
               /{" "}
-              <span className="inline-flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-[#3BAF7E]" />
+              <span className="inline-flex items-center gap-1 font-medium text-success-emerald">
+                <span className="size-1.5 rounded-full bg-success-emerald" />
                 scale
               </span>{" "}
               /{" "}
-              <span className="inline-flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-[#D9A441]" />
+              <span className="inline-flex items-center gap-1 font-medium text-marketing-amber">
+                <span className="size-1.5 rounded-full bg-marketing-amber" />
                 keep
               </span>
-              . A human confirms pause/scale — Meta Ads Manager is written when keys + numeric campaign ids are set; Google stays local.
-            </span>
+              . A human confirms pause/scale — Meta writes via graph sync; Google & TikTok stay local.
+            </p>
           </div>
-          <button
-            className="flex items-center gap-1.5 self-end rounded-lg border border-white/[0.12] bg-[#10131a]/85 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md hover:bg-[#181d28] sm:self-auto"
-            onClick={() => {
-              void refresh().then(() =>
-                showToast(
-                  bounds
-                    ? `Rescored ${range} (${bounds.from} → ${bounds.to}).`
-                    : "Scores refreshed from the heuristic model."
-                )
-              );
-            }}
-            type="button"
-          >
-            <RefreshCw className="size-[15px] text-[#9CA3AF]" />
-            Recalculate
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 self-end md:self-auto">
+            <div className="flex items-center gap-2 rounded-full bg-surface-container px-2.5 py-1 font-mono text-[10px]">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-tertiary opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-tertiary" />
+              </span>
+              <span className="font-medium text-on-surface">Live Pipeline</span>
+              <span className="text-tertiary">{metrics.review} in HITL</span>
+            </div>
+            <button
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-container-high px-3 text-[12px] font-medium text-on-surface transition-colors hover:bg-surface-bright disabled:opacity-50"
+              disabled={syncing !== null}
+              onClick={() => void syncMeta()}
+              type="button"
+              title={metaReady ? "Pull Meta Insights into desk" : "Needs Meta keys in Settings"}
+            >
+              <RefreshCw className={cn("size-3.5", syncing === "meta" && "animate-spin")} />
+              {syncing === "meta" ? "Syncing Meta…" : "Sync Meta"}
+            </button>
+            <button
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-container-high px-3 text-[12px] font-medium text-on-surface transition-colors hover:bg-surface-bright disabled:opacity-50"
+              disabled={syncing !== null}
+              onClick={() => void syncLeads()}
+              type="button"
+              title="Pull scored leads from Helix for Leads"
+            >
+              <RefreshCw className={cn("size-3.5", syncing === "leads" && "animate-spin")} />
+              {syncing === "leads" ? "Syncing Leads…" : "Sync Leads"}
+            </button>
+            <button
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-container-high px-3 text-[12px] font-medium text-on-surface transition-colors hover:bg-surface-bright"
+              onClick={() => {
+                void refresh().then(() =>
+                  showToast(
+                    bounds
+                      ? `Rescored ${range} (${bounds.from} → ${bounds.to}).`
+                      : "Scores refreshed from the heuristic model."
+                  )
+                );
+              }}
+              type="button"
+            >
+              <RefreshCw className="size-3.5" />
+              Recalculate
+            </button>
+          </div>
         </div>
         {unmatchedIds > 0 ? (
           <a
-            className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-[#F97316]/30 bg-[#F97316]/10 px-4 py-3 text-xs text-[#FDBA74] hover:border-[#F97316]/60"
+            className="flex items-center justify-between gap-3 rounded-xl bg-primary-container/10 px-4 py-3 text-xs text-marketing-amber hover:bg-primary-container/15"
             href="/unmatched"
           >
             <span>
               {unmatchedIds} campaign_id{unmatchedIds === 1 ? "" : "s"} in this window have spend and no scored
               leads. Helix will not invent a quality score.
             </span>
-            <span className="shrink-0 font-medium text-[#F97316]">Join queue →</span>
+            <span className="shrink-0 font-medium text-primary">Join queue →</span>
           </a>
         ) : null}
         {waste && waste.spendOnSpam > 0 ? (
           <a
-            className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-[#D9605F]/35 bg-[#D9605F]/10 px-4 py-3 text-xs text-[#FDA4AF] hover:border-[#D9605F]/60"
+            className="flex items-center justify-between gap-3 rounded-xl bg-alert-rose/10 px-4 py-3 text-xs text-alert-rose hover:bg-alert-rose/15"
             href="/waste"
           >
             <span>
@@ -322,13 +418,13 @@ export function MarketingDashboard() {
               spam leads
               {waste.worstCampaignName ? ` — worst: ${waste.worstCampaignName}` : ""}.
             </span>
-            <span className="shrink-0 font-medium text-[#FB7185]">$ on spam →</span>
+            <span className="shrink-0 font-medium text-alert-rose">$ on spam →</span>
           </a>
         ) : null}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
-            icon={<Wallet className="size-4 text-[#6B7280]" />}
+            icon={<Wallet className="size-4 text-outline" />}
             label="Total Spend"
             badge="Mix"
             value={money(metrics.spend)}
@@ -336,40 +432,40 @@ export function MarketingDashboard() {
             right={waste ? `${money(waste.spendOnSpam)} on spam` : "Seed + ingested CSV"}
             chart={
               <svg className="h-7 w-20" fill="none" viewBox="0 0 70 24">
-                <path d={spendSpark.line} stroke="#F97316" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
-                <path d={spendSpark.area} fill="#F97316" fillOpacity="0.12" />
+                <path d={spendSpark.line} stroke="#f97316" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
+                <path d={spendSpark.area} fill="#f97316" fillOpacity="0.12" />
               </svg>
             }
           />
           <KpiCard
-            icon={<ScatterChart className="size-4 text-[#6B7280]" />}
+            icon={<ScatterChart className="size-4 text-outline" />}
             label="Avg Quality Score"
             badge="Index 0–100"
             value={
               <>
                 {metrics.avg}
-                <span className="font-sans text-xs font-normal text-[#6B7280]">/100</span>
+                <span className="font-sans text-xs font-normal text-outline">/100</span>
               </>
             }
             left="Unweighted avg"
             right={`Median ${Math.round(metrics.medianScore)}`}
             chart={
               <div className="flex w-20 flex-col gap-1">
-                <div className="h-1.5 w-full overflow-hidden rounded-full border border-white/[0.08] bg-[#08090d]">
-                  <div className="h-full rounded-full bg-[#F97316]" style={{ width: `${metrics.avg}%` }} />
+                <div className="h-1.5 w-full overflow-hidden rounded-full border border-[var(--border-hairline)] bg-surface-container-lowest">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${metrics.avg}%` }} />
                 </div>
-                <span className="text-right text-[10px] text-[#6B7280]">Median {Math.round(metrics.medianScore)}</span>
+                <span className="text-right text-[10px] text-outline">Median {Math.round(metrics.medianScore)}</span>
               </div>
             }
           />
           <KpiCard
-            icon={<Flame className="size-4 text-[#6B7280]" />}
+            icon={<Flame className="size-4 text-outline" />}
             label="Cost / Hot Lead"
             badge={metrics.costPerHot != null && metrics.costPerHot < 80 ? "Efficient" : "Watch"}
             value={
               <>
                 {metrics.costPerHot == null ? "—" : money(Math.round(metrics.costPerHot))}
-                {metrics.costPerHot != null ? <span className="text-xs font-normal text-[#6B7280]">.00</span> : null}
+                {metrics.costPerHot != null ? <span className="text-xs font-normal text-outline">.00</span> : null}
               </>
             }
             left={
@@ -378,7 +474,7 @@ export function MarketingDashboard() {
                 : `${metrics.costPerHot < 80 ? "↓" : "↑"} vs $80 scale rule`
             }
             right="Mean w/ hot leads"
-            leftClass={metrics.costPerHot != null && metrics.costPerHot < 80 ? "text-[#9CA3AF]" : "text-[#6B7280]"}
+            leftClass={metrics.costPerHot != null && metrics.costPerHot < 80 ? "text-on-surface-variant" : "text-outline"}
             chart={
               <svg className="h-7 w-20" fill="none" viewBox="0 0 70 24">
                 <path d={costSpark.line} stroke="#3BAF7E" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
@@ -387,27 +483,27 @@ export function MarketingDashboard() {
             }
           />
           <KpiCard
-            icon={<Gavel className="size-4 text-[#6B7280]" />}
+            icon={<Gavel className="size-4 text-outline" />}
             label="HITL Queue"
             badge={metrics.review > 0 ? "Action needed" : "Clear"}
-            badgeClass={metrics.review > 0 ? "bg-[rgba(217,164,65,0.12)] text-[#FBBF24]" : undefined}
+            badgeClass={metrics.review > 0 ? "bg-[rgba(217,164,65,0.12)] text-marketing-amber" : undefined}
             value={
               <>
                 {metrics.review}
-                <span className="font-sans text-xs font-normal text-[#6B7280]">/{campaigns.length || 0} ads</span>
+                <span className="font-sans text-xs font-normal text-outline">/{campaigns.length || 0} ads</span>
               </>
             }
             left="Needs human call"
             right={metrics.reviewNames}
             chart={
               <div className="flex w-20 flex-col gap-1">
-                <div className="h-1.5 w-full overflow-hidden rounded-full border border-white/[0.08] bg-[#08090d]">
+                <div className="h-1.5 w-full overflow-hidden rounded-full border border-[var(--border-hairline)] bg-surface-container-lowest">
                   <div
-                    className="h-full rounded-full bg-[#D9A441]"
+                    className="h-full rounded-full bg-marketing-amber"
                     style={{ width: `${campaigns.length === 0 ? 0 : (metrics.review / campaigns.length) * 100}%` }}
                   />
                 </div>
-                <span className="text-right text-[10px] text-[#FBBF24]">
+                <span className="text-right text-[10px] text-marketing-amber">
                   {campaigns.length === 0 ? "0" : Math.round((metrics.review / campaigns.length) * 100)}% in queue
                 </span>
               </div>
@@ -417,28 +513,28 @@ export function MarketingDashboard() {
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-10">
           <div className="flex flex-col gap-5 lg:col-span-7">
-            <section className="rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-5 shadow-lg backdrop-blur-sm">
-              <div className="mb-3 flex flex-col items-start justify-between gap-2 border-b border-white/[0.08] pb-3 sm:flex-row sm:items-center">
+            <section className="rounded-xl border border-[var(--border-hairline)] bg-surface-container-low p-5 shadow-lg backdrop-blur-sm">
+              <div className="mb-3 flex flex-col items-start justify-between gap-2 border-b border-[var(--border-hairline)] pb-3 sm:flex-row sm:items-center">
                 <div>
                   <div className="flex items-center gap-2">
-                    <ScatterChart className="size-[18px] text-[#9CA3AF]" />
-                    <h2 className="text-sm font-semibold text-white">Spend vs Lead Quality (LIVE Correlation)</h2>
-                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-[#9CA3AF]">
+                    <ScatterChart className="size-[18px] text-on-surface-variant" />
+                    <h2 className="text-sm font-semibold text-on-surface">Spend vs Lead Quality (LIVE Correlation)</h2>
+                    <span className="rounded-full bg-surface-container-highest/40 px-2 py-0.5 text-xs font-medium text-on-surface-variant">
                       Live signal
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-[#6B7280]">
+                  <p className="mt-0.5 text-xs text-outline">
                     Correlation between budget deployment and heuristic score
                     {bounds ? ` · ${bounds.from} → ${bounds.to}` : ""}. Bubble radius = form volume.
                   </p>
                 </div>
-                <div className="flex items-center gap-1 rounded-lg border border-white/[0.06] bg-[#08090d] p-1">
+                <div className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-surface-container-lowest p-1">
                   {(["7d", "30d", "90d"] as Range[]).map((id) => (
                     <button
                       key={id}
                       className={cn(
                         "rounded px-2.5 py-0.5 text-xs font-medium",
-                        range === id ? "bg-white/[0.12] text-white" : "text-[#9CA3AF] hover:text-white"
+                        range === id ? "bg-on-surface/10 text-on-surface" : "text-on-surface-variant hover:text-on-surface"
                       )}
                       onClick={() => setRange(id)}
                       type="button"
@@ -452,29 +548,29 @@ export function MarketingDashboard() {
                 campaigns={campaigns}
                 onSelect={(id) => setOpenId((cur) => (cur === id ? null : id))}
               />
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-3 text-xs">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-hairline)] pt-3 text-xs">
                 <div className="flex items-center gap-4">
                   <LegendDot color="#3BAF7E" label="Scale (>70)" />
                   <LegendDot color="#D9A441" label="Keep · HITL (35–70)" />
                   <LegendDot color="#D9605F" label="Pause (<35)" />
                 </div>
-                <div className="text-[#6B7280]">Bubble radius = form lead volume</div>
+                <div className="text-outline">Bubble radius = form lead volume</div>
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#10131a]/85 shadow-lg backdrop-blur-sm">
-              <div className="flex flex-col items-start justify-between gap-3 border-b border-white/[0.08] p-4 sm:flex-row sm:items-center">
+            <section className="overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-surface-container-low shadow-lg backdrop-blur-sm">
+              <div className="flex flex-col items-start justify-between gap-3 border-b border-[var(--border-hairline)] p-4 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-white">Campaigns</h3>
-                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-[#9CA3AF]">
+                  <h3 className="text-sm font-semibold text-on-surface">Campaigns</h3>
+                  <span className="rounded-full bg-surface-container-highest/40 px-2 py-0.5 text-xs font-medium text-on-surface-variant">
                     {campaigns.length} synced
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 self-stretch sm:self-auto">
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-[#9CA3AF] select-none">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-on-surface-variant select-none">
                     <input
                       checked={hideEmpty}
-                      className="rounded border-white/15 bg-[#08090d] text-[#3BAF7E] focus:ring-0"
+                      className="rounded border-[var(--border-hairline)] bg-surface-container-lowest text-success-emerald focus:ring-0"
                       onChange={(e) => {
                         setHideEmpty(e.target.checked);
                         showToast(e.target.checked ? "Hiding empty $/hot cells" : "Showing all metrics");
@@ -484,16 +580,16 @@ export function MarketingDashboard() {
                     Hide empty columns
                   </label>
                   <button
-                    className="flex items-center gap-1 rounded border border-white/10 bg-[#171F2C] px-2.5 py-1 text-xs font-medium text-white hover:bg-[#1E2838]"
+                    className="flex items-center gap-1 rounded border border-[var(--border-hairline)] bg-surface-container px-2.5 py-1 text-xs font-medium text-on-surface hover:bg-surface-container-high"
                     onClick={exportCsv}
                     type="button"
                   >
-                    <Download className="size-3.5 text-[#9CA3AF]" />
+                    <Download className="size-3.5 text-on-surface-variant" />
                     Export
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 border-b border-white/[0.08] bg-[#08090d]/70 px-4 py-2">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-hairline)] bg-surface-container-lowest/70 px-4 py-2">
                 {(
                   [
                     ["all", `All ${counts.all}`],
@@ -507,21 +603,21 @@ export function MarketingDashboard() {
                     key={id}
                     className={cn(
                       "rounded-md px-3 py-1 text-xs font-medium",
-                      filter === id ? "bg-white/10 text-white" : "text-[#6B7280] hover:text-white"
+                      filter === id ? "bg-on-surface/10 text-on-surface" : "text-outline hover:text-on-surface"
                     )}
                     onClick={() => setFilter(id)}
                     type="button"
                   >
                     {label}
-                    {id === "pause" ? <span className="ml-1 text-[#D9605F]">{counts.pause}</span> : null}
-                    {id === "scale" ? <span className="ml-1 text-[#3BAF7E]">{counts.scale}</span> : null}
+                    {id === "pause" ? <span className="ml-1 text-alert-rose">{counts.pause}</span> : null}
+                    {id === "scale" ? <span className="ml-1 text-success-emerald">{counts.scale}</span> : null}
                     {id === "keep" ? <span className="ml-1 text-[#D9A441]">{counts.keep}</span> : null}
                   </button>
                 ))}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
-                  <thead className="border-b border-white/[0.06] bg-[#08090d] text-[11px] font-medium tracking-wider text-[#9CA3AF] uppercase">
+                  <thead className="border-b border-[var(--border-hairline)] bg-surface-container-lowest text-[11px] font-medium tracking-wider text-on-surface-variant uppercase">
                     <tr>
                       <th className="px-4 py-2.5">Campaign</th>
                       <th className="px-4 py-2.5 text-right">Spend</th>
@@ -556,10 +652,10 @@ export function MarketingDashboard() {
                   </tbody>
                 </table>
                 {visible.length === 0 ? (
-                  <p className="px-4 py-8 text-sm text-[#6B7280]">No campaigns in this filter.</p>
+                  <p className="px-4 py-8 text-sm text-outline">No campaigns in this filter.</p>
                 ) : null}
               </div>
-              <div className="flex flex-col items-center justify-between gap-2 border-t border-white/[0.08] bg-[#08090d] px-4 py-2.5 text-xs text-[#6B7280] sm:flex-row">
+              <div className="flex flex-col items-center justify-between gap-2 border-t border-[var(--border-hairline)] bg-surface-container-lowest px-4 py-2.5 text-xs text-outline sm:flex-row">
                 <div>Deterministic heuristic · score ≥ 70 and cheap hot leads → scale, ≤ 35 or spam-heavy → pause</div>
                 <div>
                   Page 1 of 1 · {visible.length} records
@@ -568,19 +664,19 @@ export function MarketingDashboard() {
             </section>
           </div>
 
-          <aside className="flex flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#10131a]/85 shadow-lg backdrop-blur-sm lg:col-span-3">
-            <div className="border-b border-white/[0.08] p-4">
+          <aside className="flex flex-col overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-surface-container-low shadow-lg backdrop-blur-sm lg:col-span-3">
+            <div className="border-b border-[var(--border-hairline)] p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Upload className="size-[18px] text-[#9CA3AF]" />
-                  <h3 className="text-sm font-semibold text-white">Ingest spend CSV</h3>
+                  <Upload className="size-[18px] text-on-surface-variant" />
+                  <h3 className="text-sm font-semibold text-on-surface">Ingest spend CSV</h3>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-[#9CA3AF]">
+                  <span className="rounded-full bg-surface-container-highest/40 px-2 py-0.5 text-xs font-medium text-on-surface-variant">
                     Secondary
                   </span>
                   <button
-                    className="rounded p-0.5 text-[#6B7280] hover:text-white"
+                    className="rounded p-0.5 text-outline hover:text-on-surface"
                     onClick={() => setIngestOpen((v) => !v)}
                     title="Toggle panel"
                     type="button"
@@ -589,13 +685,16 @@ export function MarketingDashboard() {
                   </button>
                 </div>
               </div>
-              <p className="mt-1 text-xs text-[#6B7280]">Meta/Google not connected this sprint (CSV ingest only)</p>
-              <div className="mt-3 flex items-center justify-between gap-1.5 rounded-lg border border-white/[0.06] bg-[#08090d] p-2">
-                <code className="truncate font-mono text-xs text-[#9CA3AF]">
-                  <span className="font-semibold text-[#F97316]">POST</span> /api/campaigns/ingest
+              <p className="mt-1 text-xs text-outline">
+                CSV always works. Meta Insights via <span className="text-on-surface">Sync Meta</span>
+                {metaReady ? " (keys OK)" : " (needs keys in Settings)"}. Google Ads write not live.
+              </p>
+              <div className="mt-3 flex items-center justify-between gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-surface-container-lowest p-2">
+                <code className="truncate font-mono text-xs text-on-surface-variant">
+                  <span className="font-semibold text-primary">POST</span> /api/campaigns/ingest
                 </code>
                 <button
-                  className="p-1 text-[#6B7280] hover:text-white"
+                  className="p-1 text-outline hover:text-on-surface"
                   onClick={() => {
                     void navigator.clipboard.writeText("POST /api/campaigns/ingest").then(
                       () => showToast("Copied: POST /api/campaigns/ingest"),
@@ -610,18 +709,18 @@ export function MarketingDashboard() {
             </div>
             {ingestOpen ? (
               <form onSubmit={(e) => void ingest(e)}>
-                <div className="border-b border-white/[0.08] bg-[#08090d] p-3">
-                  <div className="mb-1.5 flex items-center justify-between border-b border-white/[0.06] pb-1.5 text-xs text-[#6B7280]">
+                <div className="border-b border-[var(--border-hairline)] bg-surface-container-lowest p-3">
+                  <div className="mb-1.5 flex items-center justify-between border-b border-[var(--border-hairline)] pb-1.5 text-xs text-outline">
                     <span className="flex items-center gap-1.5">
                       <span className="size-2 rounded-full bg-white/20" />
                       <span className="size-2 rounded-full bg-white/20" />
                       <span className="size-2 rounded-full bg-white/20" />
-                      <span className="ml-1 font-mono text-[11px] text-[#9CA3AF]">campaigns_schema.csv</span>
+                      <span className="ml-1 font-mono text-[11px] text-on-surface-variant">campaigns_schema.csv</span>
                     </span>
                     <span className="font-mono text-[10px]">UTF-8</span>
                   </div>
                   <textarea
-                    className="h-28 w-full resize-none bg-transparent font-mono text-xs leading-relaxed text-[#9CA3AF] outline-none focus:text-white"
+                    className="h-28 w-full resize-none bg-transparent font-mono text-xs leading-relaxed text-on-surface-variant outline-none focus:text-on-surface"
                     onChange={(e) => setCsv(e.target.value)}
                     spellCheck={false}
                     value={csv}
@@ -630,8 +729,8 @@ export function MarketingDashboard() {
                 <div className="space-y-3 p-4">
                   <label
                     className={cn(
-                      "group flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-[#08090d]/80 p-4 transition-colors hover:border-[#F97316]",
-                      dragOver && "border-[#F97316]"
+                      "group flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-hairline)] bg-surface-container-lowest/80 p-4 transition-colors hover:border-primary",
+                      dragOver && "border-primary"
                     )}
                     onDragLeave={() => setDragOver(false)}
                     onDragOver={(e) => {
@@ -640,23 +739,23 @@ export function MarketingDashboard() {
                     }}
                     onDrop={onDrop}
                   >
-                    <FileUp className="size-[22px] text-[#6B7280] transition-colors group-hover:text-[#F97316]" />
-                    <span className="mt-1.5 text-xs font-medium text-[#9CA3AF] group-hover:text-white">
+                    <FileUp className="size-[22px] text-outline transition-colors group-hover:text-primary" />
+                    <span className="mt-1.5 text-xs font-medium text-on-surface-variant group-hover:text-on-surface">
                       Drop CSV or browse
                     </span>
-                    <span className="text-[10px] text-[#6B7280]">UTF-8 comma-delimited</span>
+                    <span className="text-[10px] text-outline">UTF-8 comma-delimited</span>
                     <input accept=".csv,text/csv" className="hidden" onChange={onPick} type="file" />
                   </label>
-                  <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-[#08090d] px-3 py-1.5 text-xs">
+                  <div className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-surface-container-lowest px-3 py-1.5 text-xs">
                     <div className="flex items-center gap-1.5">
-                      <span className="size-1.5 rounded-full bg-[#3BAF7E]" />
-                      <span className="text-[#9CA3AF]">{error ?? "Ready to process"}</span>
+                      <span className="size-1.5 rounded-full bg-success-emerald" />
+                      <span className="text-on-surface-variant">{error ?? "Ready to process"}</span>
                     </div>
-                    <span className="font-mono text-[#6B7280]">{csvLineCount(csv)} records</span>
+                    <span className="font-mono text-outline">{csvLineCount(csv)} records</span>
                   </div>
-                  {error ? <p className="text-xs text-[#FB7185]">{error}</p> : null}
+                  {error ? <p className="text-xs text-alert-rose">{error}</p> : null}
                   <button
-                    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#F97316] text-xs font-semibold text-[#08090d] shadow-[0_4px_14px_rgba(249,115,22,0.35)] transition-all hover:bg-[#EA580C] active:scale-[0.99] disabled:opacity-60"
+                    className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary-container text-xs font-semibold text-on-primary shadow-md transition-all hover:bg-marketing-amber active:scale-[0.99] disabled:opacity-60"
                     disabled={running}
                     type="submit"
                   >
@@ -672,18 +771,18 @@ export function MarketingDashboard() {
 
       <div
         className={cn(
-          "fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-lg border border-white/[0.18] bg-[#161a24] px-4 py-2.5 text-xs text-white shadow-2xl transition-all duration-200",
+          "fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-surface-container-high px-4 py-2.5 text-xs text-on-surface shadow-2xl transition-all duration-200",
           toast ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
         )}
       >
         {toast?.err ? (
-          <AlertTriangle className="size-[18px] text-[#D9605F]" />
+          <AlertTriangle className="size-[18px] text-alert-rose" />
         ) : (
-          <CheckCircle2 className="size-[18px] text-[#3BAF7E]" />
+          <CheckCircle2 className="size-[18px] text-success-emerald" />
         )}
         <span>{toast?.msg ?? "Ready"}</span>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -691,7 +790,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="size-2.5 rounded-full" style={{ background: color }} />
-      <span className="text-xs text-[#9CA3AF]">{label}</span>
+      <span className="text-xs text-on-surface-variant">{label}</span>
     </div>
   );
 }
@@ -718,21 +817,26 @@ function KpiCard({
   chart: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-white/[0.08] bg-[#10131a]/85 p-4 shadow-lg backdrop-blur-sm transition-colors hover:bg-[#151a24]/90">
+    <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl bg-surface-container-low p-3 shadow-sm transition-all hover:bg-surface-container">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs text-[#9CA3AF]">
+        <div className="flex items-center gap-1.5 text-outline">
           {icon}
-          <span>{label}</span>
+          <span className="text-[11px] font-medium tracking-wider uppercase">{label}</span>
         </div>
-        <span className={cn("rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium text-[#9CA3AF]", badgeClass)}>
+        <span
+          className={cn(
+            "rounded-full bg-surface-container-highest px-2 py-0.5 font-mono text-[10px] font-medium text-on-surface-variant",
+            badgeClass
+          )}
+        >
           {badge}
         </span>
       </div>
-      <div className="mt-1 flex items-baseline justify-between">
-        <div className="font-mono text-2xl font-semibold tracking-tight text-white">{value}</div>
+      <div className="my-2 flex items-baseline justify-between">
+        <div className="text-[32px] leading-10 font-semibold tracking-tight text-on-surface">{value}</div>
         {chart}
       </div>
-      <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2 text-xs text-[#6B7280]">
+      <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2 font-mono text-[10px] text-outline">
         <span className={leftClass}>{left}</span>
         <span className="truncate pl-2">{right}</span>
       </div>
@@ -773,19 +877,19 @@ function CampaignBlock({
   return (
     <>
       <tr
-        className="cursor-pointer border-l-2 transition-colors hover:bg-[#151a24]/60"
+        className="cursor-pointer border-l-2 transition-colors hover:bg-surface-container/60"
         onClick={onToggle}
         style={{ borderLeftColor: tone.hex }}
       >
         <td className="px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded bg-[#161E2C] font-mono text-xs font-medium text-[#9CA3AF]">
+            <div className="flex size-7 items-center justify-center rounded bg-surface-container font-mono text-xs font-medium text-on-surface-variant">
               #{letterIndex(index)}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <a
-                  className="font-medium text-white hover:text-[#F97316]"
+                  className="font-medium text-on-surface hover:text-primary"
                   href={`/campaigns/${c.campaignId}`}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -798,20 +902,20 @@ function CampaignBlock({
                       ? "bg-blue-500/15 text-blue-300"
                       : c.platform === "google"
                         ? "bg-amber-500/15 text-amber-300"
-                        : "bg-white/[0.08] text-[#9CA3AF]"
+                        : "bg-surface-container-highest/50 text-on-surface-variant"
                   )}
                 >
                   {platformLabel(c.platform)}
                 </span>
               </div>
-              <span className="text-xs text-[#6B7280]">
+              <span className="text-xs text-outline">
                 {compactCount(c.impressions)} impr · {compactCount(c.clicks)} clk
               </span>
             </div>
           </div>
         </td>
-        <td className="px-4 py-3 text-right font-mono font-medium text-white">{money(c.spend)}</td>
-        <td className="px-4 py-3 text-right font-mono text-white">{c.metrics.formLeads}</td>
+        <td className="px-4 py-3 text-right font-mono font-medium text-on-surface">{money(c.spend)}</td>
+        <td className="px-4 py-3 text-right font-mono text-on-surface">{c.metrics.formLeads}</td>
         <td className="px-4 py-3 text-center">
           <span className={cn("rounded-full px-2 py-0.5 font-mono font-medium", tone.bg, tone.text)}>
             {c.metrics.avgScore.toFixed(2)}
@@ -820,7 +924,7 @@ function CampaignBlock({
         {hideHot ? null : (
           <td className="px-4 py-3 text-right font-mono font-medium">
             {c.metrics.costPerHot == null ? (
-              <span className="cursor-help border-b border-dotted border-white/20 text-[#6B7280]" title="no hot leads yet">
+              <span className="cursor-help border-b border-dotted border-outline-variant/40 text-outline" title="no hot leads yet">
                 —
               </span>
             ) : (
@@ -843,7 +947,7 @@ function CampaignBlock({
         </td>
         <td className="px-4 py-3 text-right">
           <button
-            className="inline-flex items-center gap-1 font-medium text-[#9CA3AF] hover:text-white"
+            className="inline-flex items-center gap-1 font-medium text-on-surface-variant hover:text-on-surface"
             onClick={(e) => {
               e.stopPropagation();
               onToggle();
@@ -856,17 +960,17 @@ function CampaignBlock({
         </td>
       </tr>
       {open ? (
-        <tr className="border-b border-white/[0.08] bg-[#08090d]/90">
+        <tr className="border-b border-[var(--border-hairline)] bg-surface-container-lowest/90">
           <td className="p-4" colSpan={hideHot ? 6 : 7}>
-            <div className="rounded-lg border border-white/[0.08] bg-[#161a24] p-3 text-xs shadow-inner">
-              <div className="mb-2 flex items-center justify-between border-b border-white/[0.08] pb-2">
+            <div className="rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-3 text-xs shadow-inner">
+              <div className="mb-2 flex items-center justify-between border-b border-[var(--border-hairline)] pb-2">
                 <div className="flex items-center gap-2">
                   <Icon className="size-4" style={{ color: tone.hex }} />
-                  <span className="font-medium text-white">
+                  <span className="font-medium text-on-surface">
                     Audit Breakdown · Heuristic REC: {recLabel(c)}
                   </span>
                 </div>
-                <span className="font-mono text-xs text-[#6B7280]">
+                <span className="font-mono text-xs text-outline">
                   {c.runId} · {c.engine}
                   {c.demoMode ? " · demo" : ""}
                 </span>
@@ -892,29 +996,29 @@ function CampaignBlock({
                 <AuditCell
                   label="Hot leads"
                   value={`${c.metrics.nHot} hot · ${c.metrics.nSpam} spam (${spamPct}%)`}
-                  valueClass={c.metrics.nHot === 0 ? "text-[#FB7185] font-medium" : undefined}
+                  valueClass={c.metrics.nHot === 0 ? "text-alert-rose font-medium" : undefined}
                 />
                 <AuditCell
                   label="Local budget"
                   value={`${money(c.spend)} in this desk — pause/scale can write Meta when configured`}
                 />
               </div>
-              <p className="mb-3 text-[#9CA3AF]">{c.reasoning}</p>
+              <p className="mb-3 text-on-surface-variant">{c.reasoning}</p>
               <a
-                className="mb-3 inline-block text-xs text-[#F97316]"
+                className="mb-3 inline-block text-xs text-primary"
                 href={`/campaigns/${c.campaignId}`}
                 onClick={(e) => e.stopPropagation()}
               >
                 Open campaign evidence →
               </a>
               {related.length > 0 ? (
-                <p className="mb-3 text-[#6B7280]">
+                <p className="mb-3 text-outline">
                   Sample: {related.slice(0, 4).map((l) => `${l.name} ${l.score}`).join(" · ")}
                 </p>
               ) : null}
-              <div className="flex flex-col justify-between gap-2 border-t border-white/[0.08] pt-2 sm:flex-row sm:items-center">
+              <div className="flex flex-col justify-between gap-2 border-t border-[var(--border-hairline)] pt-2 sm:flex-row sm:items-center">
                 <input
-                  className="min-w-0 flex-1 rounded border border-white/10 bg-[#08090d] px-2 py-1 text-xs text-white outline-none"
+                  className="min-w-0 flex-1 rounded border border-[var(--border-hairline)] bg-surface-container-lowest px-2 py-1 text-xs text-on-surface outline-none"
                   onChange={(e) => onNote(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Reviewer note (optional, stored locally)"
@@ -923,7 +1027,7 @@ function CampaignBlock({
                 <div className="flex flex-wrap items-center gap-2">
                   {c.action !== "keep" ? (
                     <button
-                      className="rounded bg-white/[0.06] px-3 py-1 text-xs font-medium text-[#9CA3AF] hover:bg-white/10"
+                      className="rounded bg-surface-container-highest/40 px-3 py-1 text-xs font-medium text-on-surface-variant hover:bg-on-surface/10"
                       onClick={(e) => {
                         e.stopPropagation();
                         void onReview(c.id, "keep");
@@ -934,7 +1038,7 @@ function CampaignBlock({
                     </button>
                   ) : (
                     <button
-                      className="rounded bg-white/[0.06] px-3 py-1 text-xs font-medium text-[#9CA3AF] hover:bg-white/10"
+                      className="rounded bg-surface-container-highest/40 px-3 py-1 text-xs font-medium text-on-surface-variant hover:bg-on-surface/10"
                       onClick={(e) => {
                         e.stopPropagation();
                         void onReview(c.id, "scale");
@@ -945,7 +1049,7 @@ function CampaignBlock({
                     </button>
                   )}
                   <button
-                    className="rounded px-3 py-1 text-xs font-medium text-white shadow-sm"
+                    className="rounded px-3 py-1 text-xs font-medium text-on-surface shadow-sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       void onReview(c.id, c.action);
@@ -976,8 +1080,8 @@ function AuditCell({
 }) {
   return (
     <div>
-      <span className="text-[#6B7280]">{label}:</span>
-      <div className={cn("mt-0.5 text-white", valueClass)}>{value}</div>
+      <span className="text-outline">{label}:</span>
+      <div className={cn("mt-0.5 text-on-surface", valueClass)}>{value}</div>
     </div>
   );
 }

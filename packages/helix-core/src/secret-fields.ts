@@ -114,6 +114,12 @@ export const KEYS_COMMERCE: SecretField[] = [
     label: "Shopify webhook secret",
     hint: "From the webhook subscription in Shopify admin (or your app's API credentials). Required for live webhooks — without it, /api/webhooks/shopify rejects everything.",
   },
+  { name: "SLACK_WEBHOOK_URL", label: "Slack webhook", hint: "Optional daily ops brief: high-risk orders + $ on hold." },
+  {
+    name: "CRON_SECRET",
+    label: "Cron secret",
+    hint: "Optional. Set the same value as Vercel's CRON_SECRET env var to require it on the daily brief endpoint — otherwise that endpoint accepts any GET.",
+  },
 ];
 
 export const KEYS_MARKETING: SecretField[] = [
@@ -133,5 +139,11 @@ export const KEYS_MARKETING: SecretField[] = [
     label: "Google Ads developer token",
     hint: "Saved for later. Google Ads read/write is not live this sprint — use CSV ingest.",
     stub: true,
+  },
+  { name: "SLACK_WEBHOOK_URL", label: "Slack webhook", hint: "Optional daily brief: $ spent, spend on spam, top waste campaign." },
+  {
+    name: "CRON_SECRET",
+    label: "Cron secret",
+    hint: "Optional. Set the same value as Vercel's CRON_SECRET env var to require it on the daily brief endpoint — otherwise that endpoint accepts any GET.",
   },
 ];

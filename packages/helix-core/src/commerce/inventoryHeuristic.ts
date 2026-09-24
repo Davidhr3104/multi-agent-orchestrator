@@ -1,6 +1,19 @@
 import type { InventoryPredictionResult, ProductInput } from "./types";
 
 const RESTOCK_LEAD_DAYS = 14;
+const COVERAGE_DAYS = 30;
+
+/**
+ * Suggested reorder quantity: enough to cover COVERAGE_DAYS of sales at the
+ * current velocity, topped up to at least reach 2x the reorder point so a
+ * slow-mover with an old reorder point set doesn't get a token 1-2 unit PO.
+ * Deterministic, not AI judgment — no external signal to weigh here.
+ */
+export function suggestReorderQuantity(input: Pick<ProductInput, "salesVelocity" | "reorderPoint" | "currentInventory">): number {
+  const coverageUnits = Math.ceil(input.salesVelocity * COVERAGE_DAYS);
+  const minUnits = Math.max(1, input.reorderPoint * 2 - input.currentInventory);
+  return Math.max(coverageUnits, minUnits, 1);
+}
 
 export function predictInventoryHeuristic(input: ProductInput): InventoryPredictionResult {
   if (input.currentInventory <= 0) {

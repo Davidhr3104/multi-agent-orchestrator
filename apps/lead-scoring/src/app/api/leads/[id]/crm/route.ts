@@ -1,27 +1,46 @@
 import { getLead, patchLead } from "@/lib/store";
-import { sendLeadToGhl } from "@/lib/ghl";
+import { addGhlNote, sendLeadToGhl } from "@/lib/ghl";
 import { bumpUsage } from "@/lib/usage";
 import { operatorActor, requireOperator } from "@helix/core/operator";
 import { checkActionToken, withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
-async function sendToCrm(id: string, actor: string, orgId: string | undefined) {
+async function sendToCrm(
+  id: string,
+  actor: string,
+  orgId: string | undefined,
+  note?: string
+) {
   const current = await getLead(id, orgId);
   if (!current) return Response.json({ error: "Lead not found" }, { status: 404 });
 
-  const result = await sendLeadToGhl(current);
+  let working = current;
+  if (note?.trim()) {
+    const stamped = `HITL note (${new Date().toISOString().slice(0, 16)}): ${note.trim()}`;
+    const patched = await patchLead(
+      id,
+      { notes: [...(current.notes ?? []), stamped] },
+      orgId
+    );
+    if (patched) working = patched;
+  }
+
+  const result = await sendLeadToGhl(working);
   if (result.mocked) {
     return Response.json(
       {
         error: "GHL_API_KEY and GHL_LOCATION_ID required. Paste them in Settings. CRM was not sent.",
-        lead: current,
+        lead: working,
       },
       { status: 409 }
     );
   }
   bumpUsage("ghl");
   if (result.ok && result.contactId) {
+    if (note?.trim()) {
+      await addGhlNote(result.contactId, note.trim());
+    }
     const lead = await patchLead(
       id,
       {
@@ -42,7 +61,7 @@ async function sendToCrm(id: string, actor: string, orgId: string | undefined) {
       opportunityError: result.opportunityError,
     });
   }
-  return Response.json({ error: result.error || "GHL send failed", lead: current }, { status: 502 });
+  return Response.json({ error: result.error || "GHL send failed", lead: working }, { status: 502 });
 }
 
 export async function POST(
@@ -52,7 +71,14 @@ export async function POST(
   const denied = requireOperator(req);
   if (denied) return denied;
   const { id } = await params;
-  return withOrgScope((orgId) => sendToCrm(id, operatorActor(req), orgId));
+  let note: string | undefined;
+  try {
+    const body = (await req.json()) as { note?: string };
+    note = typeof body.note === "string" ? body.note : undefined;
+  } catch {
+    note = undefined;
+  }
+  return withOrgScope((orgId) => sendToCrm(id, operatorActor(req), orgId, note));
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -74,7 +100,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       headers: { "Content-Type": "text/plain" },
     });
   }
-  const note = data.opportunityError ? ` (contact synced, but pipeline opportunity failed: ${data.opportunityError})` : "";
+  const note = data.opportunityError
+    ? ` (contact synced, but pipeline opportunity failed: ${data.opportunityError})`
+    : "";
   return new Response(`Sent to CRM.${note} You can close this tab.`, {
     headers: { "Content-Type": "text/plain" },
   });

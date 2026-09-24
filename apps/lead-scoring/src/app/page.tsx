@@ -1,9 +1,5 @@
-import { LeadDashboard } from "@/components/lead-dashboard";
+import { TriageOverview } from "@/components/leads-engine/TriageOverview";
 
 export default function Home() {
-  return (
-    <main className="flex-1">
-      <LeadDashboard />
-    </main>
-  );
+  return <TriageOverview />;
 }

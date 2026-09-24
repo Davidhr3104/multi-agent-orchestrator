@@ -12,7 +12,7 @@ export type BrandPrefs = {
 };
 
 export const DEFAULT_BRAND: BrandPrefs = {
-  primary: "#38bdf8",
+  primary: "#06b6d4",
   logoUrl: "",
   productName: "Helix for Leads",
 };

@@ -1,4 +1,10 @@
-import { mapShopifyOrderRow, verifyShopifyWebhook, isShopifyWebhookConfigured, getLiveShopifyClient } from "@/lib/shopify";
+import {
+  mapShopifyOrderRow,
+  verifyShopifyWebhook,
+  isShopifyWebhookConfigured,
+  getLiveShopifyClient,
+  numericIdFromGid,
+} from "@/lib/shopify";
 import { upsertOrderFromInput } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -33,7 +39,15 @@ export async function POST(req: Request) {
 
   try {
     if (ORDER_TOPICS.has(topic)) {
-      const input = mapShopifyOrderRow(payload);
+      let input = mapShopifyOrderRow(payload);
+      const client = getLiveShopifyClient();
+      if (client) {
+        // orders/create and orders/updated payloads don't include Shopify's
+        // fraud/risk assessment — fetch it separately so the native signal
+        // is present the moment the order lands, not only on refetch.
+        const risks = await client.fetchOrderRisks(numericIdFromGid(input.shopifyOrderId));
+        input = { ...input, shopifyRisks: risks };
+      }
       const order = await upsertOrderFromInput(input);
       return Response.json({ ok: true, orderId: order.id });
     }

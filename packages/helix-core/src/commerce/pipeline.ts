@@ -41,7 +41,10 @@ function normalizeFraud(raw: ClaudeFraudJson, fallback: FraudScoreResult): Fraud
     raw.riskLevel && validLevels.includes(raw.riskLevel as RiskLevel) && raw.riskLevel === scoreImpliedLevel
       ? (raw.riskLevel as RiskLevel)
       : scoreImpliedLevel;
-  const requiresReview = riskLevel === "high" || riskLevel === "critical";
+  // Same override as the heuristic engine: a Shopify-native "cancel"
+  // recommendation forces review regardless of what score/level Claude landed on.
+  const requiresReview =
+    riskLevel === "high" || riskLevel === "critical" || (fallback.shopifySignalApplied && fallback.requiresReview);
 
   return {
     fraudScore,
@@ -50,6 +53,7 @@ function normalizeFraud(raw: ClaudeFraudJson, fallback: FraudScoreResult): Fraud
     fraudReasoning: (raw.reasoning || fallback.fraudReasoning).trim(),
     engine: "claude",
     demoMode: false,
+    shopifySignalApplied: fallback.shopifySignalApplied,
   };
 }
 

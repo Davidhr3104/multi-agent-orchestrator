@@ -407,14 +407,126 @@ export function draftProposal(
   ].join("\n");
 }
 
+function escapeHtml(s: string): string {
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+/**
+ * Renders the proposal as a structured HTML document (headings, checklist,
+ * numbered sections) saved with application/msword + the Word XML
+ * namespaces \u2014 Word opens this as a real formatted document, not a plain
+ * text dump. This is not OOXML (.docx), but it is a genuine partner-ready
+ * layout, not a <pre> text blob with a renamed extension.
+ */
+export function draftProposalHtml(
+  rfp: StoredRfp,
+  profile: string,
+  prior?: StoredRfp | null,
+  extras?: { bidTarget?: string; coiVerdict?: string; coiWhy?: string }
+): string {
+  const assign = assignTeam(rfp);
+  const battle = battleCard(rfp);
+  const gaps = complianceGaps(rfp);
+  const go = goNoGo(rfp);
+  const bidLine = extras?.bidTarget
+    ? `Smart Pricing target: ${extras.bidTarget}. Stated amount: ${rfp.amount}.`
+    : `Stated amount: ${rfp.amount}. Confirm vs. the firm's budget band in the client profile.`;
+  const coiLine = extras?.coiVerdict
+    ? `COI ${extras.coiVerdict}${extras.coiWhy ? ` \u2014 ${extras.coiWhy}` : ""}`
+    : assign.conflict
+      ? `Conflict flag: ${assign.conflict}`
+      : `No issuer conflict flagged.`;
+
+  const checklistItems = [
+    "Partner sign-off on Go/No-Go",
+    `COI cleared or CONDITIONAL conditions accepted`,
+    `Bid target confirmed (${escapeHtml(extras?.bidTarget ?? rfp.amount)})`,
+    ...(gaps.length ? gaps.map((g) => `Compliance: ${escapeHtml(g.label)}`) : ["Compliance: no eliminators flagged"]),
+    "Proposal Word pack attached",
+    rfp.corpusHits?.length ? `Firm corpus cites reviewed (${rfp.corpusHits.length})` : "Firm corpus queried",
+  ];
+
+  const corpusSection =
+    rfp.corpusHits && rfp.corpusHits.length
+      ? `<h3>2b. Firm corpus cites (${escapeHtml(rfp.corpusStatus)})</h3><ol>${rfp.corpusHits
+          .slice(0, 5)
+          .map(
+            (h) =>
+              `<li><em>[${escapeHtml(h.docTitle)}]</em> &ldquo;${escapeHtml(h.quote)}&rdquo; (${h.verified ? `chars ${h.spanStart}-${h.spanEnd}` : "unverified"})</li>`
+          )
+          .join("")}</ol>`
+      : rfp.corpusStatus === "unavailable"
+        ? `<p><em>2b. Firm corpus: no overlapping precedents (status unavailable).</em></p>`
+        : rfp.corpusStatus === "not_asked"
+          ? `<p><em>2b. Firm corpus: not queried yet \u2014 run Ask corpus before partner pack.</em></p>`
+          : "";
+
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="utf-8"><title>${escapeHtml(rfp.title)}</title>
+<style>
+  body { font-family: Calibri, sans-serif; font-size: 11pt; line-height: 1.4; }
+  h1 { font-size: 16pt; margin-bottom: 2pt; }
+  h2 { font-size: 13pt; margin-top: 18pt; border-bottom: 1px solid #999; padding-bottom: 2pt; }
+  h3 { font-size: 11.5pt; margin-top: 12pt; }
+  .meta { color: #444; margin-bottom: 4pt; }
+  .checklist li { margin-bottom: 3pt; }
+  .draft-note { color: #900; font-style: italic; margin-top: 24pt; }
+</style>
+</head>
+<body>
+<h1>HELIX FOR LEGAL \u2014 Proposal Pack</h1>
+<p class="meta"><strong>${escapeHtml(rfp.title)}</strong><br/>
+Issuer: ${escapeHtml(rfp.issuer)}<br/>
+Go/No-Go: ${escapeHtml(go.verdict)} (${go.score}) \u2014 ${escapeHtml(go.why)}<br/>
+${escapeHtml(coiLine)}</p>
+
+<h2>Pack checklist</h2>
+<ul class="checklist">${checklistItems.map((i) => `<li>&#9744; ${i}</li>`).join("")}</ul>
+
+<h2>1. Executive summary</h2>
+<p>We propose a ${escapeHtml(rfp.method)} response for ${escapeHtml(rfp.issuer)}. Desk match ${rfp.matchScore} (${escapeHtml(rfp.tier)}). Lead ${escapeHtml(assign.attorney)} (${escapeHtml(assign.role)}), ~${assign.hours}h.</p>
+
+<h2>2. Approach</h2>
+<p>${escapeHtml(rfp.reasoning)}</p>
+<p>${prior ? `Prior similar matter used as template: ${escapeHtml(prior.title)}.` : "No prior twin on the desk \u2014 write Approach from the RFP body."}</p>
+${corpusSection}
+
+<h2>3. Team qualifications</h2>
+<p>Lead: ${escapeHtml(assign.attorney)}, ${escapeHtml(assign.role)}. ${escapeHtml(assign.reason)}. Capacity ${assign.workload}h / ${assign.capacity}h this week.<br/>
+${escapeHtml(coiLine)}</p>
+
+<h2>4. Timeline</h2>
+<p>Submission: ${escapeHtml(rfp.deadline)}. Alerts fire at 7 / 3 / 1 day.</p>
+
+<h2>5. Pricing</h2>
+<p>${escapeHtml(bidLine)}</p>
+
+<h2>6. Competitive posture</h2>
+<p>${battle.names.length ? `Incumbent / named: ${escapeHtml(battle.names.join(", "))}.` : "No incumbent named."}</p>
+${battle.differentiators.length ? `<ul>${battle.differentiators.map((d) => `<li>${escapeHtml(d)}</li>`).join("")}</ul>` : ""}
+
+<h2>7. Compliance notes</h2>
+${
+  gaps.length
+    ? `<ul>${gaps.map((g) => `<li>[${escapeHtml(g.severity)}] ${escapeHtml(g.label)}: ${escapeHtml(g.detail)}</li>`).join("")}</ul>`
+    : "<p>No eliminators flagged.</p>"
+}
+
+<h2>8. Firm profile (source)</h2>
+<p>${escapeHtml(profile).replaceAll("\n", "<br/>")}</p>
+
+<p class="draft-note">Draft generated for review. Not a filed proposal.</p>
+</body>
+</html>`;
+}
+
 export function downloadProposalDoc(
   rfp: StoredRfp,
   profile: string,
   prior?: StoredRfp | null,
   extras?: { bidTarget?: string; coiVerdict?: string; coiWhy?: string }
 ) {
-  const text = draftProposal(rfp, profile, prior, extras);
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${rfp.title}</title></head><body><pre style="font-family:Calibri,sans-serif;white-space:pre-wrap">${text.replaceAll("<", "&lt;")}</pre></body></html>`;
+  const html = draftProposalHtml(rfp, profile, prior, extras);
   const blob = new Blob(["\ufeff" + html], { type: "application/msword" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);

@@ -9,6 +9,7 @@ export async function GET() {
   return Response.json({
     meta,
     google: false,
+    tiktok: false,
     csv: true,
     store: storeKind(),
     unmatched: new Set(snap.unmatched.map((u) => u.campaignId)).size,

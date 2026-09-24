@@ -61,3 +61,17 @@ export type PricingOverrides = {
 export function isPracticeArea(value: string): value is PracticeArea {
   return (PRACTICE_AREAS as readonly string[]).includes(value);
 }
+
+/**
+ * A structured, editable no-bid rule — replaces the old free-text policy
+ * paragraph that lived only in the corpus seed. `pattern` is matched
+ * case-insensitively as a substring against the RFP title+body; any match
+ * forces a NO-GO in goNoGo() rather than just being descriptive text.
+ */
+export type NoBidRule = {
+  id: string;
+  pattern: string;
+  reason: string;
+  enabled: boolean;
+  createdAt: string;
+};

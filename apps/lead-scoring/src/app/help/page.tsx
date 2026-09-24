@@ -13,7 +13,7 @@ export default function HelpPage() {
           <p className="mt-2 text-sm text-muted-foreground">{guide.overview}</p>
         </div>
         <Link
-          href="/"
+          href="/inbox"
           className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem]"
         >
           Inbox

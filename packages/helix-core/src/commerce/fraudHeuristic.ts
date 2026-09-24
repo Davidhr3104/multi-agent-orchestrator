@@ -16,6 +16,12 @@ function addressIncomplete(address: OrderInput["shippingAddress"]): boolean {
   return !address.address1 || !address.city || !address.country;
 }
 
+/** Worst (highest-score) Shopify-native risk signal on the order, if any. */
+function worstShopifyRisk(risks: OrderInput["shopifyRisks"]) {
+  if (!risks || risks.length === 0) return null;
+  return risks.reduce((worst, r) => (r.score > worst.score ? r : worst), risks[0]);
+}
+
 export function scoreFraudHeuristic(input: OrderInput): FraudScoreResult {
   const reasons: string[] = [];
   let score = 8;
@@ -54,6 +60,21 @@ export function scoreFraudHeuristic(input: OrderInput): FraudScoreResult {
     reasons.push("Combination of first order and high value compounds risk.");
   }
 
+  const worstRisk = worstShopifyRisk(input.shopifyRisks);
+  let shopifySignalApplied = false;
+  if (worstRisk) {
+    shopifySignalApplied = true;
+    if (worstRisk.recommendation === "cancel") {
+      score += 40;
+      reasons.push(`Shopify (${worstRisk.source}) recommends CANCEL: ${worstRisk.message}`);
+    } else if (worstRisk.recommendation === "investigate") {
+      score += 22;
+      reasons.push(`Shopify (${worstRisk.source}) recommends investigation: ${worstRisk.message}`);
+    } else {
+      reasons.push(`Shopify (${worstRisk.source}) fraud check: accept.`);
+    }
+  }
+
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   let riskLevel: RiskLevel = "low";
@@ -61,7 +82,11 @@ export function scoreFraudHeuristic(input: OrderInput): FraudScoreResult {
   else if (score >= 50) riskLevel = "high";
   else if (score >= 25) riskLevel = "medium";
 
-  const requiresReview = riskLevel === "high" || riskLevel === "critical";
+  // A Shopify Protect (or similar) "cancel" recommendation is a strong
+  // enough external signal to force human review regardless of where the
+  // composite heuristic score lands — don't let a low base score suppress it.
+  const requiresReview =
+    riskLevel === "high" || riskLevel === "critical" || worstRisk?.recommendation === "cancel";
 
   const reasoning =
     reasons.length > 0
@@ -75,5 +100,6 @@ export function scoreFraudHeuristic(input: OrderInput): FraudScoreResult {
     requiresReview,
     engine: "heuristic",
     demoMode: true,
+    shopifySignalApplied,
   };
 }

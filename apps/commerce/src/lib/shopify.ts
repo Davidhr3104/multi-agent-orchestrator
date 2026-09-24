@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getSecret, type OrderInput, type ProductInput } from "@helix/core";
+import { getSecret, type OrderInput, type ProductInput, type ShopifyRiskRecommendation } from "@helix/core";
 
 /**
  * Shape mirrors what a real Shopify Admin API client would return, so swapping the mock
@@ -225,6 +225,11 @@ function numericId(gid: string): string {
   return match ? match[1] : gid.replace(/\D/g, "");
 }
 
+/** Public alias of numericId — for callers outside this module (e.g. the webhook route) that need to derive a Shopify numeric id from a Helix gid://shopify/Order/N string. */
+export function numericIdFromGid(gid: string): string {
+  return numericId(gid);
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
@@ -286,11 +291,48 @@ class LiveShopifyClient implements ShopifyWriteClient {
     });
   }
 
+  /**
+   * Native Shopify fraud signal for one order (e.g. Shopify Protect) via the
+   * legacy risks endpoint. Returns [] on any failure (missing scope, no
+   * risk app installed, rate limit) — a missing risk signal must never break
+   * order sync/ingest, it just means fraudHeuristic falls back to its own
+   * scoring alone.
+   */
+  async fetchOrderRisks(numericOrderId: string): Promise<OrderInput["shopifyRisks"]> {
+    try {
+      const res = await this.admin(`orders/${numericOrderId}/risks.json`);
+      if (!res.ok) return [];
+      const payload = (await res.json()) as {
+        risks?: Array<{ recommendation?: string; score?: string | number; message?: string; source?: string }>;
+      };
+      const valid: ShopifyRiskRecommendation[] = ["cancel", "investigate", "accept"];
+      return (payload.risks ?? [])
+        .map((r) => {
+          if (!valid.includes(r.recommendation as ShopifyRiskRecommendation)) return null;
+          return {
+            recommendation: r.recommendation as ShopifyRiskRecommendation,
+            score: Number(r.score ?? 0),
+            message: String(r.message ?? ""),
+            source: String(r.source ?? "Shopify"),
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+    } catch {
+      return [];
+    }
+  }
+
   async fetchOrders(): Promise<OrderInput[]> {
     const res = await this.admin("orders.json?status=any&limit=50");
     if (!res.ok) throw new Error(`Shopify orders HTTP ${res.status}`);
     const payload = (await res.json()) as { orders?: unknown[] };
-    return (payload.orders ?? []).map(mapShopifyOrderRow);
+    const mapped = (payload.orders ?? []).map(mapShopifyOrderRow);
+    return Promise.all(
+      mapped.map(async (order) => ({
+        ...order,
+        shopifyRisks: await this.fetchOrderRisks(numericId(order.shopifyOrderId)),
+      }))
+    );
   }
 
   /**
@@ -304,7 +346,8 @@ class LiveShopifyClient implements ShopifyWriteClient {
     if (!res.ok) return null;
     const payload = (await res.json()) as { order?: unknown };
     if (!payload.order) return null;
-    return mapShopifyOrderRow(payload.order);
+    const order = mapShopifyOrderRow(payload.order);
+    return { ...order, shopifyRisks: await this.fetchOrderRisks(numericOrderId) };
   }
 
   async fetchProducts(): Promise<ProductInput[]> {
@@ -361,12 +404,74 @@ class LiveShopifyClient implements ShopifyWriteClient {
     });
     if (!res.ok) throw new Error(`Shopify cancel HTTP ${res.status}`);
   }
+
+  /**
+   * Refunds an order via the real Shopify Admin REST endpoint. A monetary
+   * refund transaction requires the original payment transaction's id
+   * (parent_id) — fetched here rather than assumed, since it's never passed
+   * in by the caller.
+   */
+  async refundOrder(shopifyOrderId: string, amount: number, restock: boolean): Promise<string> {
+    const id = numericId(shopifyOrderId);
+    const txRes = await this.admin(`orders/${id}/transactions.json`);
+    if (!txRes.ok) throw new Error(`Shopify transactions HTTP ${txRes.status}`);
+    const txPayload = (await txRes.json()) as {
+      transactions?: Array<{ id?: number; kind?: string; status?: string; gateway?: string }>;
+    };
+    const parent = (txPayload.transactions ?? []).find(
+      (t) => (t.kind === "sale" || t.kind === "capture") && t.status === "success"
+    );
+    if (!parent?.id) {
+      throw new Error("No successful sale/capture transaction found on this order to refund against.");
+    }
+
+    let refundLineItems: Array<{ line_item_id: number; quantity: number; restock_type: string }> | undefined;
+    if (restock) {
+      const orderRes = await this.admin(`orders/${id}.json`);
+      if (orderRes.ok) {
+        const orderPayload = (await orderRes.json()) as {
+          order?: { line_items?: Array<{ id?: number; quantity?: number }> };
+        };
+        const items = orderPayload.order?.line_items ?? [];
+        refundLineItems = items
+          .filter((li) => li.id != null)
+          .map((li) => ({ line_item_id: li.id!, quantity: li.quantity ?? 1, restock_type: "return" }));
+      }
+    }
+
+    const res = await this.admin(`orders/${id}/refunds.json`, {
+      method: "POST",
+      body: JSON.stringify({
+        refund: {
+          notify: false,
+          ...(refundLineItems ? { refund_line_items: refundLineItems } : {}),
+          transactions: [
+            {
+              parent_id: parent.id,
+              amount: amount.toFixed(2),
+              kind: "refund",
+              gateway: parent.gateway ?? "manual",
+            },
+          ],
+        },
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      throw new Error(`Shopify refund HTTP ${res.status}${errBody ? `: ${errBody.slice(0, 200)}` : ""}`);
+    }
+    const payload = (await res.json()) as { refund?: { id?: number } };
+    if (!payload.refund?.id) throw new Error("Shopify refund succeeded but returned no refund id.");
+    return String(payload.refund.id);
+  }
 }
 
 export interface ShopifyWriteClient extends ShopifyClient {
   fulfillOrder(shopifyOrderId: string): Promise<void>;
   cancelOrder(shopifyOrderId: string): Promise<void>;
   fetchOrderById(numericOrderId: string): Promise<OrderInput | null>;
+  fetchOrderRisks(numericOrderId: string): Promise<OrderInput["shopifyRisks"]>;
+  refundOrder(shopifyOrderId: string, amount: number, restock: boolean): Promise<string>;
 }
 
 export function getMockShopifyClient(): ShopifyClient {

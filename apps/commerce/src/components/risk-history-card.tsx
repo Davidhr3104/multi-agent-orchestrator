@@ -1,0 +1,54 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatCurrency } from "@/lib/format";
+
+type Snapshot = {
+  date: string;
+  ordersCount: number;
+  highRiskCount: number;
+  highRiskUsd: number;
+  savedUsd: number;
+};
+
+export function RiskHistoryCard() {
+  const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/risk-history")
+      .then((r) => r.json())
+      .then((d: { snapshots: Snapshot[] }) => setSnapshots(d.snapshots));
+  }, []);
+
+  if (snapshots === null) return null;
+  if (snapshots.length === 0) {
+    return (
+      <div className="glass-panel rounded-xl p-5 text-xs text-muted-foreground">
+        No historical snapshots yet — the daily brief cron records one per day once Slack is
+        configured and CRON_SECRET is set. Today's numbers above are live, not historical.
+      </div>
+    );
+  }
+
+  const totalSaved = snapshots.reduce((s, x) => s + x.savedUsd, 0);
+  const max = Math.max(1, ...snapshots.map((s) => s.highRiskUsd));
+
+  return (
+    <div className="glass-panel space-y-3 rounded-xl p-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-foreground">$ at risk — last {snapshots.length} days</h3>
+        <span className="text-xs text-muted-foreground">{formatCurrency(totalSaved)} saved total</span>
+      </div>
+      <div className="flex h-20 items-end gap-1">
+        {[...snapshots].reverse().map((s) => (
+          <div
+            key={s.date}
+            title={`${s.date}: ${formatCurrency(s.highRiskUsd)} at risk, ${formatCurrency(s.savedUsd)} saved`}
+            className="flex-1 rounded-t bg-rose-500/40"
+            style={{ height: `${Math.max(4, (s.highRiskUsd / max) * 100)}%` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}

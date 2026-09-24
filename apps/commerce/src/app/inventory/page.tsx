@@ -1,18 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { StoredProduct } from "@helix/core";
+import type { ReorderRequest, StoredProduct } from "@helix/core";
 import { ReorderQueue } from "@/components/reorder-queue";
 import { cn } from "@/lib/utils";
 
 export default function InventoryPage() {
   const [products, setProducts] = useState<StoredProduct[]>([]);
+  const [reorders, setReorders] = useState<ReorderRequest[]>([]);
 
   useEffect(() => {
     void (async () => {
       const res = await fetch("/api/products");
       const data = (await res.json()) as { products: StoredProduct[] };
       setProducts(data.products);
+    })();
+    void (async () => {
+      const res = await fetch("/api/reorders");
+      const data = (await res.json()) as { reorders: ReorderRequest[] };
+      setReorders(data.reorders);
     })();
   }, []);
 
@@ -25,7 +31,11 @@ export default function InventoryPage() {
         </p>
       </div>
 
-      <ReorderQueue products={products} />
+      <ReorderQueue
+        products={products}
+        reorders={reorders}
+        onReorderCreated={(r) => setReorders((prev) => [r, ...prev])}
+      />
 
       <div className="glass-panel glass-panel-glow overflow-hidden rounded-xl shadow-2xl">
         <div className="overflow-x-auto">

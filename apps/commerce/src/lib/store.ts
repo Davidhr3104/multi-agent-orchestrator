@@ -3,8 +3,11 @@ import {
   runFraudScoring,
   runInquiryClassification,
   runInventoryPrediction,
+  suggestReorderQuantity,
   type InquiryInput,
   type OrderInput,
+  type ReorderRequest,
+  type ReturnRequest,
   type StoredInquiry,
   type StoredOrder,
   type StoredProduct,
@@ -14,14 +17,20 @@ import {
   supabaseListInquiries,
   supabaseListOrders,
   supabaseListProducts,
+  supabaseListReorders,
+  supabaseListReturns,
   supabaseUpsertInquiry,
   supabaseUpsertOrder,
   supabaseUpsertProduct,
+  supabaseUpsertReorder,
+  supabaseUpsertReturn,
 } from "./supabase-commerce";
 
 const orders = new Map<string, StoredOrder>();
 const products = new Map<string, StoredProduct>();
 const inquiries = new Map<string, StoredInquiry>();
+const reorders = new Map<string, ReorderRequest>();
+const returns = new Map<string, ReturnRequest>();
 let seeded = false;
 let seeding: Promise<void> | null = null;
 
@@ -172,6 +181,102 @@ export async function saveProduct(product: StoredProduct): Promise<StoredProduct
   products.set(product.id, product);
   await supabaseUpsertProduct(product);
   return product;
+}
+
+export async function getProduct(productId: string): Promise<StoredProduct | null> {
+  await seedIfNeeded();
+  if (products.has(productId)) return products.get(productId) ?? null;
+  const all = await listProducts();
+  return all.find((p) => p.id === productId) ?? null;
+}
+
+export async function listReorders(): Promise<ReorderRequest[]> {
+  await seedIfNeeded();
+  const remote = await supabaseListReorders();
+  if (remote && remote.length > 0) {
+    for (const r of remote) reorders.set(r.id, r);
+    return remote;
+  }
+  return [...reorders.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function createReorderRequest(productId: string): Promise<ReorderRequest | null> {
+  await seedIfNeeded();
+  const product = await getProduct(productId);
+  if (!product) return null;
+  const reorder: ReorderRequest = {
+    id: randomId("reorder"),
+    productId: product.id,
+    sku: product.sku,
+    title: product.title,
+    quantitySuggested: suggestReorderQuantity(product),
+    status: "draft",
+    createdAt: new Date().toISOString(),
+  };
+  reorders.set(reorder.id, reorder);
+  await supabaseUpsertReorder(reorder);
+  return reorder;
+}
+
+export async function patchReorderRequest(
+  reorderId: string,
+  patch: Partial<Pick<ReorderRequest, "status" | "notes" | "orderedAt" | "receivedAt">>
+): Promise<ReorderRequest | null> {
+  await seedIfNeeded();
+  const current = reorders.get(reorderId) ?? (await listReorders()).find((r) => r.id === reorderId);
+  if (!current) return null;
+  const next: ReorderRequest = { ...current, ...patch };
+  reorders.set(next.id, next);
+  await supabaseUpsertReorder(next);
+  return next;
+}
+
+export async function listReturns(): Promise<ReturnRequest[]> {
+  await seedIfNeeded();
+  const remote = await supabaseListReturns();
+  if (remote && remote.length > 0) {
+    for (const r of remote) returns.set(r.id, r);
+    return remote;
+  }
+  return [...returns.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function createReturnRequest(input: {
+  orderId: string;
+  reason: string;
+  refundAmount: number;
+  restock: boolean;
+}): Promise<ReturnRequest | null> {
+  await seedIfNeeded();
+  const order = await getOrder(input.orderId);
+  if (!order) return null;
+  const request: ReturnRequest = {
+    id: randomId("return"),
+    orderId: order.id,
+    shopifyOrderId: order.shopifyOrderId,
+    customerEmail: order.customerEmail,
+    reason: input.reason,
+    refundAmount: input.refundAmount,
+    restock: input.restock,
+    status: "requested",
+    createdAt: new Date().toISOString(),
+  };
+  returns.set(request.id, request);
+  await supabaseUpsertReturn(request);
+  return request;
+}
+
+export async function patchReturnRequest(
+  returnId: string,
+  patch: Partial<Pick<ReturnRequest, "status" | "resolvedBy" | "resolvedAt" | "shopifyRefundId">>
+): Promise<ReturnRequest | null> {
+  await seedIfNeeded();
+  const current = returns.get(returnId) ?? (await listReturns()).find((r) => r.id === returnId);
+  if (!current) return null;
+  const next: ReturnRequest = { ...current, ...patch };
+  returns.set(next.id, next);
+  await supabaseUpsertReturn(next);
+  return next;
 }
 
 export async function listInquiries(): Promise<StoredInquiry[]> {

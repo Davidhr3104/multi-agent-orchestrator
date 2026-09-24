@@ -1,5 +1,7 @@
 import { getLead, patchLead } from "@/lib/store";
+import { finishLeadIngest } from "@/lib/finish-ingest";
 import { withOrgScope } from "@/lib/org-auth";
+import type { LeadEmit, LeadIngestInput } from "@helix/core";
 
 export const runtime = "nodejs";
 
@@ -8,18 +10,50 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  let body: { score?: number } = {};
+  let body: { score?: number; mode?: "pipeline" | "manual"; rescore?: boolean } = {};
   try {
-    body = (await req.json()) as { score?: number };
+    body = (await req.json()) as typeof body;
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const score = Math.max(0, Math.min(100, Math.round(Number(body.score))));
-  if (!Number.isFinite(score)) return Response.json({ error: "score required" }, { status: 400 });
-  const tier = score >= 75 ? "hot" : score >= 50 ? "warm" : "cold";
+
+  const wantsPipeline = body.mode === "pipeline" || body.rescore === true;
+
   return withOrgScope(async (orgId) => {
     const current = await getLead(id, orgId);
     if (!current) return Response.json({ error: "Lead not found" }, { status: 404 });
+
+    if (wantsPipeline) {
+      const input: LeadIngestInput = {
+        name: current.name,
+        email: current.email,
+        phone: current.phone,
+        company: current.company,
+        source: current.source || "helix-rescore",
+        message: current.message,
+        campaignId: current.campaignId,
+        trade: current.trade,
+        zip: current.zip,
+        budget: current.budget,
+      };
+      const emit: LeadEmit = () => undefined;
+      try {
+        const lead = await finishLeadIngest(input, emit, orgId);
+        return Response.json({ lead, mode: "pipeline" });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return Response.json({ error: message }, { status: 502 });
+      }
+    }
+
+    const score = Math.max(0, Math.min(100, Math.round(Number(body.score))));
+    if (!Number.isFinite(score)) {
+      return Response.json(
+        { error: "score required (number) or mode:\"pipeline\" to re-run engine" },
+        { status: 400 }
+      );
+    }
+    const tier = score >= 75 ? "hot" : score >= 50 ? "warm" : "cold";
     const lead = await patchLead(
       id,
       {
@@ -32,6 +66,6 @@ export async function POST(
       },
       orgId
     );
-    return Response.json({ lead: lead ?? current });
+    return Response.json({ lead: lead ?? current, mode: "manual" });
   });
 }

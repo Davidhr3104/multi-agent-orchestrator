@@ -453,6 +453,7 @@ export function LegalChrome({
               [
                 ["/pricing", "Pricing"],
                 ["/outcomes", "Outcomes"],
+                ["/firm-book", "Firm Book"],
                 ["/notifications", "Notifications"],
                 ["/profile", "Profile"],
                 ["/documents", "Documents"],

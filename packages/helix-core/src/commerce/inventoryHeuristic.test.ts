@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { predictInventoryHeuristic } from "./inventoryHeuristic";
+import { predictInventoryHeuristic, suggestReorderQuantity } from "./inventoryHeuristic";
 import type { ProductInput } from "./types";
 
 function baseProduct(overrides: Partial<ProductInput> = {}): ProductInput {
@@ -49,5 +49,22 @@ describe("predictInventoryHeuristic", () => {
     const result = predictInventoryHeuristic(baseProduct({ currentInventory: 0, salesVelocity: 1 }));
     expect(result.predictedStockoutDays).toBe(0);
     expect(result.restockRecommended).toBe(true);
+  });
+});
+
+describe("suggestReorderQuantity", () => {
+  it("covers 30 days at the current sales velocity", () => {
+    const qty = suggestReorderQuantity({ salesVelocity: 5, reorderPoint: 10, currentInventory: 8 });
+    expect(qty).toBeGreaterThanOrEqual(150);
+  });
+
+  it("never returns less than 1 even for a dead SKU", () => {
+    const qty = suggestReorderQuantity({ salesVelocity: 0, reorderPoint: 5, currentInventory: 5 });
+    expect(qty).toBeGreaterThanOrEqual(1);
+  });
+
+  it("tops up to at least 2x reorder point minus current inventory for slow movers", () => {
+    const qty = suggestReorderQuantity({ salesVelocity: 0.1, reorderPoint: 50, currentInventory: 5 });
+    expect(qty).toBeGreaterThanOrEqual(95); // 2*50 - 5
   });
 });

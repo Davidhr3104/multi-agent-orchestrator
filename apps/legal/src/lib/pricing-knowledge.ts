@@ -11,6 +11,64 @@ function num(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+export async function createPricingRule(input: {
+  practiceArea: HistoricalPrice["practiceArea"];
+  minRate: number;
+  maxRate: number;
+  avgRate: number;
+  jurisdiction: string;
+}): Promise<{ ok: true; rule: PricingRule } | { ok: false; error: string }> {
+  const db = getSupabase();
+  if (!db) return { ok: false, error: "Supabase is not configured — cannot persist real pricing rules." };
+  const { data, error } = await db
+    .from("pricing_rules")
+    .insert({
+      practice_area: input.practiceArea,
+      min_rate: input.minRate,
+      max_rate: input.maxRate,
+      avg_rate: input.avgRate,
+      jurisdiction: input.jurisdiction,
+    })
+    .select("id, practice_area, min_rate, max_rate, avg_rate, jurisdiction")
+    .single();
+  if (error || !data) return { ok: false, error: error?.message ?? "Insert failed" };
+  return {
+    ok: true,
+    rule: {
+      id: String(data.id),
+      practiceArea: asPractice(data.practice_area),
+      minRate: num(data.min_rate),
+      maxRate: num(data.max_rate),
+      avgRate: num(data.avg_rate),
+      jurisdiction: String(data.jurisdiction ?? "US"),
+    },
+  };
+}
+
+export async function updatePricingRule(
+  id: string,
+  patch: Partial<{ minRate: number; maxRate: number; avgRate: number; jurisdiction: string }>
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const db = getSupabase();
+  if (!db) return { ok: false, error: "Supabase is not configured." };
+  const row: Record<string, unknown> = {};
+  if (patch.minRate !== undefined) row.min_rate = patch.minRate;
+  if (patch.maxRate !== undefined) row.max_rate = patch.maxRate;
+  if (patch.avgRate !== undefined) row.avg_rate = patch.avgRate;
+  if (patch.jurisdiction !== undefined) row.jurisdiction = patch.jurisdiction;
+  const { error } = await db.from("pricing_rules").update(row).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deletePricingRule(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const db = getSupabase();
+  if (!db) return { ok: false, error: "Supabase is not configured." };
+  const { error } = await db.from("pricing_rules").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function loadPricingBook(): Promise<PricingBook> {
   const db = getSupabase();
   if (!db) return memoryPricingBook();

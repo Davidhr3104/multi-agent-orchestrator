@@ -16,6 +16,17 @@ export type ShippingAddress = {
   zip?: string;
 };
 
+export type ShopifyRiskRecommendation = "accept" | "investigate" | "cancel";
+
+/** One risk assessment from Shopify's own fraud analysis (orders/{id}/risks.json) — e.g. Shopify Protect. Not Helix's heuristic. */
+export type ShopifyRiskSignal = {
+  recommendation: ShopifyRiskRecommendation;
+  /** 0–1 as reported by Shopify. */
+  score: number;
+  message: string;
+  source: string;
+};
+
 export type OrderInput = {
   shopifyOrderId: string;
   customerName: string;
@@ -29,6 +40,8 @@ export type OrderInput = {
   createdAt: string;
   /** Number of prior orders from this same customer email — proxy for account history. */
   customerOrderCount: number;
+  /** Native Shopify fraud signals for this order, when available (requires an extra API call). Empty array if none reported. */
+  shopifyRisks?: ShopifyRiskSignal[];
 };
 
 export type FraudScoreResult = {
@@ -39,6 +52,8 @@ export type FraudScoreResult = {
   engine: "claude" | "heuristic";
   /** True when ANTHROPIC_API_KEY isn't configured (or Claude's response was rejected) — always shown explicitly, never indistinguishable from a live Claude run. */
   demoMode: boolean;
+  /** True when a Shopify-native risk signal (e.g. Shopify Protect "cancel"/"investigate") contributed to fraudScore/requiresReview — not just Helix's own heuristic. */
+  shopifySignalApplied: boolean;
 };
 
 export type StoredOrder = OrderInput &
@@ -70,6 +85,50 @@ export type InventoryPredictionResult = {
 };
 
 export type StoredProduct = ProductInput & InventoryPredictionResult & { id: string };
+
+export type ReturnStatus = "requested" | "approved" | "refunded" | "rejected";
+
+/**
+ * A lightweight returns/RMA record tied to one order. Unlike reorder
+ * requests, refunding IS a real Shopify write (POST /orders/{id}/refunds.json)
+ * — "approved" triggers the live refund when the order isn't a demo order.
+ */
+export type ReturnRequest = {
+  id: string;
+  orderId: string;
+  shopifyOrderId: string;
+  customerEmail: string;
+  reason: string;
+  refundAmount: number;
+  restock: boolean;
+  status: ReturnStatus;
+  createdAt: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  shopifyRefundId?: string;
+};
+
+export type ReorderStatus = "draft" | "ordered" | "received" | "cancelled";
+
+/**
+ * An internal reorder request — the write-back action for a low-stock
+ * product. Shopify's Admin REST API has no native purchase-order endpoint
+ * (that's third-party app territory, e.g. Stocky), so this is a Helix-owned
+ * record the operator tracks through draft → ordered → received, not a
+ * write to Shopify itself.
+ */
+export type ReorderRequest = {
+  id: string;
+  productId: string;
+  sku: string;
+  title: string;
+  quantitySuggested: number;
+  status: ReorderStatus;
+  notes?: string;
+  createdAt: string;
+  orderedAt?: string;
+  receivedAt?: string;
+};
 
 export type InquiryType =
   | "order_status"

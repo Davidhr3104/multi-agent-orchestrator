@@ -1,5 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSecret, onSecretsChanged, type StoredInquiry, type StoredOrder, type StoredProduct } from "@helix/core";
+import {
+  getSecret,
+  onSecretsChanged,
+  type ReorderRequest,
+  type ReturnRequest,
+  type StoredInquiry,
+  type StoredOrder,
+  type StoredProduct,
+} from "@helix/core";
 
 type Client = ReturnType<typeof createClient>;
 
@@ -66,6 +74,8 @@ function orderToRow(order: StoredOrder) {
     requires_review: order.requiresReview,
     engine: order.engine,
     demo_mode: order.demoMode,
+    shopify_signal_applied: order.shopifySignalApplied,
+    shopify_risks: order.shopifyRisks ?? [],
     reviewed_by: order.reviewedBy ?? null,
     reviewed_at: order.reviewedAt ?? null,
     review_decision: order.reviewDecision ?? null,
@@ -92,6 +102,8 @@ function orderFromRow(row: Record<string, unknown>): StoredOrder {
     requiresReview: Boolean(row.requires_review),
     engine: row.engine === "claude" ? "claude" : "heuristic",
     demoMode: Boolean(row.demo_mode),
+    shopifySignalApplied: Boolean(row.shopify_signal_applied),
+    shopifyRisks: Array.isArray(row.shopify_risks) ? (row.shopify_risks as StoredOrder["shopifyRisks"]) : undefined,
     reviewedBy: row.reviewed_by ? String(row.reviewed_by) : undefined,
     reviewedAt: row.reviewed_at ? String(row.reviewed_at) : undefined,
     reviewDecision: row.review_decision as StoredOrder["reviewDecision"],
@@ -247,3 +259,111 @@ export async function supabaseGetThemePreference(): Promise<"light" | "dark" | n
 
 export const supabaseSetThemePreference = (theme: "light" | "dark") =>
   upsertOne("user_preferences", { id: "default", theme, updated_at: new Date().toISOString() });
+
+function reorderToRow(reorder: ReorderRequest) {
+  return {
+    id: reorder.id,
+    product_id: reorder.productId,
+    sku: reorder.sku,
+    title: reorder.title,
+    quantity_suggested: reorder.quantitySuggested,
+    status: reorder.status,
+    notes: reorder.notes ?? null,
+    created_at: reorder.createdAt,
+    ordered_at: reorder.orderedAt ?? null,
+    received_at: reorder.receivedAt ?? null,
+  };
+}
+
+function reorderFromRow(row: Record<string, unknown>): ReorderRequest {
+  return {
+    id: String(row.id),
+    productId: String(row.product_id ?? ""),
+    sku: String(row.sku ?? ""),
+    title: String(row.title ?? ""),
+    quantitySuggested: Number(row.quantity_suggested ?? 0),
+    status: (row.status as ReorderRequest["status"]) ?? "draft",
+    notes: row.notes != null ? String(row.notes) : undefined,
+    createdAt: String(row.created_at),
+    orderedAt: row.ordered_at != null ? String(row.ordered_at) : undefined,
+    receivedAt: row.received_at != null ? String(row.received_at) : undefined,
+  };
+}
+
+export const supabaseListReorders = () => listAll("reorder_requests", reorderFromRow);
+export const supabaseUpsertReorder = (reorder: ReorderRequest) =>
+  upsertOne("reorder_requests", reorderToRow(reorder));
+
+function returnToRow(r: ReturnRequest) {
+  return {
+    id: r.id,
+    order_id: r.orderId,
+    shopify_order_id: r.shopifyOrderId,
+    customer_email: r.customerEmail,
+    reason: r.reason,
+    refund_amount: r.refundAmount,
+    restock: r.restock,
+    status: r.status,
+    created_at: r.createdAt,
+    resolved_by: r.resolvedBy ?? null,
+    resolved_at: r.resolvedAt ?? null,
+    shopify_refund_id: r.shopifyRefundId ?? null,
+  };
+}
+
+function returnFromRow(row: Record<string, unknown>): ReturnRequest {
+  return {
+    id: String(row.id),
+    orderId: String(row.order_id ?? ""),
+    shopifyOrderId: String(row.shopify_order_id ?? ""),
+    customerEmail: String(row.customer_email ?? ""),
+    reason: String(row.reason ?? ""),
+    refundAmount: Number(row.refund_amount ?? 0),
+    restock: Boolean(row.restock),
+    status: (row.status as ReturnRequest["status"]) ?? "requested",
+    createdAt: String(row.created_at),
+    resolvedBy: row.resolved_by != null ? String(row.resolved_by) : undefined,
+    resolvedAt: row.resolved_at != null ? String(row.resolved_at) : undefined,
+    shopifyRefundId: row.shopify_refund_id != null ? String(row.shopify_refund_id) : undefined,
+  };
+}
+
+export const supabaseListReturns = () => listAll("return_requests", returnFromRow);
+export const supabaseUpsertReturn = (r: ReturnRequest) => upsertOne("return_requests", returnToRow(r));
+
+/** Persists one day's $ at-risk/$ saved snapshot — the historical record summarizeDeskRisk's live recompute doesn't keep on its own. */
+export const supabaseUpsertDailyRiskSnapshot = (snapshot: {
+  date: string;
+  ordersCount: number;
+  highRiskCount: number;
+  highRiskUsd: number;
+  savedUsd: number;
+}) =>
+  upsertOne("daily_risk_snapshots", {
+    date: snapshot.date,
+    orders_count: snapshot.ordersCount,
+    high_risk_count: snapshot.highRiskCount,
+    high_risk_usd: snapshot.highRiskUsd,
+    saved_usd: snapshot.savedUsd,
+  });
+
+export async function supabaseListDailyRiskSnapshots(
+  limit = 30
+): Promise<Array<{ date: string; ordersCount: number; highRiskCount: number; highRiskUsd: number; savedUsd: number }> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await table(db, "daily_risk_snapshots")
+    .select("*")
+    .order("date", { ascending: false });
+  if (error) {
+    console.warn("[helix-commerce] list daily_risk_snapshots skipped:", error.message);
+    return null;
+  }
+  return (data ?? []).slice(0, limit).map((row) => ({
+    date: String(row.date),
+    ordersCount: Number(row.orders_count ?? 0),
+    highRiskCount: Number(row.high_risk_count ?? 0),
+    highRiskUsd: Number(row.high_risk_usd ?? 0),
+    savedUsd: Number(row.saved_usd ?? 0),
+  }));
+}

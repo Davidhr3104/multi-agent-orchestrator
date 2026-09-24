@@ -81,4 +81,47 @@ describe("scoreFraudHeuristic", () => {
       expect(result.requiresReview).toBe(true);
     }
   });
+
+  it("marks shopifySignalApplied false and unaffected when no Shopify risk data exists", () => {
+    const result = scoreFraudHeuristic(baseOrder());
+    expect(result.shopifySignalApplied).toBe(false);
+  });
+
+  it("escalates a normally-low-risk order to review when Shopify recommends cancel", () => {
+    const clean = scoreFraudHeuristic(baseOrder());
+    const flagged = scoreFraudHeuristic(
+      baseOrder({
+        shopifyRisks: [
+          { recommendation: "cancel", score: 0.9, message: "Stolen card suspected", source: "Shopify Protect" },
+        ],
+      })
+    );
+    expect(flagged.shopifySignalApplied).toBe(true);
+    expect(flagged.fraudScore).toBeGreaterThan(clean.fraudScore);
+    expect(flagged.requiresReview).toBe(true);
+    expect(flagged.fraudReasoning).toContain("Shopify Protect");
+    expect(flagged.fraudReasoning).toContain("CANCEL");
+  });
+
+  it("uses the worst of multiple Shopify risk signals", () => {
+    const result = scoreFraudHeuristic(
+      baseOrder({
+        shopifyRisks: [
+          { recommendation: "accept", score: 0.1, message: "ok", source: "Shopify" },
+          { recommendation: "cancel", score: 0.95, message: "high risk", source: "Shopify Protect" },
+        ],
+      })
+    );
+    expect(result.fraudReasoning).toContain("CANCEL");
+  });
+
+  it("does not push a low-value repeat-customer order to requiresReview on an 'accept' Shopify signal", () => {
+    const result = scoreFraudHeuristic(
+      baseOrder({
+        shopifyRisks: [{ recommendation: "accept", score: 0.05, message: "low risk", source: "Shopify" }],
+      })
+    );
+    expect(result.shopifySignalApplied).toBe(true);
+    expect(result.requiresReview).toBe(false);
+  });
 });

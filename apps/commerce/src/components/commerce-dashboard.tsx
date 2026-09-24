@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { StoredOrder, StoredProduct } from "@helix/core";
+import type { ReorderRequest, StoredOrder, StoredProduct } from "@helix/core";
 import { Boxes, ShieldAlert, ShoppingCart, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { MetricCard } from "@/components/metric-card";
 import { Sparkline } from "@/components/sparkline";
+import { DailyBriefCard } from "@/components/daily-brief-card";
 import { LiveOrdersTable } from "@/components/live-orders-table";
 import { OrderInspector } from "@/components/order-inspector";
 import { ReorderQueue } from "@/components/reorder-queue";
@@ -41,22 +42,26 @@ const EMPTY_RISK: RiskSummary = {
 export function CommerceDashboard() {
   const [orders, setOrders] = useState<StoredOrder[]>([]);
   const [products, setProducts] = useState<StoredProduct[]>([]);
+  const [reorders, setReorders] = useState<ReorderRequest[]>([]);
   const [risk, setRisk] = useState<RiskSummary>(EMPTY_RISK);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   async function refresh() {
-    const [ordersRes, productsRes] = await Promise.all([
+    const [ordersRes, productsRes, reordersRes] = await Promise.all([
       fetch("/api/orders"),
       fetch("/api/products"),
+      fetch("/api/reorders"),
     ]);
     const ordersData = (await ordersRes.json()) as {
       orders: StoredOrder[];
       risk?: RiskSummary;
     };
     const productsData = (await productsRes.json()) as { products: StoredProduct[] };
+    const reordersData = (await reordersRes.json()) as { reorders: ReorderRequest[] };
     setOrders(ordersData.orders);
     setRisk(ordersData.risk ?? EMPTY_RISK);
     setProducts(productsData.products);
+    setReorders(reordersData.reorders);
   }
 
   useEffect(() => {
@@ -169,6 +174,8 @@ export function CommerceDashboard() {
         />
       </section>
 
+      <DailyBriefCard />
+
       {metrics.risk.atRiskUsd > 0 ? (
         <Link
           href="/risk"
@@ -203,7 +210,11 @@ export function CommerceDashboard() {
 
       <div className="animate-enter delay-5 grid grid-cols-1 gap-6 pt-2 lg:grid-cols-12">
         <div className="lg:col-span-6">
-          <ReorderQueue products={products} />
+          <ReorderQueue
+            products={products}
+            reorders={reorders}
+            onReorderCreated={(r) => setReorders((prev) => [r, ...prev])}
+          />
         </div>
         <div className="lg:col-span-6">
           <RevenueTrendChart orders={orders} />

@@ -1,16 +1,25 @@
-import { patchLead } from "@/lib/store";
+import { getLead, patchLead } from "@/lib/store";
 import { operatorActor, requireOperator } from "@helix/core/operator";
 import { checkActionToken, withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
-async function clear(id: string, actor: string, orgId: string | undefined) {
+async function clear(id: string, actor: string, orgId: string | undefined, note?: string) {
+  const current = await getLead(id, orgId);
+  if (!current) return Response.json({ error: "Lead not found" }, { status: 404 });
+
+  const notes =
+    note?.trim()
+      ? [...(current.notes ?? []), `Approved note: ${note.trim()}`]
+      : current.notes;
+
   const lead = await patchLead(
     id,
     {
       needsReview: false,
       reviewedBy: actor,
       reviewedAt: new Date().toISOString(),
+      ...(notes ? { notes } : {}),
     },
     orgId
   );
@@ -22,8 +31,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const denied = requireOperator(req);
   if (denied) return denied;
   const { id } = await params;
+  let note: string | undefined;
+  try {
+    const body = (await req.json()) as { note?: string };
+    note = typeof body.note === "string" ? body.note : undefined;
+  } catch {
+    note = undefined;
+  }
   return withOrgScope(async (orgId) => {
-    const lead = await clear(id, operatorActor(req), orgId);
+    const lead = await clear(id, operatorActor(req), orgId, note);
     if (lead instanceof Response) return lead;
     return Response.json({ lead });
   });

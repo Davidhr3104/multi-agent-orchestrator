@@ -26,9 +26,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`dark ${inter.variable} ${jetbrains.variable} h-full antialiased`}
     >
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         suppressHydrationWarning
-        className="flex min-h-full flex-col overflow-x-hidden bg-[#08090d] font-sans text-[#F3F4F6]"
+        className="flex min-h-full flex-col overflow-x-hidden bg-background font-sans text-on-surface"
       >
         <TooltipProvider>{children}</TooltipProvider>
       </body>

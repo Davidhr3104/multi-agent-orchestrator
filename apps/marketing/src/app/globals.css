@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans-marketing), Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans-marketing), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono-marketing), "JetBrains Mono", ui-monospace, monospace;
-  --font-heading: var(--font-sans-marketing), Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans-marketing), ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,6 +39,29 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-surface: var(--surface);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-bright: var(--surface-bright);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary: var(--on-primary);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-tertiary: var(--tertiary);
+  --color-error: var(--error);
+  --color-marketing-amber: var(--marketing-amber);
+  --color-success-emerald: var(--success-emerald);
+  --color-alert-rose: var(--alert-rose);
+  --color-obsidian-base: var(--obsidian-base);
+  --color-obsidian-raised: var(--obsidian-raised);
+  --color-obsidian-overlay: var(--obsidian-overlay);
+  --color-border-hairline: var(--border-hairline);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,95 +71,94 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  --background: #08090d;
-  --foreground: #f3f4f6;
-  --card: rgba(16, 19, 26, 0.85);
-  --card-foreground: #f3f4f6;
-  --popover: #151922;
-  --popover-foreground: #f3f4f6;
-  --primary: #f97316;
-  --primary-foreground: #08090d;
-  --secondary: #151922;
-  --secondary-foreground: #f3f4f6;
-  --muted: #12151e;
-  --muted-foreground: #9ca3af;
-  --accent: #191f2c;
-  --accent-foreground: #f3f4f6;
-  --destructive: #d9605f;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.14);
-  --ring: #f97316;
-  --chart-1: #f97316;
-  --chart-2: #3baf7e;
-  --chart-3: #d9a441;
-  --chart-4: #d9605f;
-  --chart-5: #9ca3af;
-  --radius: 0.75rem;
-  --sidebar: #10131a;
-  --sidebar-foreground: #f3f4f6;
-  --sidebar-primary: #f97316;
-  --sidebar-primary-foreground: #08090d;
-  --sidebar-accent: #151922;
-  --sidebar-accent-foreground: #f3f4f6;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #f97316;
-}
-
+:root,
 .dark {
-  --background: #08090d;
-  --foreground: #f3f4f6;
-  --card: rgba(16, 19, 26, 0.85);
-  --card-foreground: #f3f4f6;
-  --popover: #151922;
-  --popover-foreground: #f3f4f6;
-  --primary: #f97316;
-  --primary-foreground: #08090d;
-  --secondary: #151922;
-  --secondary-foreground: #f3f4f6;
-  --muted: #12151e;
-  --muted-foreground: #9ca3af;
-  --accent: #191f2c;
-  --accent-foreground: #f3f4f6;
-  --destructive: #d9605f;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.14);
+  /* Stitch Marketing desk — orange primary-container #f97316 */
+  --helix-primary: #f97316;
+  --background: #121318;
+  --foreground: #e3e1e9;
+  --card: #1e1f25;
+  --card-foreground: #e3e1e9;
+  --popover: #1e1f25;
+  --popover-foreground: #e3e1e9;
+  --primary: #ffb690;
+  --primary-foreground: #552100;
+  --secondary: #c0c1ff;
+  --secondary-foreground: #1000a9;
+  --muted: #292a2f;
+  --muted-foreground: #e0c0b1;
+  --accent: #292a2f;
+  --accent-foreground: #e3e1e9;
+  --destructive: #ffb4ab;
+  --border: rgba(255, 255, 255, 0.07);
+  --input: #34343a;
   --ring: #f97316;
   --chart-1: #f97316;
-  --chart-2: #3baf7e;
-  --chart-3: #d9a441;
-  --chart-4: #d9605f;
-  --chart-5: #9ca3af;
-  --sidebar: #10131a;
-  --sidebar-foreground: #f3f4f6;
+  --chart-2: #fb923c;
+  --chart-3: #4cd7f6;
+  --chart-4: #10b981;
+  --chart-5: #f43f5e;
+  --radius: 0.5rem;
+  --sidebar: #1a1b21;
+  --sidebar-foreground: #e3e1e9;
   --sidebar-primary: #f97316;
-  --sidebar-primary-foreground: #08090d;
-  --sidebar-accent: #151922;
-  --sidebar-accent-foreground: #f3f4f6;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-primary-foreground: #552100;
+  --sidebar-accent: #1e1f25;
+  --sidebar-accent-foreground: #e3e1e9;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
   --sidebar-ring: #f97316;
+
+  --surface: #121318;
+  --surface-container: #1e1f25;
+  --surface-container-high: #292a2f;
+  --surface-container-highest: #34343a;
+  --surface-container-low: #1a1b21;
+  --surface-container-lowest: #0d0e13;
+  --surface-bright: #38393f;
+  --on-surface: #e3e1e9;
+  --on-surface-variant: #e0c0b1;
+  --outline: #a78b7d;
+  --outline-variant: #584237;
+  --primary-container: #f97316;
+  --on-primary: #552100;
+  --on-primary-container: #582200;
+  --tertiary: #4cd7f6;
+  --error: #ffb4ab;
+  --marketing-amber: #fb923c;
+  --success-emerald: #10b981;
+  --alert-rose: #f43f5e;
+  --obsidian-base: #090a0f;
+  --obsidian-raised: #0f111a;
+  --obsidian-overlay: #161824;
+  --border-hairline: rgba(255, 255, 255, 0.07);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   html {
     @apply font-sans;
   }
   body {
-    @apply bg-[#08090d] text-[#F3F4F6] antialiased;
+    @apply bg-background text-on-surface antialiased;
     min-height: 100%;
+  }
+  .material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+  .material-symbols-outlined.fill {
+    font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
   }
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #08090d;
+    background: #121318;
   }
   ::-webkit-scrollbar-thumb {
-    background: #222733;
+    background: #34343a;
     border-radius: 3px;
   }
 }

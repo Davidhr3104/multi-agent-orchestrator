@@ -1,133 +1,118 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { StoredLead } from "@helix/core";
-import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CommandPalette, ShortcutsHelp } from "@/components/command-palette";
-import { readCurrentWorkspace, readWorkspaces, writeCurrentWorkspace, type Workspace } from "@/lib/prefs";
-import {
-  BarChart3,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Inbox,
-  LayoutDashboard,
-  Menu,
-  Plug,
-  Repeat2,
-  Search,
-  Settings,
-  Sliders,
-  Sparkles,
-  Target,
-  Workflow,
-  X,
-  Cpu,
-} from "lucide-react";
+import { listWorkspaces, readCurrentWorkspace, writeCurrentWorkspace } from "@/lib/workspace";
+import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "helix-leads-sidebar-collapsed";
-const SETTINGS_KEY = "helix-leads-settings-open";
-
-const PRODUCTS = [
-  { name: "Helix for Commerce", href: "#commerce", className: "text-emerald-400" },
-  { name: "Helix for Legal", href: "http://localhost:43149", className: "text-amber-400" },
-  { name: "Helix for Video", href: "#video", className: "text-red-400" },
-  { name: "Helix for Social", href: "#social", className: "text-pink-400" },
-  { name: "Helix for Edit", href: "#edit", className: "text-violet-400" },
-];
+type NavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  badge?: number;
+  badgeTone?: "primary" | "error";
+};
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
+  if (href === "/settings") return pathname === "/settings" || pathname.startsWith("/settings/brand");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function Icon({ name, className, fill }: { name: string; className?: string; fill?: boolean }) {
+  return (
+    <span className={cn("material-symbols-outlined text-[20px]", fill && "fill", className)} aria-hidden>
+      {name}
+    </span>
+  );
+}
+
+function breadcrumbFor(pathname: string) {
+  if (pathname === "/") return { section: "Overview", page: "Dashboard" };
+  if (pathname.startsWith("/leads")) return { section: "Overview", page: "Lead Roster" };
+  if (pathname.startsWith("/inbox")) return { section: "Overview", page: "Triage Inbox" };
+  if (pathname.startsWith("/analytics")) return { section: "Overview", page: "Analytics" };
+  if (pathname.startsWith("/settings/scoring")) return { section: "Configuration", page: "Scoring Rules" };
+  if (pathname.startsWith("/settings/prompts")) return { section: "Configuration", page: "Prompts" };
+  if (pathname.startsWith("/settings/integrations")) return { section: "Configuration", page: "Integrations" };
+  if (pathname.startsWith("/settings/automations")) return { section: "Configuration", page: "Automations" };
+  if (pathname.startsWith("/settings/usage")) return { section: "System", page: "API & Webhooks" };
+  if (pathname.startsWith("/audit")) return { section: "System", page: "Audit Log" };
+  if (pathname === "/settings" || pathname.startsWith("/settings/brand"))
+    return { section: "System", page: "Desk Settings" };
+  if (pathname.startsWith("/settings")) return { section: "Configuration", page: "Settings" };
+  return { section: "Helix", page: "Leads" };
+}
+
+const PRODUCTS = [
+  { name: "Helix for Commerce", href: "https://helix-for-commerce.vercel.app", className: "text-emerald-300" },
+  { name: "Helix for Legal", href: "https://helix-for-legal.vercel.app", className: "text-violet-300" },
+  { name: "Helix for Marketing", href: "https://helix-for-marketing.vercel.app", className: "text-fuchsia-300" },
+  { name: "Helix for Leads", href: "/", className: "text-primary" },
+];
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(true);
-  const [productsOpen, setProductsOpen] = useState(false);
-  const [newCount, setNewCount] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
-  const [ready, setReady] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [workspaceId, setWorkspaceId] = useState("a");
+  const [productsOpen, setProductsOpen] = useState(false);
+  const [ingestBusy, setIngestBusy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [ghlConnected, setGhlConnected] = useState(false);
+  const [hotCount, setHotCount] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [slaPct, setSlaPct] = useState<number | null>(null);
+  const [workspaceId, setWorkspaceId] = useState("default");
   const [brandName, setBrandName] = useState("Helix for Leads");
-  const [logoUrl, setLogoUrl] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const workspaces = useMemo(() => listWorkspaces(), []);
+  const crumbs = breadcrumbFor(pathname);
 
   useEffect(() => {
+    setWorkspaceId(readCurrentWorkspace());
     try {
-      setCollapsed(window.localStorage.getItem(STORAGE_KEY) === "1");
-      setSettingsOpen(window.localStorage.getItem(SETTINGS_KEY) !== "0");
-      setWorkspaces(readWorkspaces());
-      setWorkspaceId(readCurrentWorkspace());
+      const raw = window.localStorage.getItem("helix-leads-brand");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { productName?: string };
+        if (parsed.productName?.trim()) setBrandName(parsed.productName.trim());
+      }
     } catch {
       /* ignore */
     }
-    setReady(true);
   }, []);
 
   useEffect(() => {
-    fetch("/api/org")
-      .then((r) => r.json())
-      .then((d: { org?: { orgName?: string; logoUrl?: string; primaryColor?: string } | null }) => {
-        if (d.org?.orgName) setBrandName(d.org.orgName);
-        if (d.org?.logoUrl) setLogoUrl(d.org.logoUrl);
-        document.documentElement.style.setProperty("--helix-primary", d.org?.primaryColor || "#38bdf8");
-      })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [collapsed, ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      window.localStorage.setItem(SETTINGS_KEY, settingsOpen ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [settingsOpen, ready]);
+    void Promise.all([
+      fetch("/api/status").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/leads").then((r) => r.json()).catch(() => ({ leads: [] })),
+    ]).then(([status, leadsRes]) => {
+      setGhlConnected(Boolean((status as { ghl?: boolean }).ghl));
+      const leads = ((leadsRes as { leads?: StoredLead[] }).leads ?? []) as StoredLead[];
+      setHotCount(leads.filter((l) => l.tier === "hot" && l.classification === "lead").length);
+      setReviewCount(leads.filter((l) => l.needsReview).length);
+      if (leads.length === 0) {
+        setSlaPct(null);
+      } else {
+        const clear = leads.filter((l) => !l.needsReview).length;
+        setSlaPct(Math.round((clear / leads.length) * 1000) / 10);
+      }
+    });
+  }, [pathname]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null;
-      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen(true);
         return;
       }
-      if (e.key === "Escape") {
-        setPaletteOpen(false);
-        setHelpOpen(false);
-        window.dispatchEvent(new Event("helix:close-panel"));
-        return;
-      }
-      if (typing) return;
-      if (e.key === "/") {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-      if (e.key === "n" || e.key === "N") {
-        e.preventDefault();
-        window.dispatchEvent(new Event("helix:new-lead"));
-      }
-      if (e.key === "?") {
+      if (e.key === "?" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
         setHelpOpen(true);
       }
@@ -137,233 +122,216 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void fetch("/api/leads")
-      .then((r) => r.json())
-      .then((data: { leads?: StoredLead[] }) => {
-        const leads = data.leads ?? [];
-        setNewCount(leads.filter((l) => (l.pipelineStage ?? "new") === "new").length);
-        setReviewCount(leads.filter((l) => l.needsReview).length);
-      })
-      .catch(() => undefined);
-  }, [pathname]);
-
-  useEffect(() => {
     setMobileOpen(false);
-    setProductsOpen(false);
   }, [pathname]);
 
-  const expanded = !collapsed;
+  function showToast(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2800);
+  }
 
-  const nav = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/leads", label: "Leads", icon: Target, badge: newCount },
-    { href: "/analytics", label: "Analytics", icon: BarChart3 },
-    { href: "/inbox", label: "Inbox", icon: Inbox, badge: reviewCount },
-  ] as const;
+  async function ingestTestLead() {
+    setIngestBusy(true);
+    try {
+      const stamp = Date.now().toString(36).slice(-4);
+      const res = await fetch("/api/leads/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `Test Lead ${stamp}`,
+          email: `test.${stamp}@example.com`,
+          source: "dashboard_cta",
+          message: "Looking to evaluate Helix for inbound triage this quarter. Budget flexible, timeline 2 weeks.",
+          budget: "$25k",
+          timeline: "2 weeks",
+          company: "Acme Ops",
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let leadId: string | null = null;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop() ?? "";
+        for (const chunk of chunks) {
+          const line = chunk
+            .split("\n")
+            .filter((l) => l.startsWith("data:"))
+            .map((l) => l.slice(5).trim())
+            .join("");
+          if (!line) continue;
+          const event = JSON.parse(line) as { type: string; lead?: StoredLead; message?: string };
+          if (event.type === "result" && event.lead) leadId = event.lead.id;
+          if (event.type === "error") throw new Error(event.message ?? "Ingest failed");
+        }
+      }
+      showToast(leadId ? "Test lead ingested" : "Ingest finished");
+      window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+      if (leadId) router.push(`/leads?focus=${leadId}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Ingest failed");
+    } finally {
+      setIngestBusy(false);
+    }
+  }
 
-  const settingsItems = [
-    { href: "/settings/scoring", label: "Scoring Rules", icon: Sliders },
-    { href: "/settings/prompts", label: "Prompt Playground", icon: Sparkles },
-    { href: "/settings/usage", label: "Usage & API", icon: Cpu },
-    { href: "/settings/automations", label: "Automations", icon: Workflow },
-    { href: "/settings/integrations", label: "Integrations", icon: Plug },
-  ] as const;
+  const overview: NavItem[] = [
+    { href: "/", label: "Dashboard", icon: "grid_view" },
+    { href: "/leads", label: "Leads", icon: "group", badge: hotCount > 0 ? hotCount : undefined, badgeTone: "primary" },
+    { href: "/inbox", label: "Triage Inbox", icon: "move_to_inbox", badge: reviewCount > 0 ? reviewCount : undefined, badgeTone: "error" },
+    { href: "/analytics", label: "Analytics & Telemetry", icon: "insights" },
+  ];
 
-  function NavLabel({ label, children }: { label: string; children: ReactNode }) {
-    if (expanded || mobileOpen) return children;
+  const configuration: NavItem[] = [
+    { href: "/settings/scoring", label: "Scoring Rules", icon: "tune" },
+    { href: "/settings/prompts", label: "Prompt Studio", icon: "terminal" },
+    { href: "/settings/integrations", label: "Integrations & Sync", icon: "hub" },
+    { href: "/settings/automations", label: "Automations & Workflows", icon: "alt_route" },
+  ];
+
+  const system: NavItem[] = [
+    { href: "/settings", label: "Desk Settings", icon: "settings" },
+    { href: "/audit", label: "Audit Log & Security", icon: "security" },
+    { href: "/settings/usage", label: "API & Webhooks", icon: "webhook" },
+  ];
+
+  function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
     return (
-      <Tooltip>
-        <TooltipTrigger className="flex w-full justify-center">{children}</TooltipTrigger>
-        <TooltipContent side="right" className="border border-white/10 bg-[#041a2e] text-slate-200">
-          {label}
-        </TooltipContent>
-      </Tooltip>
+      <div className="mb-6">
+        <p className="mb-2 px-4 text-[10px] font-bold tracking-[0.2em] text-outline uppercase">{title}</p>
+        <div className="space-y-1">
+          {items.map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-primary-container text-on-primary-container"
+                    : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                )}
+              >
+                <Icon name={item.icon} fill={active} className={active ? "text-on-primary-container" : ""} />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.badge != null && item.badge > 0 ? (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                      item.badgeTone === "error"
+                        ? "bg-error-container text-error"
+                        : "bg-surface-container-highest text-primary"
+                    )}
+                  >
+                    {item.badge} {item.badgeTone === "error" ? "pending" : "new"}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     );
   }
 
   const sidebar = (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-white/10 bg-slate-900/95 transition-all duration-300",
-        mobileOpen ? "w-[250px] translate-x-0" : "w-[250px] -translate-x-full",
-        "md:translate-x-0",
-        expanded ? "md:w-[250px]" : "md:w-16"
+        "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-outline-variant/20 bg-surface-container-low transition-transform duration-300",
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
-      <div className="flex h-16 shrink-0 items-center gap-2 border-b border-white/10 px-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoUrl || "/helix-leads-icon.png"} alt="" className="h-full w-full object-contain" />
+      <div className="flex h-16 items-center gap-3 border-b border-outline-variant/20 px-5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/helix-leads-icon.png?v=legal1"
+          alt=""
+          className="h-10 w-10 shrink-0 object-contain object-center drop-shadow-[0_0_12px_rgba(6,182,212,0.35)]"
+        />
+        <div className="min-w-0 flex-1" aria-label={brandName}>
+          <div className="flex items-center gap-1.5 leading-none">
+            <span className="text-[14px] font-semibold tracking-tight text-on-surface">HELIX</span>
+            <span className="text-[9px] font-medium tracking-widest text-primary uppercase">FOR LEADS</span>
+          </div>
+          <p className="mt-1 truncate text-[10px] leading-none text-outline">Intelligent Engine</p>
         </div>
-        {expanded || mobileOpen ? (
-          logoUrl ? (
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{brandName}</span>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src="/helix-leads-wordmark.png"
-              alt={brandName}
-              className="h-7 min-w-0 flex-1 object-contain object-left brightness-0 invert"
-            />
-          )
-        ) : null}
         <button
           type="button"
-          className="ml-auto hidden rounded-md p-1 text-white/70 hover:bg-white/5 md:inline-flex"
-          onClick={() => setCollapsed((v) => !v)}
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        >
-          {expanded ? <ChevronLeft className="size-5" /> : <ChevronRight className="size-5" />}
-        </button>
-        <button
-          type="button"
-          className="ml-auto rounded-md p-1 text-white/70 hover:bg-white/5 md:hidden"
+          className="rounded-md p-1 text-outline hover:bg-surface-container-high md:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="Close menu"
         >
-          <X className="size-5" />
+          <Icon name="close" />
         </button>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-        {nav.map((item) => {
-          const active = isActive(pathname, item.href);
-          const Icon = item.icon;
-          const badge = "badge" in item ? item.badge : undefined;
-          return (
-            <NavLabel key={item.href} label={item.label}>
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/5",
-                  !expanded && !mobileOpen && "justify-center px-0",
-                  active && "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20"
-                )}
-              >
-                <Icon className="size-5 shrink-0" />
-                {expanded || mobileOpen ? (
-                  <>
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {badge != null && badge > 0 ? (
-                      <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-400">
-                        {badge}
-                      </span>
-                    ) : null}
-                  </>
-                ) : null}
-              </Link>
-            </NavLabel>
-          );
-        })}
-
-        <div className="mt-1">
-          <NavLabel label="Settings">
-            <button
-              type="button"
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/5",
-                !expanded && !mobileOpen && "justify-center px-0",
-                pathname.startsWith("/settings") && "bg-cyan-500/20 text-cyan-400"
-              )}
-              onClick={() => {
-                if (!expanded && !mobileOpen) {
-                  setCollapsed(false);
-                  setSettingsOpen(true);
-                  return;
-                }
-                setSettingsOpen((v) => !v);
-              }}
-            >
-              <Settings className="size-5 shrink-0" />
-              {expanded || mobileOpen ? (
-                <>
-                  <span className="flex-1 text-left">Settings</span>
-                  <ChevronDown
-                    className={cn("size-4 transition-transform", settingsOpen && "rotate-180")}
-                  />
-                </>
-              ) : null}
-            </button>
-          </NavLabel>
-          {settingsOpen && (expanded || mobileOpen) ? (
-            <div className="mt-1 space-y-1">
-              {settingsItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg py-3 pr-4 pl-12 text-sm font-medium text-white/70 hover:bg-white/5",
-                      active && "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20"
-                    )}
-                  >
-                    <Icon className="size-5 shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-
-        <NavLabel label="Audit Log">
-          <Link
-            href="/audit"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/5",
-              !expanded && !mobileOpen && "justify-center px-0",
-              isActive(pathname, "/audit") && "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20"
-            )}
-          >
-            <FileText className="size-5 shrink-0" />
-            {expanded || mobileOpen ? <span>Audit Log</span> : null}
-          </Link>
-        </NavLabel>
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <NavGroup title="Overview" items={overview} />
+        <NavGroup title="Configuration" items={configuration} />
+        <NavGroup title="System" items={system} />
       </nav>
 
-      <div className="relative border-t border-white/10 p-2">
-        <NavLabel label="Switch Product">
-          <button
-            type="button"
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/70 hover:bg-white/5",
-              !expanded && !mobileOpen && "justify-center px-0"
-            )}
-            onClick={() => setProductsOpen((v) => !v)}
-          >
-            <Repeat2 className="size-5 shrink-0" />
-            {expanded || mobileOpen ? <span>Switch Product</span> : null}
-          </button>
-        </NavLabel>
+      <div className="border-t border-outline-variant/20 p-4">
+        <div className="mb-3 rounded-xl bg-surface-container-lowest p-3">
+          <div className="flex items-center justify-between text-[10px] font-bold tracking-wider text-outline uppercase">
+            <span>Clear of HITL</span>
+            <span className="text-tertiary">{slaPct == null ? "—" : `${slaPct}%`}</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+            <div
+              className="h-full rounded-full bg-tertiary transition-all"
+              style={{ width: `${slaPct == null ? 0 : Math.min(100, slaPct)}%` }}
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="mb-3 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-on-surface-variant hover:bg-surface-container-high"
+          onClick={() => setProductsOpen((v) => !v)}
+        >
+          <Icon name="swap_horiz" className="text-[18px]" />
+          <span className="flex-1 text-left text-xs font-medium">Switch Product</span>
+          <Icon name={productsOpen ? "expand_less" : "expand_more"} className="text-[18px]" />
+        </button>
         {productsOpen ? (
-          <div
-            className={cn(
-              "card-bg absolute bottom-14 z-50 rounded-xl p-2",
-              expanded || mobileOpen ? "left-2 right-2" : "left-16 w-56"
-            )}
-          >
+          <div className="mb-3 space-y-1 rounded-xl border border-outline-variant/30 bg-surface-container p-2">
             {PRODUCTS.map((p) => (
               <a
                 key={p.name}
                 href={p.href}
-                className={cn(
-                  "block rounded-lg px-3 py-2 text-sm font-medium hover:bg-white/5",
-                  p.className
-                )}
+                className={cn("block rounded-lg px-3 py-2 text-xs font-medium hover:bg-surface-container-high", p.className)}
               >
                 {p.name}
               </a>
             ))}
           </div>
         ) : null}
+
+        <a
+          href="/settings"
+          className="flex items-center gap-3 rounded-xl bg-surface-container px-3 py-2.5 transition-colors hover:bg-surface-container-high"
+        >
+          <div className="flex size-9 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary-container">
+            AV
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-on-surface">Alex Vance</p>
+            <p className="truncate text-[11px] text-outline">Ops · Desk settings</p>
+          </div>
+        </a>
       </div>
     </aside>
   );
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-surface text-on-surface">
       {mobileOpen ? (
         <button
           type="button"
@@ -373,36 +341,40 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       ) : null}
       {sidebar}
-      <div
-        className={cn(
-          "flex min-h-full flex-col transition-all duration-300",
-          expanded ? "md:ml-[250px]" : "md:ml-16"
-        )}
-      >
-        <div className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-white/10 bg-[#021426] px-3">
+
+      <div className="flex min-h-full flex-col md:ml-72">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-outline-variant/20 bg-surface/90 px-4 backdrop-blur-md sm:px-6">
           <button
             type="button"
-            className="rounded-md p-1 text-white/80 hover:bg-white/5 md:hidden"
+            className="rounded-md p-1.5 text-on-surface-variant hover:bg-surface-container-high md:hidden"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
           >
-            <Menu className="size-5" />
+            <Icon name="menu" />
           </button>
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-slate-500" />
+
+          <div className="hidden min-w-0 items-center gap-2 text-sm sm:flex">
+            <span className="text-outline">{crumbs.section}</span>
+            <Icon name="chevron_right" className="text-[16px] text-outline" />
+            <span className="font-semibold text-on-surface">{crumbs.page}</span>
+          </div>
+
+          <div className="relative ml-auto min-w-0 max-w-md flex-1">
+            <Icon name="search" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[18px] text-outline" />
             <input
               ref={searchRef}
-              className="h-8 w-full rounded-md border border-sky-900/50 bg-[#0a1e30] pr-16 pl-8 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-sky-500"
+              className="h-9 w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest pr-14 pl-10 text-sm text-on-surface placeholder:text-outline outline-none focus:border-primary"
               placeholder="Search leads, logs, settings…"
               onFocus={() => setPaletteOpen(true)}
               readOnly
             />
-            <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-sky-900/50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+            <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-outline-variant/40 px-1.5 py-0.5 font-mono text-[10px] text-outline">
               ⌘K
             </kbd>
           </div>
+
           <select
-            className="hidden h-8 max-w-[10rem] rounded-md border border-sky-900/50 bg-[#0a1e30] px-2 text-xs text-slate-300 sm:block"
+            className="hidden h-9 max-w-[9rem] rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2 text-xs text-on-surface-variant lg:block"
             value={workspaceId}
             onChange={(e) => {
               setWorkspaceId(e.target.value);
@@ -416,12 +388,44 @@ export function AppShell({ children }: { children: ReactNode }) {
               </option>
             ))}
           </select>
+
+          <div
+            className={cn(
+              "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold sm:flex",
+              ghlConnected
+                ? "border-tertiary/40 bg-tertiary-container/40 text-tertiary"
+                : "border-outline-variant/40 bg-surface-container text-outline"
+            )}
+            title={ghlConnected ? "GoHighLevel connected" : "CRM not configured"}
+          >
+            <span className={cn("size-1.5 rounded-full", ghlConnected ? "bg-tertiary" : "bg-outline")} />
+            {ghlConnected ? "GHL Connected" : "CRM Offline"}
+          </div>
+
           <OrgSessionBadge />
-        </div>
+
+          <button
+            type="button"
+            disabled={ingestBusy}
+            onClick={() => void ingestTestLead()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-container px-3 text-xs font-bold text-on-primary-container transition hover:brightness-110 disabled:opacity-60"
+          >
+            <Icon name="add" className="text-[18px]" />
+            <span className="hidden sm:inline">{ingestBusy ? "Ingesting…" : "Ingest Test Lead"}</span>
+          </button>
+        </header>
+
         <div className="flex-1">{children}</div>
       </div>
+
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {toast ? (
+        <div className="fixed right-4 bottom-4 z-50 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm text-on-surface shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -446,7 +450,7 @@ function OrgSessionBadge() {
     return (
       <Link
         href="/login"
-        className="hidden shrink-0 rounded-md border border-sky-900/50 bg-[#0a1e30] px-2 py-1 text-xs text-slate-300 hover:bg-[#0f2942] sm:block"
+        className="hidden shrink-0 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-high sm:block"
       >
         Sign in
       </Link>
@@ -454,7 +458,7 @@ function OrgSessionBadge() {
   }
   return (
     <span
-      className="hidden shrink-0 truncate rounded-md border border-emerald-900/50 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-300 sm:block"
+      className="hidden max-w-[8rem] shrink-0 truncate rounded-lg border border-tertiary/30 bg-tertiary-container/30 px-2.5 py-1.5 text-xs text-tertiary sm:block"
       title={state.user?.email ?? undefined}
     >
       {state.org?.orgName ?? "No workspace"}
