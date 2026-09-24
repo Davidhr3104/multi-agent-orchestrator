@@ -43,7 +43,7 @@ export type AgentRun = {
 
 export type LeadClassification = "lead" | "spam" | "info";
 export type LeadTier = "hot" | "warm" | "cold";
-export type CrmStatus = "not_sent" | "mocked" | "sent";
+export type CrmStatus = "not_sent" | "mocked" | "sent" | "failed";
 export type PipelineStage = "new" | "qualified" | "contacted" | "won" | "lost";
 
 export type LeadIngestInput = {
@@ -131,6 +131,7 @@ export type StoredLead = LeadScoreResult &
     ghlContactId?: string;
     ghlOpportunityId?: string;
     ghlOpportunityError?: string;
+    crmError?: string;
     pipelineStage?: PipelineStage;
     dealValue?: number;
     closedAt?: string;

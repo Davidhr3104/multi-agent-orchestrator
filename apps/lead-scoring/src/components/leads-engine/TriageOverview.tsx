@@ -92,12 +92,16 @@ export function TriageOverview() {
   async function approveAndPush(id: string) {
     setBusyId(id);
     try {
-      await fetch(`/api/leads/${id}/review`, { method: "POST" });
       const crm = await fetch(`/api/leads/${id}/crm`, { method: "POST" });
       const data = (await crm.json()) as { error?: string };
-      if (!crm.ok) showToast(data.error || "CRM push failed");
-      else showToast("Approved & pushed");
+      if (!crm.ok) {
+        showToast(data.error || "CRM push failed");
+      } else {
+        await fetch(`/api/leads/${id}/review`, { method: "POST" });
+        showToast("Approved & pushed");
+      }
       await refresh();
+      window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
     } finally {
       setBusyId(null);
     }

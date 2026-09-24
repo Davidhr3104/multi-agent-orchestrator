@@ -123,11 +123,6 @@ export default function InboxPage() {
     try {
       const noteBody = note.trim() ? { note: note.trim() } : {};
       if (path === "approve") {
-        await fetch(`/api/leads/${id}/review`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(noteBody),
-        });
         const crm = await fetch(`/api/leads/${id}/crm`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -137,6 +132,11 @@ export default function InboxPage() {
           const data = (await crm.json()) as { error?: string };
           setError(data.error || `CRM ${crm.status}`);
         } else {
+          await fetch(`/api/leads/${id}/review`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(noteBody),
+          });
           setNote("");
         }
       } else if (path === "crm") {
@@ -159,6 +159,7 @@ export default function InboxPage() {
         }
       }
       await refresh();
+      window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
     } finally {
       setBusy(null);
     }

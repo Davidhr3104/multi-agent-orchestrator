@@ -28,10 +28,11 @@ async function sendToCrm(
 
   const result = await sendLeadToGhl(working);
   if (result.mocked) {
+    const notSent = await patchLead(id, { crmStatus: "not_sent", crmError: undefined }, orgId);
     return Response.json(
       {
         error: "GHL_API_KEY and GHL_LOCATION_ID required. Paste them in Settings. CRM was not sent.",
-        lead: working,
+        lead: notSent ?? working,
       },
       { status: 409 }
     );
@@ -61,7 +62,12 @@ async function sendToCrm(
       opportunityError: result.opportunityError,
     });
   }
-  return Response.json({ error: result.error || "GHL send failed", lead: working }, { status: 502 });
+  const failed = await patchLead(
+    id,
+    { crmStatus: "failed", crmError: result.error || "GHL send failed" },
+    orgId
+  );
+  return Response.json({ error: result.error || "GHL send failed", lead: failed ?? working }, { status: 502 });
 }
 
 export async function POST(

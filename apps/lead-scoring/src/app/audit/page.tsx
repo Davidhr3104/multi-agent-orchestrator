@@ -108,6 +108,34 @@ function buildEvents(leads: StoredLead[]): AuditEvent[] {
       });
     }
 
+    if (lead.crmStatus === "failed") {
+      const at = lead.reviewedAt ?? lead.createdAt;
+      const parts = formatParts(at);
+      events.push({
+        id: `crm-failed-${lead.id}`,
+        at,
+        ...parts,
+        kind: "CRM_SYNC_FAILED",
+        severity: "WARNING",
+        actor: "Sync Relay",
+        actorSub: "GHL dispatch failed",
+        target: `Lead #${baseId}`,
+        targetSub: `${lead.name} · ${lead.crmError ?? "unknown error"}`,
+        hash: shortHash(`crm-failed:${lead.id}:${lead.crmError ?? ""}`),
+        signed: true,
+        title: "CRM handoff failed",
+        prev: { crmStatus: "not_sent" },
+        next: { crmStatus: "failed", crmError: lead.crmError ?? null },
+        raw: {
+          event_type: "CRM_SYNC_FAILED",
+          lead_id: lead.id,
+          name: lead.name,
+          crmStatus: lead.crmStatus,
+          crmError: lead.crmError ?? null,
+        },
+      });
+    }
+
     if (lead.needsReview) {
       const parts = formatParts(lead.createdAt);
       events.push({

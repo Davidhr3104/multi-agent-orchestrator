@@ -423,17 +423,24 @@ function LeadsRoster() {
     if (!selected) return;
     setBusy(true);
     try {
-      if (selected.needsReview) {
-        await fetch(`/api/leads/${selected.id}/review`, { method: "POST" });
-      }
       const res = await fetch(`/api/leads/${selected.id}/crm`, { method: "POST" });
       const data = (await res.json()) as { lead?: StoredLead; error?: string };
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
-        showToast("Pushed to CRM");
-      } else {
-        showToast(data.error || `CRM ${res.status}`);
       }
+      if (!res.ok) {
+        showToast(data.error || `CRM ${res.status}`);
+        return;
+      }
+      if (selected.needsReview) {
+        const reviewRes = await fetch(`/api/leads/${selected.id}/review`, { method: "POST" });
+        const reviewData = (await reviewRes.json()) as { lead?: StoredLead };
+        if (reviewData.lead) {
+          setLeads((prev) => prev.map((l) => (l.id === reviewData.lead!.id ? reviewData.lead! : l)));
+        }
+      }
+      showToast("Pushed to CRM");
+      window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
     } finally {
       setBusy(false);
     }
