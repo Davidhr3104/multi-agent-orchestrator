@@ -79,13 +79,20 @@ export default function InboxPage() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Editable-field guard runs FIRST: inside an input/textarea/select (or contenteditable),
+      // Ctrl/Cmd+Z must keep its native text-undo behavior and never trigger the approve undo.
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      )
+        return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && undo) {
         e.preventDefault();
         void undoApprove(undo.id);
         return;
       }
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement)
-        return;
       const sel = leads.find((l) => l.id === selectedId);
       if (!sel) return;
       if (e.key.toLowerCase() === "a") {
@@ -227,9 +234,19 @@ export default function InboxPage() {
   async function undoApprove(id: string) {
     clearUndoTimer();
     setUndo(null);
-    await fetch(`/api/leads/${id}/review`, { method: "DELETE" }).catch(() => null);
+    setError(null);
+    // .catch keeps a network failure from throwing out of the component; null = request never completed.
+    const res = await fetch(`/api/leads/${id}/review`, { method: "DELETE" }).catch(() => null);
+    if (!res) {
+      setError(`Undo failed for lead ${id}: network error — the approve is still in effect.`);
+    } else if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(
+        `Undo failed for lead ${id} (${res.status}${data.error ? `: ${data.error}` : ""}) — the approve is still in effect.`
+      );
+    }
     await refresh();
-    window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+    if (res?.ok) window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
   }
 
   async function assign(id: string, repId: string) {

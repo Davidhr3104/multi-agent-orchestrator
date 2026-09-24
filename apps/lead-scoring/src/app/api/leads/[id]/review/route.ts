@@ -49,8 +49,18 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const denied = requireOperator(req);
   if (denied) return denied;
   const { id } = await params;
+  const actor = operatorActor(req);
   return withOrgScope(async (orgId) => {
-    const lead = await patchLead(id, { needsReview: true }, orgId);
+    const current = await getLead(id, orgId);
+    if (!current) return Response.json({ error: "Lead not found" }, { status: 404 });
+
+    // Audit trail: record the undo so reviewedBy/reviewedAt are not read as the current state.
+    const notes = [
+      ...(current.notes ?? []),
+      `Undo (${new Date().toISOString()}) by ${actor}: review reopened after approve`,
+    ];
+
+    const lead = await patchLead(id, { needsReview: true, notes }, orgId);
     if (!lead) return Response.json({ error: "Lead not found" }, { status: 404 });
     return Response.json({ lead });
   });
