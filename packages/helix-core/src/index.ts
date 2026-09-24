@@ -18,7 +18,7 @@ export {
 export { citeSpan, hydrateScoredField, missingCite } from "./fact";
 export { autoSeedEnabled } from "./desk-mode";
 export { encodeSse } from "./sse";
-export { scoreLeadHeuristic } from "./lead/heuristic";
+export { scoreLeadHeuristic, type ScoreThresholds } from "./lead/heuristic";
 export {
   applyBehavior,
   attachIntelligence,
@@ -52,7 +52,7 @@ export {
 } from "./rfp/corpus";
 export type { CorpusChunk, CorpusDocument } from "./rfp/corpus";
 export { scoreFraudHeuristic } from "./commerce/fraudHeuristic";
-export { predictInventoryHeuristic } from "./commerce/inventoryHeuristic";
+export { predictInventoryHeuristic, suggestReorderQuantity } from "./commerce/inventoryHeuristic";
 export { classifyInquiryHeuristic } from "./commerce/inquiryHeuristic";
 export {
   runFraudScoring,
@@ -71,9 +71,15 @@ export type {
   OrderInput,
   OrderItem,
   ProductInput,
+  ReorderRequest,
+  ReorderStatus,
+  ReturnRequest,
+  ReturnStatus,
   RiskLevel,
   Sentiment,
   ShippingAddress,
+  ShopifyRiskRecommendation,
+  ShopifyRiskSignal,
   StoredInquiry,
   StoredOrder,
   StoredProduct,

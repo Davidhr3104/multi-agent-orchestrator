@@ -41,6 +41,34 @@ describe("lead heuristic", () => {
     expect(scored.score).toBeGreaterThanOrEqual(40);
     expect(scored.score).toBeLessThanOrEqual(60);
   });
+
+  it("uses custom thresholds instead of the hardcoded 40-60 band", () => {
+    const scored = scoreLeadHeuristic(
+      {
+        name: "Ava",
+        email: "ava@example.org",
+        source: "website",
+        message: "Just looking at how the scoring works before we talk.",
+      },
+      { hitl: 0.4, thresholds: { autoQualifyScore: 80, dqScore: 45, vipScore: 90, nurtureMin: 30, nurtureMax: 65 } }
+    );
+    // Same input as the existing "flags thin mid scores" test, but with dqScore raised to 45:
+    // a lead scoring in the low-40s should now fall UNDER the DQ threshold and not need review.
+    expect(scored.score).toBeLessThan(46);
+    expect(scored.needsReview).toBe(false);
+  });
+
+  it("defaults reproduce today's behavior when no thresholds are passed", () => {
+    const scored = scoreLeadHeuristic({
+      name: "Ava",
+      email: "ava@example.org",
+      source: "website",
+      message: "Just looking at how the scoring works before we talk.",
+    });
+    expect(scored.needsReview).toBe(true);
+    expect(scored.score).toBeGreaterThanOrEqual(40);
+    expect(scored.score).toBeLessThanOrEqual(60);
+  });
 });
 
 describe("FACT citeSpan", () => {

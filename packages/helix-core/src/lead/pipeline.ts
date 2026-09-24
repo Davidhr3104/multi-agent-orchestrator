@@ -9,7 +9,7 @@ import type {
   ScoredField,
   StoredLead,
 } from "../types";
-import { scoreLeadHeuristic } from "./heuristic";
+import { scoreLeadHeuristic, type ScoreThresholds } from "./heuristic";
 import { leadScoringPrompt } from "./prompts";
 
 function id(prefix: string): string {
@@ -68,7 +68,8 @@ function normalizeClaude(
   raw: ClaudeJson,
   fallback: LeadScoreResult,
   document: string,
-  hitl: number
+  hitl: number,
+  thresholds: ScoreThresholds
 ): LeadScoreResult {
   const classification =
     raw.classification === "spam" || raw.classification === "info" || raw.classification === "lead"
@@ -92,7 +93,8 @@ function normalizeClaude(
       ? raw.fields.map((f, i) => hydrateScoredField(document, f, i))
       : fallback.fields;
 
-  const needsReview = confidence < hitl || (score >= 40 && score <= 60);
+  const needsReview =
+    confidence < hitl || (score > thresholds.dqScore && score < thresholds.autoQualifyScore);
 
   return {
     classification,
@@ -109,11 +111,12 @@ function normalizeClaude(
 export async function runLeadPipeline(
   input: LeadIngestInput,
   emit: LeadEmit,
-  opts?: { hitl?: number; addendum?: string }
+  opts?: { hitl?: number; addendum?: string; thresholds?: ScoreThresholds }
 ): Promise<StoredLead> {
   const runId = id("run");
   const createdAt = now();
   const hitl = opts?.hitl ?? 0.65;
+  const thresholds = opts?.thresholds;
   const trace: AgentRun[] = [];
 
   log(emit, "orchestrator", "info", "Lead ingest accepted.", {
@@ -143,7 +146,7 @@ export async function runLeadPipeline(
   );
   log(emit, "extractor", "info", `Parsed ${input.name} <${input.email}>.`);
 
-  const heuristic = scoreLeadHeuristic(input, { hitl });
+  const heuristic = scoreLeadHeuristic(input, { hitl, thresholds });
   let scored = heuristic;
   const document = [input.name, input.email, input.source, input.message, input.budget, input.timeline]
     .filter(Boolean)
@@ -168,7 +171,7 @@ export async function runLeadPipeline(
     const text = await completeWithClaude(leadScoringPrompt(input, opts?.addendum));
     const parsed = text ? parseJsonObject<ClaudeJson>(text) : null;
     if (parsed) {
-      scored = normalizeClaude(parsed, heuristic, document, hitl);
+      scored = normalizeClaude(parsed, heuristic, document, hitl, thresholds ?? { autoQualifyScore: 80, dqScore: 50, vipScore: 90, nurtureMin: 30, nurtureMax: 65 });
       claudeCompetitors = (parsed.competitors ?? []).filter((n) => typeof n === "string" && n.trim());
       battleCard = (parsed.battle_card ?? "").trim();
       log(emit, "recommender", "success", "Claude JSON accepted.", {

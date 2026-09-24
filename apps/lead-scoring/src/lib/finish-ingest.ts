@@ -10,7 +10,7 @@ import {
 } from "@helix/core";
 import { listLeads, saveLead } from "@/lib/store";
 import { addGhlReingestNote } from "@/lib/ghl";
-import { getBrain } from "@/lib/brain";
+import { applyBrainPolicies, getBrain } from "@/lib/brain";
 import { notifySlackHitl } from "@/lib/slack";
 import { bumpUsage } from "@/lib/usage";
 import { assignSalesRep } from "@/lib/reps";
@@ -39,10 +39,11 @@ export async function finishLeadIngest(
   const scored = await runLeadPipeline(parsed, emit, {
     hitl: brain.hitl,
     addendum: brain.addendum,
+    thresholds: brain.thresholds,
   });
   bumpUsage(isClaudeConfigured() ? "claude" : "heuristic");
   const all = await listLeads(orgId);
-  const lead = attachIntelligence(scored, existing, all);
+  const lead = applyBrainPolicies(attachIntelligence(scored, existing, all), brain);
   try {
     const enriched = await enrichEmailDomain(lead.email);
     if (enriched) {
@@ -65,7 +66,7 @@ export async function finishLeadIngest(
   lead.assignee = assigned.name;
   lead.routingReason = assigned.reason;
   await saveLead(lead, orgId);
-  if (lead.needsReview) {
+  if (lead.needsReview && brain.automations.hitl) {
     await notifySlackHitl(
       {
         id: lead.id,

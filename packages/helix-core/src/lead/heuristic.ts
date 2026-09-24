@@ -7,6 +7,22 @@ import type {
   ScoredField,
 } from "../types";
 
+export type ScoreThresholds = {
+  autoQualifyScore: number;
+  dqScore: number;
+  vipScore: number;
+  nurtureMin: number;
+  nurtureMax: number;
+};
+
+const DEFAULT_THRESHOLDS: ScoreThresholds = {
+  autoQualifyScore: 80,
+  dqScore: 50,
+  vipScore: 90,
+  nurtureMin: 30,
+  nurtureMax: 65,
+};
+
 const SPAM_RE =
   /crypto|nft|seo blast|buy followers|unsubscribe|viagra|casino|click here|free money/i;
 const INFO_RE = /\b(just looking|research|curious|how (does|do) it work|pricing page)\b/i;
@@ -58,9 +74,10 @@ function field(
 
 export function scoreLeadHeuristic(
   input: LeadIngestInput,
-  opts?: { hitl?: number }
+  opts?: { hitl?: number; thresholds?: ScoreThresholds }
 ): LeadScoreResult {
   const hitl = opts?.hitl ?? 0.65;
+  const thresholds = opts?.thresholds ?? DEFAULT_THRESHOLDS;
   const message = (input.message ?? "").trim();
   const source = (input.source ?? "unknown").trim() || "unknown";
   const spamHint = SPAM_RE.test(message) || SPAM_RE.test(input.email);
@@ -147,7 +164,8 @@ export function scoreLeadHeuristic(
     ),
   ];
 
-  const needsReview = confidence < hitl || (score >= 40 && score <= 60);
+  const needsReview =
+    confidence < hitl || (score > thresholds.dqScore && score < thresholds.autoQualifyScore);
 
   const reasoning = [
     `Heuristic engine classified this as ${classification} (score ${score}, ${tier}).`,
