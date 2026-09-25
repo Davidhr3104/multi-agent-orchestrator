@@ -9,7 +9,6 @@ import {
   type StoredLead,
 } from "@helix/core";
 import { listLeads, saveLead } from "@/lib/store";
-import { addGhlReingestNote } from "@/lib/ghl";
 import { applyBrainPolicies, getBrain } from "@/lib/brain";
 import { notifySlackHitl } from "@/lib/slack";
 import { bumpUsage } from "@/lib/usage";
@@ -29,7 +28,7 @@ export async function finishLeadIngest(
         ts: new Date().toISOString(),
         agent: "orchestrator",
         level: "warn",
-        message: `Duplicate of ${existing.id} — will update score and note re-ingest.`,
+        message: `Possible duplicate of ${existing.id} — saved as a separate lead pending manual merge.`,
         field: "email",
         evidence: existing.email,
       },
@@ -43,7 +42,10 @@ export async function finishLeadIngest(
   });
   bumpUsage(isClaudeConfigured() ? "claude" : "heuristic");
   const all = await listLeads(orgId);
-  const lead = applyBrainPolicies(attachIntelligence(scored, existing, all), brain);
+  const lead = applyBrainPolicies(attachIntelligence(scored, null, all), brain);
+  if (existing) {
+    lead.duplicateOf = existing.id;
+  }
   try {
     const enriched = await enrichEmailDomain(lead.email);
     if (enriched) {
@@ -76,9 +78,6 @@ export async function finishLeadIngest(
       },
       orgId
     );
-  }
-  if (existing?.ghlContactId) {
-    await addGhlReingestNote(existing.ghlContactId, lead.score);
   }
   return lead;
 }
