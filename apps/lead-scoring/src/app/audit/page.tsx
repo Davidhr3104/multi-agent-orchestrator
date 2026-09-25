@@ -190,6 +190,84 @@ function buildEvents(leads: StoredLead[]): AuditEvent[] {
       });
     }
 
+    if (lead.pipelineStage === "lost" && lead.classification !== "spam") {
+      const at = lead.reviewedAt ?? lead.createdAt;
+      const parts = formatParts(at);
+      events.push({
+        id: `archived-${lead.id}`,
+        at,
+        ...parts,
+        kind: "PIPELINE_ARCHIVED",
+        severity: "INFO",
+        actor: lead.reviewedBy ?? "Operator",
+        actorSub: "manual archive",
+        target: `Lead #${baseId}`,
+        targetSub: `${lead.name} · archived`,
+        hash: shortHash(`archived:${lead.id}`),
+        signed: true,
+        title: "Lead archived",
+        prev: { pipelineStage: "new" },
+        next: { pipelineStage: "lost" },
+        raw: {
+          event_type: "PIPELINE_ARCHIVED",
+          lead_id: lead.id,
+          name: lead.name,
+        },
+      });
+    }
+
+    if (["contacted", "qualified", "won"].includes(lead.pipelineStage ?? "")) {
+      const at = lead.reviewedAt ?? lead.createdAt;
+      const parts = formatParts(at);
+      events.push({
+        id: `stage-${lead.id}-${lead.pipelineStage}`,
+        at,
+        ...parts,
+        kind: "PIPELINE_STAGE_CHANGE",
+        severity: "INFO",
+        actor: lead.reviewedBy ?? "Operator",
+        actorSub: `stage → ${lead.pipelineStage}`,
+        target: `Lead #${baseId}`,
+        targetSub: `${lead.name} · ${lead.pipelineStage}`,
+        hash: shortHash(`stage:${lead.id}:${lead.pipelineStage}`),
+        signed: true,
+        title: "Pipeline stage changed",
+        prev: { pipelineStage: "new" },
+        next: { pipelineStage: lead.pipelineStage },
+        raw: {
+          event_type: "PIPELINE_STAGE_CHANGE",
+          lead_id: lead.id,
+          name: lead.name,
+          pipelineStage: lead.pipelineStage,
+        },
+      });
+    }
+
+    if (lead.duplicateOf && lead.duplicateOf !== lead.id) {
+      const parts = formatParts(lead.createdAt);
+      events.push({
+        id: `dup-${lead.id}`,
+        at: lead.createdAt,
+        ...parts,
+        kind: "DUPLICATE_DETECTED",
+        severity: "WARNING",
+        actor: "Helix Core",
+        actorSub: "dedup check",
+        target: `Lead #${baseId}`,
+        targetSub: `${lead.name} · possible duplicate of ${lead.duplicateOf.replace(/^seed-/, "LD-").slice(0, 14)}`,
+        hash: shortHash(`dup:${lead.id}:${lead.duplicateOf}`),
+        signed: true,
+        title: "Possible duplicate detected",
+        prev: {},
+        next: { duplicateOf: lead.duplicateOf },
+        raw: {
+          event_type: "DUPLICATE_DETECTED",
+          lead_id: lead.id,
+          duplicate_of: lead.duplicateOf,
+        },
+      });
+    }
+
     // baseline ingest event
     {
       const parts = formatParts(lead.createdAt);

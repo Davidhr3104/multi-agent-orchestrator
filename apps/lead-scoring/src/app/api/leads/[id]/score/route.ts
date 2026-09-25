@@ -39,6 +39,15 @@ export async function POST(
       const emit: LeadEmit = () => undefined;
       try {
         const lead = await finishLeadIngest(input, emit, orgId);
+        // Mark the most recent scoreHistory entry as a manual rescore, not a fresh pipeline run,
+        // so the audit view can distinguish operator-triggered rescoring from real ingestion.
+        if (lead.scoreHistory && lead.scoreHistory.length > 0) {
+          const history = [...lead.scoreHistory];
+          const last = history[history.length - 1];
+          history[history.length - 1] = { ...last, reason: `Manual rescore — ${last.reason}` };
+          await patchLead(lead.id, { scoreHistory: history }, orgId);
+          lead.scoreHistory = history;
+        }
         return Response.json({ lead, mode: "pipeline" });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
