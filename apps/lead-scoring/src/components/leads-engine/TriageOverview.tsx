@@ -162,20 +162,25 @@ export function TriageOverview() {
         <p className="text-sm text-outline">Loading triage…</p>
       ) : (
         <>
+          {kpis.hitlPending > 0 ? (
+            <AttentionQueue
+              leads={leads}
+              busyId={busyId}
+              onApprove={(id) => void approveAndPush(id)}
+              onSpam={(id) => void markSpam(id)}
+            />
+          ) : (
+            <div className="rounded-xl border border-outline-variant/25 bg-surface-container px-5 py-8 text-center">
+              <p className="text-sm font-semibold text-on-surface">No leads pending review</p>
+              <p className="mt-1 text-xs text-on-surface-variant">
+                The HITL queue is clear. Ingest a lead or check{" "}
+                <a href="/settings" className="text-primary underline">Desk Settings</a> to load demo
+                data.
+              </p>
+            </div>
+          )}
           <KpiStrip {...kpis} />
-          <div className="grid gap-4 lg:grid-cols-5">
-            <div className="lg:col-span-3">
-              <StreamChart leads={leads} />
-            </div>
-            <div className="lg:col-span-2">
-              <AttentionQueue
-                leads={leads}
-                busyId={busyId}
-                onApprove={(id) => void approveAndPush(id)}
-                onSpam={(id) => void markSpam(id)}
-              />
-            </div>
-          </div>
+          <StreamChart leads={leads} />
           <div className="grid gap-4 lg:grid-cols-5">
             <div className="lg:col-span-3">
               <PriorityTable leads={leads} />
