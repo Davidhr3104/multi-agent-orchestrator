@@ -25,6 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return Response.json({ error: "Lead not found" }, { status: 404 });
     }
     const merged = attachIntelligence(losing, winning, []);
+    merged.duplicateOf = undefined;
     const saved = await patchLead(intoId, merged, orgId);
     await deleteLeads([id]);
     return Response.json({ lead: saved, mergedFromId: id });
