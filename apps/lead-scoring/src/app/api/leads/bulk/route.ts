@@ -78,6 +78,7 @@ export async function POST(req: Request) {
             errors.push({ id, error: `Contact synced but opportunity failed: ${result.opportunityError}` });
           }
         } else {
+          await patchLead(id, { crmStatus: "failed", crmError: result.error || "GHL send failed" }, orgId);
           errors.push({ id, error: result.error || "GHL send failed" });
         }
       }
