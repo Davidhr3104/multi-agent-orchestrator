@@ -349,6 +349,7 @@ function LeadsRoster() {
   const [draftEmail, setDraftEmail] = useState<{ subject: string; body: string } | null>(null);
   const [slots, setSlots] = useState<{ label?: string; start?: string; url?: string }[]>([]);
   const [lookalikes, setLookalikes] = useState<{ id: string; name: string; score: number }[]>([]);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -536,6 +537,69 @@ function LeadsRoster() {
     }
   }
 
+  function toggleCheck(id: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllVisible(visibleIds: string[]) {
+    setChecked((prev) => {
+      const allChecked = visibleIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allChecked) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function bulkAction(action: "delete" | "review" | "archive" | "ghl") {
+    const ids = [...checked];
+    if (ids.length === 0) return;
+    const confirmed = window.confirm(
+      action === "ghl"
+        ? `Approve and push ${ids.length} lead(s) to CRM?`
+        : action === "delete"
+          ? `Delete ${ids.length} lead(s)? This cannot be undone.`
+          : `${action === "archive" ? "Archive" : "Approve"} ${ids.length} lead(s)?`
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/leads/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        leads?: StoredLead[];
+        removed?: number;
+        errors?: { id: string; error: string }[];
+      };
+      const okCount = action === "delete" ? (data.removed ?? 0) : (data.leads?.length ?? 0);
+      const failCount = data.errors?.length ?? 0;
+      if (action === "delete") {
+        setLeads((prev) => prev.filter((l) => !ids.includes(l.id)));
+        if (selected && ids.includes(selected.id)) setSelectedId(null);
+      } else if (data.leads) {
+        const map = new Map(data.leads.map((l) => [l.id, l]));
+        setLeads((prev) => prev.map((l) => map.get(l.id) ?? l));
+      }
+      setChecked(new Set());
+      showToast(failCount > 0 ? `${okCount} ok / ${failCount} failed` : `${okCount} lead(s) updated`);
+      window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function draftEmailForLead() {
     if (!selected) return;
     setBusy(true);
@@ -699,6 +763,40 @@ function LeadsRoster() {
         ))}
       </div>
 
+      {checked.size > 0 ? (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm">
+          <span>{checked.size} selected</span>
+          <button
+            type="button"
+            onClick={() => void bulkAction("ghl")}
+            className="rounded bg-primary-container px-3 py-1 text-xs font-semibold text-on-primary-container"
+          >
+            Approve &amp; Push
+          </button>
+          <button
+            type="button"
+            onClick={() => void bulkAction("archive")}
+            className="rounded bg-surface-container px-3 py-1 text-xs font-semibold"
+          >
+            Archive
+          </button>
+          <button
+            type="button"
+            onClick={() => void bulkAction("delete")}
+            className="rounded bg-error-container px-3 py-1 text-xs font-semibold text-error"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            onClick={() => setChecked(new Set())}
+            className="ml-auto text-xs text-outline underline"
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-7">
           <div className="overflow-hidden rounded-xl border border-outline-variant/25 bg-surface-container">
@@ -711,6 +809,14 @@ function LeadsRoster() {
                 <table className="w-full min-w-[640px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-outline-variant/20 text-[10px] font-bold tracking-wider text-outline uppercase">
+                      <th className="w-8 px-4 py-3 font-bold">
+                        <input
+                          type="checkbox"
+                          checked={visible.length > 0 && visible.every((l) => checked.has(l.id))}
+                          onChange={() => toggleAllVisible(visible.map((l) => l.id))}
+                          aria-label="Select all visible leads"
+                        />
+                      </th>
                       <th className="px-4 py-3 font-bold">Lead</th>
                       <th className="px-4 py-3 font-bold">Signals</th>
                       <th className="px-4 py-3 font-bold">Score</th>
@@ -732,6 +838,15 @@ function LeadsRoster() {
                             active ? "bg-primary-container/15" : "hover:bg-surface-container-high/50"
                           )}
                         >
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={checked.has(lead.id)}
+                              onChange={() => toggleCheck(lead.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Select ${lead.name}`}
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-highest text-[11px] font-bold text-primary">

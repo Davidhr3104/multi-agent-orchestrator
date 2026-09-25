@@ -57,10 +57,12 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [owner, setOwner] = useState("");
-  const [undo, setUndo] = useState<{ id: string; secondsLeft: number } | null>(null);
+  const [undo, setUndo] = useState<{ ids: string[]; secondsLeft: number } | null>(null);
   const [undoLostId, setUndoLostId] = useState<string | null>(null);
   const undoTimerRef = useRef<{ interval: number; timeout: number } | null>(null);
   const undoLostTimerRef = useRef<number | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -90,7 +92,7 @@ export default function InboxPage() {
         return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && undo) {
         e.preventDefault();
-        void undoApprove(undo.id);
+        void undoApprove(undo.ids);
         return;
       }
       const sel = leads.find((l) => l.id === selectedId);
@@ -164,7 +166,7 @@ export default function InboxPage() {
             body: JSON.stringify(noteBody),
           });
           setNote("");
-          startUndoWindow(id);
+          startUndoWindow([id]);
         }
       } else if (path === "crm") {
         const res = await fetch(`/api/leads/${id}/crm`, {
@@ -200,13 +202,14 @@ export default function InboxPage() {
     }
   }
 
-  function startUndoWindow(id: string) {
+  function startUndoWindow(ids: string[]) {
+    if (ids.length === 0) return;
     setUndo((cur) => {
-      if (cur && cur.id !== id) {
-        // A different lead's undo window was still active — replacing it here would
+      if (cur && (cur.ids.length !== ids.length || cur.ids.some((id) => !ids.includes(id)))) {
+        // A different approve's undo window was still active — replacing it here would
         // silently strand it (CRM push already confirmed, no way back). Surface it
         // instead of failing silently.
-        setUndoLostId(cur.id);
+        setUndoLostId(cur.ids.join(", "));
         if (undoLostTimerRef.current) window.clearTimeout(undoLostTimerRef.current);
         undoLostTimerRef.current = window.setTimeout(() => {
           setUndoLostId(null);
@@ -216,12 +219,12 @@ export default function InboxPage() {
       return cur;
     });
     clearUndoTimer();
-    setUndo({ id, secondsLeft: 5 });
+    setUndo({ ids, secondsLeft: 5 });
     const interval = window.setInterval(() => {
       setUndo((cur) => {
-        if (!cur || cur.id !== id) return cur;
+        if (!cur || cur.ids.length !== ids.length || cur.ids.some((id) => !ids.includes(id))) return cur;
         const next = cur.secondsLeft - 1;
-        return next > 0 ? { id, secondsLeft: next } : cur;
+        return next > 0 ? { ids, secondsLeft: next } : cur;
       });
     }, 1000);
     const timeout = window.setTimeout(() => {
@@ -231,22 +234,28 @@ export default function InboxPage() {
     undoTimerRef.current = { interval, timeout };
   }
 
-  async function undoApprove(id: string) {
+  async function undoApprove(ids: string[]) {
     clearUndoTimer();
     setUndo(null);
     setError(null);
-    // .catch keeps a network failure from throwing out of the component; null = request never completed.
-    const res = await fetch(`/api/leads/${id}/review`, { method: "DELETE" }).catch(() => null);
-    if (!res) {
-      setError(`Undo failed for lead ${id}: network error — the approve is still in effect.`);
-    } else if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+    const failures: string[] = [];
+    for (const id of ids) {
+      // .catch keeps a network failure from throwing out of the component; null = request never completed.
+      const res = await fetch(`/api/leads/${id}/review`, { method: "DELETE" }).catch(() => null);
+      if (!res) {
+        failures.push(`${id}: network error`);
+      } else if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        failures.push(`${id} (${res.status}${data.error ? `: ${data.error}` : ""})`);
+      }
+    }
+    if (failures.length > 0) {
       setError(
-        `Undo failed for lead ${id} (${res.status}${data.error ? `: ${data.error}` : ""}) — the approve is still in effect.`
+        `Undo failed for ${failures.length} lead(s): ${failures.join("; ")} — the approve is still in effect for those.`
       );
     }
     await refresh();
-    if (res?.ok) window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+    if (failures.length < ids.length) window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
   }
 
   async function assign(id: string, repId: string) {
@@ -265,6 +274,71 @@ export default function InboxPage() {
     }
     setOwner(repId);
     await refresh();
+  }
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllVisible(visibleIds: string[]) {
+    setChecked((prev) => {
+      const allChecked = visibleIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allChecked) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function bulkAction(action: "archive" | "ghl") {
+    const ids = [...checked];
+    if (ids.length === 0) return;
+    const confirmed = window.confirm(
+      action === "ghl"
+        ? `Approve and push ${ids.length} lead(s) to CRM?`
+        : `Archive ${ids.length} lead(s)?`
+    );
+    if (!confirmed) return;
+    setBulkBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/leads/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        leads?: StoredLead[];
+        errors?: { id: string; error: string }[];
+      };
+      const failCount = data.errors?.length ?? 0;
+      const successIds = (data.leads ?? []).map((l) => l.id);
+      if (action === "ghl" && successIds.length > 0) {
+        // CRM-then-review contract established in Fase A Task 3: the bulk "ghl" action
+        // only pushes to CRM, it does not clear needsReview — do that here per id.
+        for (const id of successIds) {
+          await fetch(`/api/leads/${id}/review`, { method: "POST" }).catch(() => null);
+        }
+        startUndoWindow(successIds);
+      }
+      if (failCount > 0) {
+        setError(`${successIds.length} ok / ${failCount} failed`);
+      }
+      setChecked(new Set());
+      await refresh();
+      window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
   const filters: { id: InboxFilter; label: string; count: number }[] = [
@@ -362,10 +436,15 @@ export default function InboxPage() {
 
       {undo ? (
         <div className="fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm text-on-surface shadow-lg">
-          <span>Approved & pushed to CRM — undo reopens HITL only, not the CRM push ({undo.secondsLeft}s)</span>
+          <span>
+            {undo.ids.length > 1
+              ? `Undo bulk approve (${undo.ids.length} leads)`
+              : "Approved & pushed to CRM — undo reopens HITL only, not the CRM push"}{" "}
+            ({undo.secondsLeft}s)
+          </span>
           <button
             type="button"
-            onClick={() => void undoApprove(undo.id)}
+            onClick={() => void undoApprove(undo.ids)}
             className="rounded bg-primary-container px-2 py-1 text-xs font-semibold text-on-primary-container"
           >
             Undo (Ctrl+Z)
@@ -376,9 +455,50 @@ export default function InboxPage() {
       <div className="grid gap-4 lg:grid-cols-12">
         {/* Stack */}
         <div className="lg:col-span-4">
-          <p className="mb-2 text-[10px] font-bold tracking-[0.16em] text-outline uppercase">
-            Pending Inspection Stack
-          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-[0.16em] text-outline uppercase">
+              Pending Inspection Stack
+            </p>
+            {visible.length > 0 ? (
+              <label className="flex items-center gap-1.5 text-[10px] text-outline">
+                <input
+                  type="checkbox"
+                  checked={visible.every((l) => checked.has(l.id))}
+                  onChange={() => toggleAllVisible(visible.map((l) => l.id))}
+                  aria-label="Select all visible leads"
+                />
+                Select all
+              </label>
+            ) : null}
+          </div>
+          {checked.size > 0 ? (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm">
+              <span>{checked.size} selected</span>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void bulkAction("ghl")}
+                className="rounded bg-primary-container px-3 py-1 text-xs font-semibold text-on-primary-container disabled:opacity-50"
+              >
+                Approve &amp; Push
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void bulkAction("archive")}
+                className="rounded bg-surface-container px-3 py-1 text-xs font-semibold disabled:opacity-50"
+              >
+                Archive
+              </button>
+              <button
+                type="button"
+                onClick={() => setChecked(new Set())}
+                className="ml-auto text-xs text-outline underline"
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
           <ul className="space-y-2">
             {visible.length === 0 ? (
               <li className="rounded-xl border border-dashed border-outline-variant/40 px-4 py-10 text-center text-sm text-outline">
@@ -390,17 +510,32 @@ export default function InboxPage() {
                 const tone = tierTone(lead);
                 return (
                   <li key={lead.id}>
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedId(lead.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedId(lead.id);
+                        }
+                      }}
                       className={cn(
-                        "w-full rounded-xl border px-4 py-3 text-left transition",
+                        "w-full cursor-pointer rounded-xl border px-4 py-3 text-left transition",
                         active
                           ? "border-primary/60 bg-primary/10 shadow-[0_0_24px_rgba(6,182,212,0.12)]"
                           : "border-outline-variant/25 bg-surface-container hover:bg-surface-container-high"
                       )}
                     >
                       <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={checked.has(lead.id)}
+                          onChange={() => toggleCheck(lead.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${lead.name}`}
+                          className="mt-1.5"
+                        />
                         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-highest text-[11px] font-bold text-primary">
                           {initials(lead.name)}
                         </div>
@@ -432,7 +567,7 @@ export default function InboxPage() {
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   </li>
                 );
               })
