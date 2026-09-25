@@ -11,6 +11,7 @@ import {
   tierLabel,
   tierTone,
 } from "@/components/leads-engine/lead-ui";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const STAGES: PipelineStage[] = ["new", "qualified", "contacted", "won", "lost"];
@@ -827,59 +828,69 @@ function LeadsRoster() {
                     {visible.map((lead) => {
                       const active = lead.id === selectedId;
                       return (
-                        <tr
-                          key={lead.id}
-                          onClick={() => {
-                            setSelectedId(lead.id);
-                            router.replace(`/leads?filter=${filter}&focus=${lead.id}`);
-                          }}
-                          className={cn(
-                            "cursor-pointer transition",
-                            active ? "bg-primary-container/15" : "hover:bg-surface-container-high/50"
-                          )}
-                        >
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={checked.has(lead.id)}
-                              onChange={() => toggleCheck(lead.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label={`Select ${lead.name}`}
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-highest text-[11px] font-bold text-primary">
-                                {initials(lead.name)}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate font-semibold text-on-surface">{lead.name}</p>
-                                <p className="truncate text-xs text-on-surface-variant">
-                                  {lead.company ? `${lead.company} · ` : ""}
-                                  {lead.email}
-                                </p>
-                              </div>
+                        <Tooltip key={lead.id}>
+                          <TooltipTrigger>
+                            <tr
+                              onClick={() => {
+                                setSelectedId(lead.id);
+                                router.replace(`/leads?filter=${filter}&focus=${lead.id}`);
+                              }}
+                              className={cn(
+                                "cursor-pointer transition",
+                                active ? "bg-primary-container/15" : "hover:bg-surface-container-high/50"
+                              )}
+                            >
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={checked.has(lead.id)}
+                                  onChange={() => toggleCheck(lead.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Select ${lead.name}`}
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-highest text-[11px] font-bold text-primary">
+                                    {initials(lead.name)}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate font-semibold text-on-surface">{lead.name}</p>
+                                    <p className="truncate text-xs text-on-surface-variant">
+                                      {lead.company ? `${lead.company} · ` : ""}
+                                      {lead.email}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex max-w-[220px] flex-wrap gap-1">
+                                  {signalChips(lead).map((chip) => (
+                                    <span
+                                      key={chip}
+                                      className="rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] text-on-surface-variant"
+                                    >
+                                      {chip}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <ScorePill lead={lead} />
+                              </td>
+                              <td className="px-4 py-3 font-mono text-xs text-outline">
+                                {relativeTime(lead.createdAt)}
+                              </td>
+                            </tr>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="start">
+                            <div className="space-y-1">
+                              <p className="font-semibold">{lead.name} · {lead.score}</p>
+                              <p className="text-xs text-outline">{lead.tier} · {lead.classification}</p>
+                              <p className="mt-1 text-xs line-clamp-2">{lead.message?.slice(0, 120)}</p>
                             </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex max-w-[220px] flex-wrap gap-1">
-                              {signalChips(lead).map((chip) => (
-                                <span
-                                  key={chip}
-                                  className="rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] text-on-surface-variant"
-                                >
-                                  {chip}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <ScorePill lead={lead} />
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-outline">
-                            {relativeTime(lead.createdAt)}
-                          </td>
-                        </tr>
+                          </TooltipContent>
+                        </Tooltip>
                       );
                     })}
                   </tbody>
