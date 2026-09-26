@@ -103,7 +103,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
       const message = await patchMessage(
         id,
-        { status: "sent", needsReview: false, isRead: true },
+        {
+          status: "sent",
+          needsReview: false,
+          isRead: true,
+          lastReplySentAt: new Date().toISOString(),
+        },
         { actionType: `send:${operatorActor(req)}:${sentVia}`, humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });

@@ -392,6 +392,7 @@ export async function patchMessage(
       | "isStarred"
       | "draftTone"
       | "handedOffAt"
+      | "lastReplySentAt"
     >
   >,
   opts?: { humanOverride?: boolean; actionType?: string }

@@ -95,6 +95,8 @@ export type EmailThread = {
   engine: "claude" | "heuristic";
   leadIntent: boolean;
   handedOffAt?: string;
+  /** ISO timestamp of the last time *we* sent a reply on this thread — cleared when a new inbound message arrives. */
+  lastReplySentAt?: string;
   receivedAt: string;
   createdAt: string;
   updatedAt: string;

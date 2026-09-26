@@ -1,5 +1,5 @@
 import { fetchGmailInbox, fetchGmailInboxForAccount, type GmailIngest } from "@/lib/gmail";
-import { ingestMessage, listAllThreads } from "@/lib/store";
+import { ingestMessage, listAllThreads, patchMessage } from "@/lib/store";
 import { supabaseListEmailAccounts } from "@/lib/supabase-desk";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/types";
 import { requireOperator } from "@helix/core/operator";
@@ -36,10 +36,32 @@ export async function POST(req: Request) {
   }
 
   const existing = await listAllThreads();
+  const byExternalThreadId = new Map(existing.filter((t) => t.externalThreadId).map((t) => [t.externalThreadId, t]));
   const seen = new Set(existing.map((t) => t.externalThreadId).filter(Boolean));
   const ingested = [];
   for (const row of rows) {
-    if (seen.has(row.externalThreadId)) continue;
+    if (seen.has(row.externalThreadId)) {
+      // This Gmail thread already exists in our store. `ingestMessage()` only
+      // ever creates brand-new threads, so there is currently no code path
+      // that appends this row as a new message onto the existing thread —
+      // sync just skips it as already-seen. What we CAN do here is detect a
+      // genuine inbound reply (sender isn't our own mailbox) landing on a
+      // thread we're still waiting on, and clear lastReplySentAt so it drops
+      // out of the followup queue. Guard against clearing on an echo of our
+      // own sent message coming back through sync.
+      const thread = byExternalThreadId.get(row.externalThreadId);
+      if (
+        thread?.lastReplySentAt &&
+        row.fromEmail.toLowerCase() !== thread.toEmail.toLowerCase()
+      ) {
+        await patchMessage(
+          thread.id,
+          { lastReplySentAt: undefined },
+          { actionType: "sync:inbound_reply_clears_followup", humanOverride: false }
+        );
+      }
+      continue;
+    }
     seen.add(row.externalThreadId);
     ingested.push(
       await ingestMessage({
