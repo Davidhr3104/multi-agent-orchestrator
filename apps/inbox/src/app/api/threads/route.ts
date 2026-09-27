@@ -2,6 +2,7 @@ import { listAllThreads, listMessages, applyDeskPatches } from "@/lib/store";
 import type { ThreadStatus } from "@/lib/types";
 import { toInboxMessage } from "@/lib/types";
 import { applyThreadPatches, readDeskCookie } from "@/lib/desk-state-cookie";
+import { isOverdue } from "@helix/core/inbox/business-days";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
   const needsReview = url.searchParams.get("needs_review");
+  const overdueParam = url.searchParams.get("overdue");
   const state = readDeskCookie(req);
   applyDeskPatches(state.patches);
 
@@ -31,6 +33,12 @@ export async function GET(req: Request) {
     threads = threads.filter((t) => t.status === st);
   } else if (status === "spam") {
     threads = threads.filter((t) => t.category === "spam" || t.status === "blocked");
+  }
+
+  if (overdueParam === "true") {
+    threads = threads.filter(
+      (t) => t.status === "sent" && t.lastReplySentAt && isOverdue(t.lastReplySentAt)
+    );
   }
 
   return Response.json({ threads });

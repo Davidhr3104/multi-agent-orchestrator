@@ -36,6 +36,13 @@ export function ActiveInspector({
     }
   }
 
+  async function sendFollowup() {
+    // Reuses the existing smart_reply codepath to regenerate the draft in a
+    // followup tone, then hands control back to the operator to review/edit
+    // before they hit "Send reply" — no new send codepath is introduced.
+    await act("smart_reply");
+  }
+
   return (
     <section className="glass-panel relative overflow-hidden rounded-xl border-[#8B5CF6]/35 p-5 shadow-lg dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
       <div className="pointer-events-none absolute -top-12 -right-12 size-32 rounded-full bg-[#8B5CF6]/15 blur-2xl" />
@@ -102,6 +109,16 @@ export function ActiveInspector({
         >
           {busy === "approve" ? "…" : "Send reply"}
         </button>
+        {thread.status === "sent" ? (
+          <button
+            type="button"
+            disabled={busy != null}
+            className="btn-tactile h-8 rounded-md border border-amber-500/40 px-3 text-[11px] text-amber-600 dark:text-amber-300 disabled:opacity-50"
+            onClick={() => void sendFollowup()}
+          >
+            {busy === "smart_reply" ? "…" : "Send followup"}
+          </button>
+        ) : null}
         {thread.leadIntent && !thread.handedOffAt ? (
           <button
             type="button"

@@ -3,13 +3,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, ChevronLeft, CircleHelp, LayoutDashboard, Repeat2, Send, Settings, Shield, Timer } from "lucide-react";
+import { Activity, BarChart3, ChevronLeft, CircleHelp, Clock, LayoutDashboard, Repeat2, Send, Settings, Shield, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export type InboxNavId =
   | "dashboard"
   | "queue"
+  | "followups"
   | "routed"
   | "blocked"
   | "sla"
@@ -91,6 +92,7 @@ export function InboxChrome({
   }[] = [
     { id: "dashboard", label: "Dashboard", href: "/" },
     { id: "queue", label: "HITL queue", href: "/hitl-queue", badge: reviewCount, badgeTone: "amber" },
+    { id: "followups", label: "Followups", href: "/followup-queue" },
     { id: "routed", label: "Routed", href: "/routed", badge: routedCount, badgeTone: "muted" },
     { id: "blocked", label: "Blocked", href: "/blocked", badge: blockedCount, badgeTone: "muted" },
     { id: "sla", label: "SLA", href: "/sla" },
@@ -148,9 +150,11 @@ export function InboxChrome({
                   ? LayoutDashboard
                   : item.id === "queue"
                     ? Activity
-                    : item.id === "routed"
-                      ? Send
-                      : item.id === "sla"
+                    : item.id === "followups"
+                      ? Clock
+                      : item.id === "routed"
+                        ? Send
+                        : item.id === "sla"
                         ? Timer
                         : item.id === "analytics"
                           ? BarChart3
