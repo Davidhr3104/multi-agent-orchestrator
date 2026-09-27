@@ -24,7 +24,17 @@ function loadKbDocuments(): CorpusDocument[] {
 
 function allKbChunks(): CorpusChunk[] {
   if (cachedChunks) return cachedChunks;
-  cachedChunks = loadKbDocuments().flatMap((doc) => chunkDocument(doc));
+  // I3: the kb/ directory can be missing or unreadable (not deployed,
+  // Next.js file-tracing didn't bundle it, permissions, etc.) — that must
+  // degrade to "no citations", never break ingestion/classification. Per
+  // the repo-wide rule in CLAUDE.md: "Missing or failed → heuristic
+  // fallback, never a blank screen."
+  try {
+    cachedChunks = loadKbDocuments().flatMap((doc) => chunkDocument(doc));
+  } catch (err) {
+    console.warn("[helix-inbox] KB unavailable:", err);
+    cachedChunks = [];
+  }
   return cachedChunks;
 }
 
