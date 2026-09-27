@@ -52,6 +52,13 @@ create table if not exists inbox.email_threads (
   needs_review boolean not null default false,
   snooze_until timestamptz,
   engine text not null default 'heuristic',
+  -- handed_off_at (lead-handoff.sql) and last_reply_sent_at (last-reply-sent-at.sql)
+  -- are also applied as incremental migrations against already-provisioned
+  -- databases — included here too so a FRESH database provisioned straight
+  -- from this file already has both columns. See supabase/README.md for the
+  -- required apply order.
+  handed_off_at timestamptz,
+  last_reply_sent_at timestamptz,
   received_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
