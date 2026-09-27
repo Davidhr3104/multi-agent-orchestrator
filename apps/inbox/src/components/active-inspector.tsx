@@ -36,10 +36,12 @@ export function ActiveInspector({
     }
   }
 
-  async function sendFollowup() {
-    // Reuses the existing smart_reply codepath to regenerate the draft in a
-    // followup tone, then hands control back to the operator to review/edit
-    // before they hit "Send reply" — no new send codepath is introduced.
+  async function draftFollowup() {
+    // M4: this button reuses the same smart_reply codepath as "Regen reply"
+    // — it drafts, it does not send. regenerateSmartReply(id) takes no
+    // tone/intent parameter today, so there is no "followup" mode to pass
+    // through; adding one would be a bigger change than this label fix
+    // warrants. The operator still reviews/edits before hitting "Send reply".
     await act("smart_reply");
   }
 
@@ -114,9 +116,9 @@ export function ActiveInspector({
             type="button"
             disabled={busy != null}
             className="btn-tactile h-8 rounded-md border border-amber-500/40 px-3 text-[11px] text-amber-600 dark:text-amber-300 disabled:opacity-50"
-            onClick={() => void sendFollowup()}
+            onClick={() => void draftFollowup()}
           >
-            {busy === "smart_reply" ? "…" : "Send followup"}
+            {busy === "smart_reply" ? "…" : "Draft followup"}
           </button>
         ) : null}
         {thread.leadIntent && !thread.handedOffAt ? (
