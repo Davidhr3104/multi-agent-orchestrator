@@ -6,6 +6,7 @@ import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { Sheet, SheetTrigger, SheetContent } from "@/components/ui/sheet";
 import { EducationalEmpty } from "@/components/educational-empty";
 import { INBOX_HELP, EMPTY_INBOX } from "@helix/help";
 import { summarizeInboxSla } from "@/lib/sla";
@@ -731,9 +732,37 @@ export function InboxDashboard() {
                   <span className="size-2 animate-pulse rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
                   <h3 className="text-sm font-semibold text-foreground">Active inspector</h3>
                 </div>
-                <div className="flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-gradient-to-r from-[#10B981]/20 to-[#059669]/20 px-2.5 py-1 text-emerald-700 dark:text-[#34D399] shadow-[0_0_12px_-2px_rgba(16,185,129,0.3)]">
-                  <span className="font-mono text-[10px] font-semibold tracking-wider uppercase">Match</span>
-                  <span className="font-mono text-xs font-bold">{selected.urgencyScore}%</span>
+                <div className="flex items-center gap-2">
+                  <Sheet>
+                    <SheetTrigger
+                      type="button"
+                      className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Why this?
+                    </SheetTrigger>
+                    <SheetContent>
+                      <div className="space-y-4 p-4">
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Classification</p>
+                          <p className="text-sm font-semibold">
+                            {categoryLabel(selected.category)} · {selected.sentiment}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {Math.round(selected.aiConfidence)}% confidence
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Reasoning</p>
+                          <p className="text-sm">{selected.reasoning}</p>
+                        </div>
+                        {/* KB citations section added in Task 8 */}
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                  <div className="flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-gradient-to-r from-[#10B981]/20 to-[#059669]/20 px-2.5 py-1 text-emerald-700 dark:text-[#34D399] shadow-[0_0_12px_-2px_rgba(16,185,129,0.3)]">
+                    <span className="font-mono text-[10px] font-semibold tracking-wider uppercase">Match</span>
+                    <span className="font-mono text-xs font-bold">{selected.urgencyScore}%</span>
+                  </div>
                 </div>
               </div>
               <h4 className="mb-1 text-sm leading-snug font-semibold text-foreground">{selected.subject}</h4>

@@ -23,6 +23,12 @@
   --ring: 239 84% 60%;
   --primary: 239 84% 60%;
   --primary-foreground: 0 0% 100%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --input: 220 13% 91%;
   --glass-bg: 0 0% 100% / 0.82;
   --glass-border: 220 13% 91%;
   --glass-shadow: 0 10px 30px -12px rgb(15 23 42 / 0.12);
@@ -49,6 +55,12 @@
   --ring: 263 70% 66%;
   --primary: 263 70% 66%;
   --primary-foreground: 0 0% 100%;
+  --popover: 217 33% 11%;
+  --popover-foreground: 226 100% 94%;
+  --secondary: 258 40% 12%;
+  --secondary-foreground: 226 100% 94%;
+  --destructive: 0 84% 63%;
+  --input: 271 60% 55% / 0.22;
   --glass-bg: 260 35% 8% / 0.65;
   --glass-border: 0 0% 100% / 0.08;
   --glass-shadow:
@@ -81,6 +93,12 @@
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
   --color-ring: hsl(var(--ring));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-input: hsl(var(--input));
   --color-cosmic: #0b0f1a;
   --color-brand-cobalt: #3d4df5;
   --color-brand-electric: #4e5ff7;
