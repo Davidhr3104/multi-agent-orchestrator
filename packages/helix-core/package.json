@@ -9,7 +9,8 @@
     "./action-token": "./src/action-token.ts",
     "./secret-fields": "./src/secret-fields.ts",
     "./lead/intelligence": "./src/lead/intelligence.ts",
-    "./inbox/business-days": "./src/inbox/business-days.ts"
+    "./inbox/business-days": "./src/inbox/business-days.ts",
+    "./inbox/eml": "./src/inbox/eml.ts"
   },
   "scripts": {
     "test": "vitest run"
