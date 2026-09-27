@@ -24,6 +24,7 @@ import {
   supabaseUpsertThreads,
 } from "@/lib/supabase-desk";
 import type { ThreadPatch } from "@/lib/desk-state-cookie";
+import { matchThread, type MatchableThread, type MatchableMessage, type ParsedEml } from "@helix/core/inbox/eml";
 
 export type { InboxMessage, EmailThread, ThreadMessage, AiActionLog, UserPreferences } from "@/lib/types";
 export { toInboxMessage, categoryLabel } from "@/lib/types";
@@ -539,6 +540,56 @@ export async function ingestMessage(input: {
     await notifySlackLeadIntent(thread);
   }
   return toInboxMessage(thread);
+}
+
+export async function findThreadForEml(parsed: ParsedEml): Promise<EmailThread | null> {
+  const mem = deskMem();
+  seedMemory();
+  await hydrateFromRemote();
+  const threads: MatchableThread[] = [...mem.threads.values()].map((t) => ({
+    id: t.id,
+    subject: t.subject,
+    fromEmail: t.fromEmail,
+    toEmail: t.toEmail,
+  }));
+  const allMessages: MatchableMessage[] = [];
+  for (const [threadId, msgs] of mem.messages.entries()) {
+    for (const m of msgs) {
+      if (m.rfcMessageId) allMessages.push({ threadId, rfcMessageId: m.rfcMessageId });
+    }
+  }
+  const matched = matchThread(parsed, threads, allMessages);
+  if (!matched) return null;
+  return (await getThread(matched.id)) ?? null;
+}
+
+export async function appendEmlToThread(thread: EmailThread, parsed: ParsedEml): Promise<InboxMessage> {
+  const newMessage: ThreadMessage = {
+    id: `tm-${thread.id}-${Date.now().toString(36)}`,
+    threadId: thread.id,
+    rfcMessageId: parsed.rfcMessageId,
+    fromEmail: parsed.fromEmail,
+    toEmail: parsed.toEmail,
+    subject: parsed.subject,
+    body: parsed.textBody,
+    sentAt: parsed.date,
+    createdAt: nowIso(),
+  };
+  const existing = await listThreadMessages(thread.id);
+  const mem = deskMem();
+  mem.messages.set(thread.id, [...existing, newMessage]);
+  await supabaseUpsertThreadMessages([newMessage]);
+
+  const isInboundReply = parsed.fromEmail.toLowerCase() !== thread.toEmail.toLowerCase();
+  const patch: Partial<Pick<EmailThread, "lastReplySentAt">> = {};
+  if (isInboundReply && thread.lastReplySentAt) {
+    patch.lastReplySentAt = undefined;
+  }
+  const updated = await patchMessage(thread.id, patch, {
+    actionType: "eml_attached",
+    humanOverride: true,
+  });
+  return updated!;
 }
 
 export async function regenerateSmartReply(id: string): Promise<InboxMessage | null> {
