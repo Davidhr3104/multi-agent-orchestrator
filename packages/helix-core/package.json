@@ -10,12 +10,17 @@
     "./secret-fields": "./src/secret-fields.ts",
     "./lead/intelligence": "./src/lead/intelligence.ts",
     "./inbox/business-days": "./src/inbox/business-days.ts",
-    "./inbox/eml": "./src/inbox/eml.ts"
+    "./inbox/eml": "./src/inbox/eml.ts",
+    "./inbox/followup": "./src/inbox/followup.ts"
   },
   "scripts": {
     "test": "vitest run"
   },
+  "dependencies": {
+    "mailparser": "^3.9.29"
+  },
   "devDependencies": {
+    "@types/mailparser": "^3.4.6",
     "vitest": "^3.2.4"
   }
 }

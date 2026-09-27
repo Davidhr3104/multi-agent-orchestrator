@@ -20,6 +20,12 @@ export type ThreadPatch = Partial<
     | "reasoning"
     | "draftTone"
     | "engine"
+    // M7: handedOffAt and lastReplySentAt are both real EmailThread fields
+    // that patchMessage() writes — without them here, the cookie-only
+    // (no-Supabase) fallback mode silently drops both on every round-trip
+    // (readDeskCookie → applyDeskPatches only re-applies whitelisted keys).
+    | "handedOffAt"
+    | "lastReplySentAt"
   >
 >;
 
@@ -95,6 +101,8 @@ export function patchFromThread(thread: EmailThread | InboxMessage): ThreadPatch
     reasoning: thread.reasoning,
     draftTone: thread.draftTone,
     engine: thread.engine,
+    handedOffAt: thread.handedOffAt,
+    lastReplySentAt: thread.lastReplySentAt,
   };
 }
 

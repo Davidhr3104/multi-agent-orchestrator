@@ -26,6 +26,7 @@ import {
 } from "@/lib/supabase-desk";
 import type { ThreadPatch } from "@/lib/desk-state-cookie";
 import { matchThread, type MatchableThread, type MatchableMessage, type ParsedEml } from "@helix/core/inbox/eml";
+import { shouldClearFollowup } from "@helix/core/inbox/followup";
 
 export type { InboxMessage, EmailThread, ThreadMessage, AiActionLog, UserPreferences } from "@/lib/types";
 export { toInboxMessage, categoryLabel } from "@/lib/types";
@@ -425,6 +426,8 @@ export async function ingestMessage(input: {
   rfcMessageId?: string;
   /** Which connected mailbox this arrived at — when set, toEmail reflects the real alias (ops@, support@), not the global default. */
   emailAccountId?: string;
+  /** ISO timestamp of when the message was actually sent (e.g. a .eml's Date header) — when omitted, defaults to now. Only affects the message's own sentAt, not the thread's createdAt/receivedAt (ingestion time stays ingestion time). */
+  sentAt?: string;
 }): Promise<InboxMessage> {
   const mem = deskMem();
   seedMemory();
@@ -459,7 +462,7 @@ export async function ingestMessage(input: {
       toEmail,
       subject: input.subject,
       body: input.body,
-      sentAt: createdAt,
+      sentAt: input.sentAt ?? createdAt,
       createdAt,
     },
   ];
@@ -565,7 +568,26 @@ export async function findThreadForEml(parsed: ParsedEml): Promise<EmailThread |
   return (await getThread(matched.id)) ?? null;
 }
 
-export async function appendEmlToThread(thread: EmailThread, parsed: ParsedEml): Promise<InboxMessage> {
+export type AppendEmlResult = { message: InboxMessage; duplicate: boolean };
+
+export async function appendEmlToThread(
+  thread: EmailThread,
+  parsed: ParsedEml
+): Promise<AppendEmlResult> {
+  const existing = await listThreadMessages(thread.id);
+
+  // I1: a .eml whose rfcMessageId matches a message we already have for this
+  // thread is a re-upload of the same email, not a new reply — don't append
+  // a duplicate ThreadMessage, and don't let it clear/reopen the thread.
+  const alreadyKnown = Boolean(
+    parsed.rfcMessageId && existing.some((m) => m.rfcMessageId === parsed.rfcMessageId)
+  );
+
+  if (alreadyKnown) {
+    const current = await getThread(thread.id);
+    return { message: toInboxMessage(current ?? thread), duplicate: true };
+  }
+
   const newMessage: ThreadMessage = {
     id: `tm-${thread.id}-${Date.now().toString(36)}`,
     threadId: thread.id,
@@ -577,21 +599,23 @@ export async function appendEmlToThread(thread: EmailThread, parsed: ParsedEml):
     sentAt: parsed.date,
     createdAt: nowIso(),
   };
-  const existing = await listThreadMessages(thread.id);
   const mem = deskMem();
   mem.messages.set(thread.id, [...existing, newMessage]);
   await supabaseUpsertThreadMessages([newMessage]);
 
-  const isInboundReply = parsed.fromEmail.toLowerCase() !== thread.toEmail.toLowerCase();
-  const patch: Partial<Pick<EmailThread, "lastReplySentAt">> = {};
-  if (isInboundReply && thread.lastReplySentAt) {
+  const patch: Partial<Pick<EmailThread, "lastReplySentAt" | "status" | "needsReview">> = {};
+  if (shouldClearFollowup(thread, { fromEmail: parsed.fromEmail, alreadyKnown: false, sentAt: parsed.date })) {
+    // I4: same rule as the sync path — clearing lastReplySentAt on a genuine
+    // reply must reopen the thread into the review queue in the same patch.
     patch.lastReplySentAt = undefined;
+    patch.status = "review";
+    patch.needsReview = true;
   }
   const updated = await patchMessage(thread.id, patch, {
     actionType: "eml_attached",
     humanOverride: true,
   });
-  return updated!;
+  return { message: updated!, duplicate: false };
 }
 
 export async function regenerateSmartReply(id: string): Promise<InboxMessage | null> {

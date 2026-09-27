@@ -3,6 +3,8 @@ import { simpleParser } from "mailparser";
 export type ParsedEml = {
   subject: string;
   fromEmail: string;
+  /** The .eml's display name for the sender (e.g. "Jane Doe" from "Jane Doe <jane@example.com>"), when present. */
+  fromName?: string;
   toEmail?: string;
   date: string;
   rfcMessageId?: string;
@@ -36,6 +38,7 @@ export async function parseEml(raw: Buffer | string): Promise<ParsedEml> {
   return {
     subject: parsed.subject ?? "",
     fromEmail: parsed.from?.value[0]?.address ?? "",
+    fromName: parsed.from?.value[0]?.name || undefined,
     toEmail: parsed.to && "value" in parsed.to ? parsed.to.value[0]?.address : undefined,
     date: (parsed.date ?? new Date()).toISOString(),
     rfcMessageId: parsed.messageId,
