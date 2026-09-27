@@ -50,6 +50,16 @@ export async function POST(req: Request) {
       // out of the followup queue. Guard against clearing on an echo of our
       // own sent message coming back through sync.
       const thread = byExternalThreadId.get(row.externalThreadId);
+      // Both sides are verified bare, lowercase-comparable addresses, so no
+      // display-name stripping is needed here: row.fromEmail comes from
+      // parseFrom() in gmail.ts, which strips any "Display Name <addr>"
+      // wrapper and returns only the bare address in `.email` (see the
+      // `angle` branch there). thread.toEmail is either DEFAULT_TO_EMAIL
+      // (types.ts — a hardcoded bare literal, "triage@company.io") or an
+      // EmailAccount.emailAddress populated by fetchGmailAddress() in
+      // gmail-oauth.ts, which reads `emailAddress` straight off Gmail's
+      // users.getProfile response — a bare address by construction, never a
+      // header-style string.
       if (
         thread?.lastReplySentAt &&
         row.fromEmail.toLowerCase() !== thread.toEmail.toLowerCase()
