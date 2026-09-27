@@ -6,6 +6,7 @@ import {
   snoozeThread,
   applyDeskPatches,
 } from "@/lib/store";
+import { queryInboxKb } from "@/lib/kb-store";
 import {
   jsonWithDeskCookie,
   patchFromThread,
@@ -31,7 +32,14 @@ export async function GET(req: Request, ctx: Ctx) {
   if (!message) return Response.json({ error: "Not found" }, { status: 404 });
   const patched = state.patches[id] ? { ...message, ...state.patches[id] } : message;
   const history = await listThreadMessages(id);
-  return Response.json({ message: patched, history });
+  // I2: recompute kbHits on every read instead of trusting whatever was set
+  // at ingest time — the ingest-time value lives only in the in-memory
+  // thread object and does not survive a Supabase-backed cold start/restart,
+  // so citations would silently vanish. Recomputing here is cheap (KB is a
+  // small, cached, in-process corpus) and makes the drawer's citations
+  // durable across restarts without a second migration/column.
+  const kbHits = queryInboxKb({ subject: patched.subject, body: patched.body });
+  return Response.json({ message: { ...patched, kbHits }, history });
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {

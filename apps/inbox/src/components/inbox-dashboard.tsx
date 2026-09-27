@@ -6,7 +6,7 @@ import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { Sheet, SheetTrigger, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { EducationalEmpty } from "@/components/educational-empty";
 import { INBOX_HELP, EMPTY_INBOX } from "@helix/help";
 import { summarizeInboxSla } from "@/lib/sla";
@@ -740,7 +740,8 @@ export function InboxDashboard() {
                     >
                       Why this?
                     </SheetTrigger>
-                    <SheetContent>
+                    <SheetContent className="overflow-y-auto">
+                      <SheetTitle className="px-4 pt-4">Why this?</SheetTitle>
                       <div className="space-y-4 p-4">
                         <div>
                           <p className="text-xs uppercase text-muted-foreground">Classification</p>
@@ -755,9 +756,9 @@ export function InboxDashboard() {
                           <p className="text-xs uppercase text-muted-foreground">Reasoning</p>
                           <p className="text-sm">{selected.reasoning}</p>
                         </div>
-                        {selected.kbHits && selected.kbHits.length > 0 ? (
-                          <div>
-                            <p className="text-xs uppercase text-muted-foreground">Knowledge base</p>
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">Knowledge base</p>
+                          {selected.kbHits && selected.kbHits.length > 0 ? (
                             <ul className="space-y-2">
                               {selected.kbHits.map((hit) => (
                                 <li
@@ -772,8 +773,12 @@ export function InboxDashboard() {
                                 </li>
                               ))}
                             </ul>
-                          </div>
-                        ) : null}
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              No KB citations for this thread
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </SheetContent>
                   </Sheet>
