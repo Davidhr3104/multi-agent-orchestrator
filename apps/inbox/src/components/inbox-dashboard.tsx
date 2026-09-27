@@ -755,7 +755,25 @@ export function InboxDashboard() {
                           <p className="text-xs uppercase text-muted-foreground">Reasoning</p>
                           <p className="text-sm">{selected.reasoning}</p>
                         </div>
-                        {/* KB citations section added in Task 8 */}
+                        {selected.kbHits && selected.kbHits.length > 0 ? (
+                          <div>
+                            <p className="text-xs uppercase text-muted-foreground">Knowledge base</p>
+                            <ul className="space-y-2">
+                              {selected.kbHits.map((hit) => (
+                                <li
+                                  key={hit.chunkId}
+                                  className="rounded border border-border p-2 text-sm"
+                                >
+                                  <p className="font-semibold">{hit.docTitle}</p>
+                                  <p className="italic">&ldquo;{hit.quote}&rdquo;</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {hit.verified ? "Verified" : "Unverified"} · relevance {hit.score}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
                       </div>
                     </SheetContent>
                   </Sheet>

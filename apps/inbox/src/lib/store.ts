@@ -8,6 +8,7 @@ import {
 } from "@/lib/types";
 import { suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
 import { smartReplyWithContext } from "@/lib/smart-reply";
+import { queryInboxKb } from "@/lib/kb-store";
 import { notifySlackLeadIntent } from "@/lib/slack";
 import { autoSeedEnabled } from "@helix/core";
 import {
@@ -473,6 +474,7 @@ export async function ingestMessage(input: {
       aiConfidence: smart.confidence,
       reasoning: smart.reasoning ? `${thread.reasoning} · ${smart.reasoning}` : thread.reasoning,
       draftTone: mem.prefs.defaultTone,
+      kbHits: queryInboxKb({ subject: input.subject, body: input.body }),
     };
   }
 

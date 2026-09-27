@@ -97,6 +97,8 @@ export type EmailThread = {
   handedOffAt?: string;
   /** ISO timestamp of the last time *we* sent a reply on this thread — cleared when a new inbound message arrives. */
   lastReplySentAt?: string;
+  /** Knowledge-base citations retrieved for this thread's subject/body, if any (populated at classification time). */
+  kbHits?: import("@helix/core").CorpusHit[];
   receivedAt: string;
   createdAt: string;
   updatedAt: string;
