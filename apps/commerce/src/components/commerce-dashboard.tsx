@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReorderRequest, StoredOrder, StoredProduct } from "@helix/core";
 import { Boxes, ShieldAlert, ShoppingCart, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { AskAiCard } from "@/components/ask-ai-card";
 import { MetricCard } from "@/components/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { DailyBriefCard } from "@/components/daily-brief-card";
@@ -132,6 +133,8 @@ export function CommerceDashboard() {
           </p>
         </div>
       </div>
+
+      <AskAiCard orderId={selected?.id} />
 
       <section className="animate-enter delay-2 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
