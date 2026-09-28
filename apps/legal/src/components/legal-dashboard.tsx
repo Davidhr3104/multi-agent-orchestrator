@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PartnerVerdict, PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
+import { AskAiCard } from "@/components/ask-ai-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -606,6 +607,8 @@ export function LegalDashboard() {
             </button>
           </div>
         </section>
+
+        <AskAiCard rfpId={selected?.id} />
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
           <div className="animate-entrance stagger-5 space-y-4 lg:col-span-8">
