@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, RefreshCw, Search, Zap } from "lucide-react";
+import { AskAiCard } from "@/components/ask-ai-card";
 import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -339,6 +340,8 @@ export function InboxDashboard() {
           </button>
         </div>
       </div>
+
+      <AskAiCard threadId={selected?.id} />
 
       {sla.breachCount > 0 || sla.hoursSaved > 0 ? (
         <Link
