@@ -61,7 +61,37 @@ export function AskAiCard() {
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-outline-variant/25 bg-surface-container p-5">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 140% at 15% 0%, rgba(6,182,212,0.22) 0%, rgba(6,182,212,0.08) 35%, transparent 70%)",
+        }}
+        aria-hidden
+      />
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-60"
+        viewBox="0 0 1000 400"
+        preserveAspectRatio="none"
+        aria-hidden
+      >
+        <path
+          d="M20 380 C 160 340, 220 300, 300 320 S 460 280, 520 220 S 640 60, 760 90 S 900 40, 980 20"
+          fill="none"
+          stroke="url(#ask-ai-sparkline-gradient)"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <defs>
+          <linearGradient id="ask-ai-sparkline-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.15" />
+            <stop offset="60%" stopColor="#22d3ee" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#67e8f9" stopOpacity="0.85" />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-outline-variant/40 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-on-surface-variant uppercase">
