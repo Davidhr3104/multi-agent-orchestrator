@@ -2,7 +2,7 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=helix-commerce",
-  "outputDirectory": "apps/commerce/.next",
+  "outputDirectory": ".next",
   "crons": [
     {
       "path": "/api/daily-brief",
