@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AttributedLead, CampaignAction, DeskWasteSummary, SpendEvent, StoredCampaign } from "@helix/core";
+import { AskAiCard } from "@/components/ask-ai-card";
 import { ScatterPlot } from "@/components/scatter-plot";
 import { SAMPLE_CSV } from "@/lib/sample-csv";
 import {
@@ -396,6 +397,9 @@ export function MarketingDashboard() {
             </button>
           </div>
         </div>
+
+        <AskAiCard />
+
         {unmatchedIds > 0 ? (
           <a
             className="flex items-center justify-between gap-3 rounded-xl bg-primary-container/10 px-4 py-3 text-xs text-marketing-amber hover:bg-primary-container/15"
