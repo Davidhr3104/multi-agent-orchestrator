@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StoredLead } from "@helix/core";
+import { AskAiCard } from "@/components/ask-ai-card";
 import { AttentionQueue } from "./AttentionQueue";
 import { KpiStrip } from "./KpiStrip";
 import { PriorityTable } from "./PriorityTable";
@@ -157,6 +158,8 @@ export function TriageOverview() {
           {simBusy ? "Simulating…" : "Simulate Webhook"}
         </button>
       </div>
+
+      <AskAiCard />
 
       {loading ? (
         <p className="text-sm text-outline">Loading triage…</p>
