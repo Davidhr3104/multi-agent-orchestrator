@@ -416,7 +416,7 @@ export function AskAiDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col border-l border-sky-900/40 bg-[#04101c] sm:max-w-md"
+        className="flex h-full w-full min-h-0 flex-col overflow-hidden border-l border-sky-900/40 bg-[#04101c] sm:max-w-md"
       >
         <SheetHeader className="border-b border-sky-900/40 pb-3">
           <div className="flex items-center justify-between gap-2 pr-8">
