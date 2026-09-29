@@ -1,5 +1,15 @@
 export { completeWithClaude, isClaudeConfigured, parseJsonObject } from "./claude";
-export { askAi, type AskAiEngine, type AskAiMessage, type AskAiResult, type AskAiRole } from "./ask-ai";
+export {
+  askAi,
+  askAiWithProposal,
+  type AskAiActionProposal,
+  type AskAiAttachment,
+  type AskAiDrawerResult,
+  type AskAiEngine,
+  type AskAiMessage,
+  type AskAiResult,
+  type AskAiRole,
+} from "./ask-ai";
 export {
   getSecret,
   isGhlConfigured,

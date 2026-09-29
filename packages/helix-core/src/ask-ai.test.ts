@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { askAi } from "./ask-ai";
+import { askAi, askAiWithProposal } from "./ask-ai";
 import { resetSecretsCache, setSecrets } from "./secrets";
 
 const prevPath = process.env.HELIX_SECRETS_PATH;
@@ -113,5 +113,145 @@ describe("askAi", () => {
     });
 
     expect(result.engine).toBe("fallback");
+  });
+});
+
+describe("askAiWithProposal", () => {
+  it("falls back to the record context when Claude is not configured", async () => {
+    const result = await askAiWithProposal({
+      systemPrompt: "You explain Helix for Leads.",
+      recordContext: "5 leads, 2 cold.",
+      history: [{ role: "user", content: "Archive my cold leads" }],
+      proposalInstruction: "Propose archive_leads when asked to clean up stale leads.",
+    });
+    expect(result).toEqual({ answer: "5 leads, 2 cold.", engine: "fallback" });
+    expect(result.proposal).toBeUndefined();
+  });
+
+  it("returns a plain answer with no proposal when the response has no JSON block", async () => {
+    setSecrets({ ANTHROPIC_API_KEY: "sk-ant-test-key" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "Your hottest lead is Acme Corp at 90." }],
+        }),
+      })
+    );
+
+    const result = await askAiWithProposal({
+      systemPrompt: "You explain Helix for Leads.",
+      history: [{ role: "user", content: "What's my hottest lead?" }],
+      proposalInstruction: "Propose archive_leads when asked to clean up stale leads.",
+    });
+
+    expect(result).toEqual({ answer: "Your hottest lead is Acme Corp at 90.", engine: "claude" });
+    expect(result.proposal).toBeUndefined();
+  });
+
+  it("parses a valid fenced action_proposal JSON block", async () => {
+    setSecrets({ ANTHROPIC_API_KEY: "sk-ant-test-key" });
+    const proposalJson = JSON.stringify({
+      type: "action_proposal",
+      action: "archive_leads",
+      summary: "I found 2 cold leads with no activity in 30+ days.",
+      targets: [
+        { id: "lead-1", label: "Acme Corp" },
+        { id: "lead-2", label: "Beta LLC" },
+      ],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "```json\n" + proposalJson + "\n```" }],
+        }),
+      })
+    );
+
+    const result = await askAiWithProposal({
+      systemPrompt: "You explain Helix for Leads.",
+      history: [{ role: "user", content: "Archive my cold leads" }],
+      proposalInstruction: "Propose archive_leads when asked to clean up stale leads.",
+    });
+
+    expect(result.engine).toBe("claude");
+    expect(result.proposal).toEqual({
+      type: "action_proposal",
+      action: "archive_leads",
+      summary: "I found 2 cold leads with no activity in 30+ days.",
+      targets: [
+        { id: "lead-1", label: "Acme Corp" },
+        { id: "lead-2", label: "Beta LLC" },
+      ],
+    });
+    expect(result.answer).toBe("I found 2 cold leads with no activity in 30+ days.");
+  });
+
+  it("treats malformed JSON in a fenced block as no proposal, never throws", async () => {
+    setSecrets({ ANTHROPIC_API_KEY: "sk-ant-test-key" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "```json\n{ not: valid json\n```" }],
+        }),
+      })
+    );
+
+    const result = await askAiWithProposal({
+      systemPrompt: "You explain Helix for Leads.",
+      history: [{ role: "user", content: "Archive my cold leads" }],
+      proposalInstruction: "Propose archive_leads when asked to clean up stale leads.",
+    });
+
+    expect(result.engine).toBe("claude");
+    expect(result.proposal).toBeUndefined();
+    expect(result.answer).toContain("not: valid json");
+  });
+
+  it("falls back when Claude is unreachable", async () => {
+    setSecrets({ ANTHROPIC_API_KEY: "sk-ant-test-key" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    const result = await askAiWithProposal({
+      systemPrompt: "You explain Helix for Leads.",
+      recordContext: "5 leads, 2 cold.",
+      history: [{ role: "user", content: "Archive my cold leads" }],
+      proposalInstruction: "Propose archive_leads when asked to clean up stale leads.",
+    });
+
+    expect(result).toEqual({ answer: "5 leads, 2 cold.", engine: "fallback" });
+    expect(result.proposal).toBeUndefined();
+  });
+
+  it("includes image attachments as content blocks alongside text", async () => {
+    setSecrets({ ANTHROPIC_API_KEY: "sk-ant-test-key" });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: [{ type: "text", text: "I see a screenshot of a lead list." }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await askAiWithProposal({
+      systemPrompt: "You explain Helix for Leads.",
+      history: [
+        {
+          role: "user",
+          content: "What do you see?",
+          attachments: [{ type: "image", data: "base64data", mediaType: "image/png" }],
+        },
+      ],
+      proposalInstruction: "Propose archive_leads when asked to clean up stale leads.",
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.messages[0].content).toEqual([
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "base64data" } },
+      { type: "text", text: "What do you see?" },
+    ]);
   });
 });
