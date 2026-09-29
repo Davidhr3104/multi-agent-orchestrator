@@ -11,7 +11,13 @@ const QUICK_CHIPS = [
   { label: "How is sentiment detected?", question: "How does the engine detect sentiment?" },
 ];
 
-export function AskAiCard({ threadId }: { threadId?: string }) {
+export function AskAiCard({
+  threadId,
+  onOpenDrawer,
+}: {
+  threadId?: string;
+  onOpenDrawer?: (initialQuestion?: string) => void;
+}) {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -52,6 +58,11 @@ export function AskAiCard({ threadId }: { threadId?: string }) {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (onOpenDrawer) {
+      onOpenDrawer(question.trim() || undefined);
+      setQuestion("");
+      return;
+    }
     void ask(question);
   }
 
@@ -73,7 +84,7 @@ export function AskAiCard({ threadId }: { threadId?: string }) {
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-              Helix Copilot
+              Helix AI
             </span>
             <span className={`flex items-center gap-1 text-[11px] font-semibold ${statusTone}`}>
               <span className={`inline-block size-1.5 rounded-full ${dotTone}`} />
@@ -105,7 +116,7 @@ export function AskAiCard({ threadId }: { threadId?: string }) {
               disabled={busy || !question.trim()}
               className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg bg-gradient-to-r from-[#4E5FF7] via-[#6366F1] to-[#8B5CF6] px-4 text-xs font-bold text-white shadow-[0_4px_18px_rgba(124,58,237,0.45)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {busy ? "Asking…" : "Ask Copilot →"}
+              {busy ? "Asking…" : "Ask Helix →"}
             </button>
           </form>
 
@@ -146,12 +157,21 @@ export function AskAiCard({ threadId }: { threadId?: string }) {
           ) : null}
         </div>
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/ask-ai/ask-ai-visual.png"
-          alt=""
-          className="hidden h-44 w-auto shrink-0 rounded-lg object-contain lg:block"
-        />
+        <button
+          type="button"
+          onClick={() => onOpenDrawer?.()}
+          disabled={!onOpenDrawer}
+          aria-label="Open Ask Helix AI assistant"
+          className="group relative hidden shrink-0 rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100 lg:block"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ask-ai/ask-ai-visual.png" alt="" className="h-44 w-auto rounded-lg object-contain" />
+          {onOpenDrawer ? (
+            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+              Ask Helix <span aria-hidden>→</span>
+            </span>
+          ) : null}
+        </button>
       </div>
     </div>
   );

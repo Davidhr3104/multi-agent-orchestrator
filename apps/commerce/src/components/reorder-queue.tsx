@@ -71,6 +71,7 @@ export function ReorderQueue({
           return (
             <div
               key={product.id}
+              data-ai-id={product.id}
               className="flex items-center justify-between rounded-lg border border-border bg-black/[0.015] p-3 transition hover:border-black/10 dark:bg-white/[0.02] dark:hover:border-white/10"
             >
               <div className="space-y-1">

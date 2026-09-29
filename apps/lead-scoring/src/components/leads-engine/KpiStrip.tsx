@@ -1,11 +1,31 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 type Props = {
   ingested: number;
   hotPercent: number;
   median: number;
   hitlPending: number;
 };
+
+function KpiValue({ value }: { value: string }) {
+  const prev = useRef(value);
+  const [bump, setBump] = useState(0);
+  useEffect(() => {
+    if (prev.current === value) return;
+    prev.current = value;
+    setBump((n) => n + 1);
+  }, [value]);
+  return (
+    <p
+      key={bump}
+      className={"mt-3 font-mono text-3xl font-bold tracking-tight text-on-surface" + (bump ? " kpi-bump" : "")}
+    >
+      {value}
+    </p>
+  );
+}
 
 export function KpiStrip({ ingested, hotPercent, median, hitlPending }: Props) {
   const cards = [
@@ -64,7 +84,7 @@ export function KpiStrip({ ingested, hotPercent, median, hitlPending }: Props) {
               {c.icon}
             </span>
           </div>
-          <p className="mt-3 font-mono text-3xl font-bold tracking-tight text-on-surface">{c.value}</p>
+          <KpiValue value={c.value} />
           <p className="mt-1 text-xs text-on-surface-variant">{c.hint}</p>
         </div>
       ))}

@@ -1,12 +1,13 @@
 import { patchLead } from "@/lib/store";
 import { listSalesReps } from "@/lib/reps";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { requireOperatorOrGuest } from "@/lib/org-auth";
 import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   const { id } = await params;
   let body: unknown;

@@ -1,6 +1,6 @@
 import {
   DEFAULT_LEGAL_PROFILE,
-  autoSeedEnabled,
+  resolveDeskMode,
   scoreRfpHeuristic,
   type RfpIngestInput,
   type StoredRfp,
@@ -13,6 +13,8 @@ import type { PricingOverrides, PricingQuote } from "@/lib/pricing-types";
 import { heuristicPricingQuote, runPricingQuote } from "@/lib/pricing";
 import {
   isSupabaseConfigured,
+  legalGate,
+  supabaseProbeDesk,
   supabaseGetRfp,
   supabaseListAudit,
   supabaseListRfps,
@@ -213,14 +215,42 @@ function applyDemoCatalog() {
   d.seeded = true;
 }
 
+export function currentDeskMode(): "demo" | "live" {
+  const m = legalGate.mode();
+  // Before the first probe finishes there is nothing connected to consult: decide from the env alone.
+  return m === "unknown" ? resolveDeskMode({ connected: false, realRecords: 0 }) : m;
+}
+
 function seedMemory() {
   const d = desk();
   if (d.seeded) return;
-  if (!autoSeedEnabled()) {
+  if (currentDeskMode() !== "demo") {
     d.seeded = true;
     return;
   }
   applyDemoCatalog();
+}
+
+const PROBE_TTL_MS = 10_000;
+let lastProbe = 0;
+
+/** Re-decides demo vs live (throttled) and drops memory when it flips so demo and real data never mix. */
+async function ensureDeskMode(): Promise<void> {
+  let remoteRecords = legalGate.mode() === "live" ? 1 : 0;
+  if (Date.now() - lastProbe > PROBE_TTL_MS) {
+    lastProbe = Date.now();
+    remoteRecords = (await supabaseProbeDesk()).hasRfps ? 1 : 0;
+  }
+  const changed = legalGate.evaluate({ connected: false, remoteRecords });
+  if (!changed) return;
+  const d = desk();
+  d.memory.clear();
+  d.comms.clear();
+  d.audit.length = 0;
+  d.conflicts.clear();
+  d.quotes.clear();
+  d.seeded = false;
+  d.remoteBootstrapped = false;
 }
 
 function pushAuditSync(actor: string, action: string, detail: string): AuditEvent {
@@ -290,6 +320,7 @@ async function hydrateFromRemote(): Promise<void> {
 }
 
 export async function listRfps(): Promise<StoredRfp[]> {
+  await ensureDeskMode();
   const d = desk();
   seedMemory();
   await hydrateFromRemote();
@@ -306,6 +337,7 @@ export async function saveRfp(rfp: StoredRfp): Promise<StoredRfp> {
 }
 
 export async function getRfp(id: string): Promise<StoredRfp | null> {
+  await ensureDeskMode();
   const d = desk();
   seedMemory();
   if (d.memory.has(id)) return d.memory.get(id) ?? null;
@@ -356,6 +388,7 @@ export async function checkAndStoreNoBid(rfp: StoredRfp): Promise<{ blocked: boo
 }
 
 export async function listComms(id: string): Promise<CommEvent[]> {
+  await ensureDeskMode();
   seedMemory();
   await hydrateFromRemote();
   return [...(desk().comms.get(id) ?? [])].sort((a, b) => b.at.localeCompare(a.at));
@@ -376,7 +409,20 @@ export async function addComm(id: string, kind: CommKind, text: string): Promise
   return listComms(id);
 }
 
+/** Ids of the notes logged on an RFP — Helix AI's Undo for "add a note" removes any that appeared since. */
+export async function commIds(id: string): Promise<string[]> {
+  return (await listComms(id)).map((c) => c.id);
+}
+
+export async function removeCommsExcept(id: string, keepIds: string[]): Promise<void> {
+  desk().comms.set(
+    id,
+    (desk().comms.get(id) ?? []).filter((c) => keepIds.includes(c.id))
+  );
+}
+
 export async function listAudit(): Promise<AuditEvent[]> {
+  await ensureDeskMode();
   const d = desk();
   seedMemory();
   await hydrateFromRemote();
@@ -472,6 +518,7 @@ export async function pricingSummaries(): Promise<Record<string, PricingQuote>> 
 export type DeskModeStatus = {
   empty: boolean;
   demo: boolean;
+  mode: "demo" | "live";
   store: "supabase" | "memory";
   count: number;
 };
@@ -480,18 +527,26 @@ export async function deskStatus(): Promise<DeskModeStatus> {
   const rfps = await listRfps();
   return {
     empty: rfps.length === 0,
-    demo: rfps.some((r) => r.id.startsWith("seed-")),
+    demo: currentDeskMode() === "demo",
+    mode: currentDeskMode(),
     store: isSupabaseConfigured() ? "supabase" : "memory",
     count: rfps.length,
   };
 }
 
 export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  await ensureDeskMode();
+  if (currentDeskMode() !== "demo") {
+    throw new Error("Demo data is only available before you start using your own data.");
+  }
   applyDemoCatalog();
   return deskStatus();
 }
 
 export async function clearDesk(): Promise<DeskModeStatus> {
+  // "Start with my own data": leave the demo for good, so new RFPs persist to Supabase.
+  legalGate.goLive();
+  legalGate.evaluate({ connected: false, remoteRecords: 0 });
   const g = globalThis as typeof globalThis & { __helixLegalDesk?: LegalDesk };
   delete g.__helixLegalDesk;
   const d = desk();

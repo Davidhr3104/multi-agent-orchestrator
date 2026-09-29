@@ -7,11 +7,12 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   leads: StoredLead[];
+  flashIds?: string[];
 };
 
-export function PriorityTable({ leads }: Props) {
+export function PriorityTable({ leads, flashIds = [] }: Props) {
   const rows = [...leads]
-    .filter((l) => l.tier === "hot" && l.classification === "lead")
+    .filter((l) => l.tier === "hot" && l.classification === "lead" && l.pipelineStage !== "lost")
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
@@ -36,7 +37,10 @@ export function PriorityTable({ leads }: Props) {
               <li key={lead.id}>
                 <Link
                   href={`/leads?focus=${lead.id}`}
-                  className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-surface-container-high/60"
+                  className={cn(
+                    "flex items-center gap-3 px-5 py-3.5 transition hover:bg-surface-container-high/60",
+                    flashIds.includes(lead.id) && "ai-flash"
+                  )}
                 >
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary-container">
                     {initials(lead.name)}
@@ -47,6 +51,11 @@ export function PriorityTable({ leads }: Props) {
                       {lead.company ?? lead.email} · {relativeTime(lead.createdAt)}
                     </p>
                   </div>
+                  {lead.pipelineStage && lead.pipelineStage !== "new" ? (
+                    <span className="rounded-full border border-outline-variant/40 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-on-surface-variant uppercase">
+                      {lead.pipelineStage}
+                    </span>
+                  ) : null}
                   <span
                     className={cn(
                       "rounded-full px-2.5 py-0.5 font-mono text-[11px] font-bold",

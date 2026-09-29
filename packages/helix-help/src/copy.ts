@@ -84,20 +84,24 @@ export const HOW_TO_USE_COMMERCE: HowToUseGuide = {
       body: "Scan revenue, fulfillment, and restock alerts. Live orders show which tickets need HITL review first.",
     },
     {
-      title: "2. Work Orders with the inspector",
+      title: "2. Ask Helix AI",
+      body: "Click Ask Helix to open the assistant panel and work in plain language, or keep using the screens — both do the same thing. Ask which orders look risky, or give orders: \"Hold order #1003\", \"Approve order #1002\", \"Restock the drone kit\". Safe, reversible changes (holding an order, drafting a reorder, approving a clean low-risk order) run right away with an Undo button. Cancelling an order, or approving a risky or real Shopify order, stops and asks you first — those cannot be taken back on Shopify.",
+    },
+    {
+      title: "3. Work Orders with the inspector",
       body: "Select an order to see fraud score, reasoning, and customer context. Approve, flag, or cancel from HITL Review.",
     },
     {
-      title: "3. Products and Inventory",
+      title: "4. Products and Inventory",
       body: "Browse catalog health, then use Inventory for reorder recommendations before stockouts hit the storefront.",
     },
     {
-      title: "4. Customers and Analytics",
+      title: "5. Customers and Analytics",
       body: "Review customer signals and Analytics charts for revenue and risk trends across the desk.",
     },
     {
-      title: "5. Settings and Sync",
-      body: "Confirm Shopify, Claude, and Supabase in Settings. Paste API keys there instead of editing .env. Desks start empty — Load demo catalog for the mock store. Use Sync Shopify when credentials are configured; HITL approve fulfills, cancel voids the order on Shopify.",
+      title: "6. Settings and Sync",
+      body: "Confirm Shopify, Claude, and Supabase in Settings. Paste API keys there instead of editing .env. Until you connect Shopify the desk shows a sample store (Reset demo restores it); connecting switches it to your real orders. Use Sync Shopify when credentials are configured; HITL approve fulfills, cancel voids the order on Shopify.",
     },
   ],
   hitlTip:
@@ -120,24 +124,28 @@ export const HOW_TO_USE_MARKETING: HowToUseGuide = {
       body: "Each row is a campaign in the selected window (7d / 30d / 90d): spend, form volume, average score, cost per hot lead, and the REC action. Windows cut dated spend and leads — they are not the same snapshot.",
     },
     {
-      title: "2. Check the catalog example",
+      title: "2. Ask Helix AI",
+      body: "Click Ask Helix to open the assistant panel and work in plain language, or keep using the screens — both do the same thing. Ask where spend is wasted, or give orders: \"Keep Ad D\", \"Pause Ad A\", \"Scale Ad B\". Keeping a campaign is local and runs right away with an Undo. Pausing or scaling changes live ad delivery, so Helix AI always asks you to confirm first, and Ads Manager is only updated when Meta is connected.",
+    },
+    {
+      title: "3. Check the catalog example",
       body: "Ad A (volume, low score) should recommend pause. Ad B (quality, affordable hot leads) should recommend scale. Ad C may drop out of 7d if its scored leads sit outside that window.",
     },
     {
-      title: "3. HITL",
+      title: "4. HITL",
       body: "Open HITL or a campaign and Confirm pause, Confirm scale, or Keep. Status is local only — Meta/Google stay stubs. Decisions persist in the desk file (and Supabase when configured).",
     },
     {
-      title: "4. Join queue",
+      title: "5. Join queue",
       body: "Spend whose campaign_id has no scored leads does not get a fake score. It lands on Join queue as unmatched.",
     },
     {
-      title: "5. Ingest CSV",
+      title: "6. Ingest CSV",
       body: "Paste spend with campaign_id, name, platform, spend, form_leads. Optional date column (YYYY-MM-DD). Joins against scored leads by campaign_id.",
     },
     {
-      title: "6. Settings",
-      body: "Paste Anthropic and Supabase keys in Settings. Desks start empty — Load demo catalog there if you want Ad A–E. CSV is the live spend path. Meta and Google tokens can be saved as stubs — they do not write to Ads Manager.",
+      title: "7. Settings",
+      body: "Paste Anthropic and Supabase keys in Settings. Until you connect Meta Ads the desk shows sample campaigns (Reset demo restores them); connecting switches it to your real spend. CSV is the live spend path. Meta and Google tokens can be saved as stubs — they do not write to Ads Manager.",
     },
   ],
   hitlTip:
@@ -161,20 +169,24 @@ export const HOW_TO_USE_INBOX: HowToUseGuide = {
       body: "Scan metrics for open threads, need-review, urgent, and blocked. Use filters or ⌘K to find a thread fast.",
     },
     {
-      title: "2. Ingest or wait for triage",
+      title: "2. Ask Helix AI",
+      body: "Click Ask Helix to open the assistant panel and work in plain language, or keep using the screens — both do the same thing. Ask what is urgent, or give orders: \"Draft a reply to Maya Chen\", \"Snooze Priya Shah's email\", \"Archive the HVAC Weekly newsletter\". Drafts, snoozes and archives of low-urgency mail run right away with an Undo. Sending an email, or touching something urgent or still awaiting your review, always stops and asks you first.",
+    },
+    {
+      title: "3. Ingest or wait for triage",
       body: "Paste an email into Ingest thread, or enable auto-triage in Settings so new mail is classified automatically.",
     },
     {
-      title: "3. Work the HITL queue",
+      title: "4. Work the HITL queue",
       body: "Open HITL queue for low-confidence decisions. Select a thread to see category, route target, reasoning, and draft.",
     },
     {
-      title: "4. Act in the inspector",
+      title: "5. Act in the inspector",
       body: "Send reply uses Resend (fails without keys). Mark routed is a local handoff only. Sync Gmail when a token is pasted in Settings.",
     },
     {
-      title: "5. Tune preferences",
-      body: "In Settings, paste Claude / Resend keys, then set reply tone, VIP senders, and theme. Desks start empty — Load demo catalog for Northwind samples. Routed and Blocked views keep a clean history.",
+      title: "6. Tune preferences",
+      body: "In Settings, paste Claude / Resend keys, then set reply tone, VIP senders, and theme. Until you connect Gmail the desk shows sample Northwind threads; connecting a mailbox switches it to your real mail. Routed and Blocked views keep a clean history.",
     },
   ],
   hitlTip:
@@ -199,20 +211,24 @@ export const HOW_TO_USE_LEGAL: HowToUseGuide = {
       body: "Drop or paste an RFP. Helix extracts fields with FACT cites, then scores fit against your firm profile.",
     },
     {
-      title: "2. Review Opportunities",
+      title: "2. Ask Helix AI",
+      body: "Click Ask Helix to open the assistant panel and work in plain language, or keep using the screens — both do the same thing. Ask about scores, deadlines and what needs attention, or give orders: \"Run a conflict check on the SPI coding RFP\", \"Prepare a fee quote for the County IT RFP\", \"Add a note to the SPI RFP: …\", \"Send the Clinical NLP RFP to partner review\". Safe changes run right away with an Undo button (reports and quotes only compute, so they have nothing to undo). A GO / CONDITIONAL / NO-GO is always a partner's call: Helix AI asks you to confirm it and stamps it \"Helix AI · approved by you\" in the Audit log.",
+    },
+    {
+      title: "3. Review Opportunities",
       body: "Open each opportunity to inspect evidence spans, deadlines, compliance gaps, and competitive notes.",
     },
     {
-      title: "3. Resolve Go/No-Go and COI",
+      title: "4. Resolve Go/No-Go and COI",
       body: "Confirm or override the pursuit verdict. Clear conflict signals before committing partner time.",
     },
     {
-      title: "4. Pricing and documents",
+      title: "5. Pricing and documents",
       body: "Use Pricing for fee posture, Documents for packs, and Deadlines so nothing slips past ISO dates.",
     },
     {
-      title: "5. Settings and Audit",
-      body: "Paste Anthropic and Supabase keys in Settings, then keep the client profile accurate. Desks start empty — Load demo catalog for sample RFPs. Audit Log records AI decisions and human overrides.",
+      title: "6. Settings and Audit",
+      body: "Paste Anthropic and Supabase keys in Settings, then keep the client profile accurate. The desk starts with sample RFPs under a Demo data label; Use my own data clears them for good. Audit Log records AI decisions and human overrides.",
     },
   ],
   hitlTip:
@@ -235,24 +251,28 @@ export const HOW_TO_USE_LEADS: HowToUseGuide = {
       body: "Inbox health, lead quality, and review queue show where to spend time first.",
     },
     {
-      title: "2. Work Leads and Inbox",
+      title: "2. Ask Helix AI",
+      body: "Click Ask Helix to open the assistant panel and work in plain language, or keep using the screens — both do the same thing. Ask questions (\"Why did Jordan Hale score 96?\") or give orders (\"Move Jordan Hale to contacted\", \"Clean up my stale leads\", \"Add a note to Maya Chen: sent pricing\"). Safe, reversible changes run right away with an Undo button. Anything risky — approving the review queue, archiving a high-score or bulk set of leads, moving a lead still awaiting review — stops and asks you first. Every AI change is stamped \"Helix AI · approved by you\" in the Audit log.",
+    },
+    {
+      title: "3. Work Leads and Inbox",
       body: "Open Leads for the full table/kanban. Use Inbox for HITL items that need approve or revise.",
     },
     {
-      title: "3. Inspect score breakdown",
+      title: "4. Inspect score breakdown",
       body: "Check classification, tier, confidence, and enrichment before pushing to CRM.",
     },
     {
-      title: "4. Tune scoring rules",
+      title: "5. Tune scoring rules",
       body: "Settings → Scoring Rules and Prompt Playground control thresholds and agent behavior.",
     },
     {
-      title: "5. Connect and measure",
-      body: "Settings → paste GHL/CRM keys. Load demo catalog if you want sample HVAC leads. Analytics for source quality, Audit for score history.",
+      title: "6. Connect and measure",
+      body: "Until you connect GoHighLevel the desk shows sample leads under a Demo data banner (Reset demo restores them). Settings → paste GHL/CRM keys and it switches to your real leads. Analytics for source quality, Audit for score history.",
     },
   ],
   hitlTip:
-    "Review queue items stay out of CRM until a human approves. Do not force-sync spam or low-confidence noise.",
+    "Review queue items stay out of CRM until a human approves. Do not force-sync spam or low-confidence noise. Helix AI follows the same rule: it never approves the review queue on its own.",
   shortcuts: [
     { keys: "Filters", action: "Hot · Warm · Cold · Review · Spam on the Dashboard" },
     { keys: "Inbox", action: "HITL review queue" },

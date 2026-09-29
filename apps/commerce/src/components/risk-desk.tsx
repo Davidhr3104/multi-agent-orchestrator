@@ -165,6 +165,7 @@ export function RiskDesk({
                 {ranked.map((o) => (
                   <tr
                     key={o.id}
+                    data-ai-id={o.id}
                     onClick={() => setSelectedId(o.id)}
                     className={cn(
                       "cursor-pointer border-b border-border/30 hover:bg-white/[0.03]",

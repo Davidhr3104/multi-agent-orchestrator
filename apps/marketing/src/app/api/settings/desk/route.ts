@@ -13,7 +13,13 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "JSON required." }, { status: 400 });
   }
-  if (body.action === "demo") return Response.json(await loadDemoCatalog());
+  if (body.action === "demo") {
+    try {
+      return Response.json(await loadDemoCatalog());
+    } catch (err) {
+      return Response.json({ error: err instanceof Error ? err.message : "Could not load demo" }, { status: 409 });
+    }
+  }
   if (body.action === "empty") return Response.json(await clearDesk());
   return Response.json({ error: "action must be demo or empty." }, { status: 400 });
 }

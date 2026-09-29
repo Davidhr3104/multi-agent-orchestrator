@@ -257,3 +257,47 @@
     transform: none !important;
   }
 }
+@keyframes ask-ai-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.ask-ai-typing-dot {
+  animation: ask-ai-typing-dot 1.2s ease-in-out infinite;
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16,185,129,0.3) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(16,185,129,0.3);
+  border-radius: 4px;
+}
+
+@keyframes ai-flash {
+  0% {
+    background-color: rgba(16,185,129,0.4);
+    box-shadow: inset 3px 0 0 #10b981;
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+.ai-flash {
+  animation: ai-flash 3.2s ease-out 1;
+}

@@ -10,7 +10,8 @@ import { suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
 import { smartReplyWithContext } from "@/lib/smart-reply";
 import { queryInboxKb } from "@/lib/kb-store";
 import { notifySlackLeadIntent } from "@/lib/slack";
-import { autoSeedEnabled } from "@helix/core";
+import { resolveDeskMode } from "@helix/core";
+import { isGmailAccountConfigured } from "@/lib/gmail-oauth";
 import {
   isSupabaseConfigured,
   supabaseGetEmailAccountById,
@@ -23,6 +24,8 @@ import {
   supabaseUpsertThread,
   supabaseUpsertThreadMessages,
   supabaseUpsertThreads,
+  supabaseProbeDesk,
+  inboxGate,
 } from "@/lib/supabase-desk";
 import type { ThreadPatch } from "@/lib/desk-state-cookie";
 import { matchThread, type MatchableThread, type MatchableMessage, type ParsedEml } from "@helix/core/inbox/eml";
@@ -234,6 +237,38 @@ function applyDemoCatalog() {
       leadIntent: false,
     },
     {
+      fromName: "HVAC Weekly",
+      fromEmail: "newsletter@hvacweekly.com",
+      subject: "This week in HVAC: 5 pricing trends for 2026",
+      body: "Your weekly digest: refrigerant pricing, labor trends and three case studies from the field. Unsubscribe any time.",
+      category: "fyi",
+      sentiment: "neutral",
+      urgencyScore: 18,
+      aiConfidence: 97,
+      routeTo: "Archive",
+      draftReply: "",
+      status: "open",
+      reasoning: "Newsletter — informational, no reply expected",
+      needsReview: false,
+      leadIntent: false,
+    },
+    {
+      fromName: "Dana Ruiz",
+      fromEmail: "dana@brightlineparts.com",
+      subject: "Invoice #4471 — payment reminder",
+      body: "Friendly reminder that invoice #4471 for $1,240 is due on the 5th. Let us know if you need a copy resent.",
+      category: "action_required",
+      sentiment: "neutral",
+      urgencyScore: 46,
+      aiConfidence: 90,
+      routeTo: "Finance · Ops",
+      draftReply: "Hi Dana, thanks for the reminder — we'll get invoice #4471 paid before the 5th.",
+      status: "open",
+      reasoning: "Vendor invoice reminder with a due date",
+      needsReview: false,
+      leadIntent: false,
+    },
+    {
       fromName: "Crypto Blast",
       fromEmail: "noreply@cryptoblast.io",
       subject: "FREE NFT DROP CLICK NOW",
@@ -280,14 +315,40 @@ function applyDemoCatalog() {
   });
 }
 
+export function currentDeskMode(): "demo" | "live" {
+  return currentMode();
+}
+
+function currentMode(): "demo" | "live" {
+  const m = inboxGate.mode();
+  // Before the first remote probe finishes, decide from what is knowable synchronously.
+  return m === "unknown" ? resolveDeskMode({ connected: isGmailAccountConfigured(), realRecords: 0 }) : m;
+}
+
 function seedMemory() {
   const mem = deskMem();
   if (mem.seeded) return;
-  if (!autoSeedEnabled()) {
+  if (currentMode() !== "demo") {
     mem.seeded = true;
     return;
   }
   applyDemoCatalog();
+}
+
+/** Re-decides demo vs live from a mailbox connection / real threads, and reloads memory if it flipped. */
+async function ensureDeskMode() {
+  const probe = await supabaseProbeDesk();
+  const changed = inboxGate.evaluate({
+    connected: probe.connected || isGmailAccountConfigured(),
+    remoteRecords: probe.hasThreads ? 1 : 0,
+  });
+  if (!changed) return;
+  const mem = deskMem();
+  mem.threads.clear();
+  mem.messages.clear();
+  mem.aiLogs.length = 0;
+  mem.seeded = false;
+  mem.remoteBootstrapped = false;
 }
 
 async function hydrateFromRemote() {
@@ -300,11 +361,8 @@ async function hydrateFromRemote() {
     mem.threads.clear();
     for (const t of remote) mem.threads.set(t.id, t);
   } else {
+    // Empty remote: show the demo desk only if the mode allows it. Demo data is never written to Supabase.
     seedMemory();
-    if (mem.threads.size > 0) {
-      await supabaseUpsertThreads([...mem.threads.values()]);
-      for (const list of mem.messages.values()) await supabaseUpsertThreadMessages(list);
-    }
   }
   const remotePrefs = await supabaseGetPreferences(DEFAULT_WORKSPACE_ID);
   if (remotePrefs) {
@@ -340,6 +398,7 @@ export function applyDeskPatches(patches: Record<string, ThreadPatch>) {
 }
 
 export async function listMessages(): Promise<InboxMessage[]> {
+  await ensureDeskMode();
   seedMemory();
   await hydrateFromRemote();
   // Do not re-fetch Supabase on every list — that clobbers in-memory HITL
@@ -700,6 +759,8 @@ export function getDraftTone(): DraftTone {
 export type DeskModeStatus = {
   empty: boolean;
   demo: boolean;
+  mode: "demo" | "live";
+  connected: boolean;
   store: "supabase" | "memory";
   count: number;
 };
@@ -708,13 +769,19 @@ export async function deskStatus(): Promise<DeskModeStatus> {
   const threads = await listAllThreads();
   return {
     empty: threads.length === 0,
-    demo: threads.some((t) => t.fromEmail.includes("northwind") || t.id.startsWith("thr-seed") || t.fromName === "Maya Chen"),
+    demo: currentMode() === "demo",
+    mode: currentMode(),
+    connected: isGmailAccountConfigured() || inboxGate.mode() === "live",
     store: isSupabaseConfigured() ? "supabase" : "memory",
     count: threads.length,
   };
 }
 
 export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  await ensureDeskMode();
+  if (currentMode() !== "demo") {
+    throw new Error("Demo data is only available before a mailbox is connected.");
+  }
   applyDemoCatalog();
   return deskStatus();
 }

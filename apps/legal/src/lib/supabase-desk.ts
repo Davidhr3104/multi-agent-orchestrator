@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getSecret, onSecretsChanged, type StoredRfp } from "@helix/core";
+import { createDemoGate, getSecret, onSecretsChanged, type StoredRfp } from "@helix/core";
 import type { AuditEvent } from "@/lib/audit-types";
 
 type Client = SupabaseClient;
@@ -16,7 +16,18 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
+/**
+ * Demo/live switch for this desk. Legal has no external API to connect, so it goes live when Supabase
+ * already holds real RFPs, or when the operator chooses "use my own data". While in demo, nothing is
+ * read from or written to Supabase.
+ */
+export const legalGate = createDemoGate("legal");
+
 export function getSupabase(): Client | null {
+  return legalGate.suspended() ? null : rawClient();
+}
+
+function rawClient(): Client | null {
   if (cached !== undefined) return cached;
   const url = getSecret("NEXT_PUBLIC_SUPABASE_URL");
   const key = getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY");
@@ -155,6 +166,23 @@ function fromAuditRow(row: Record<string, unknown>): AuditEvent {
     action: String(row.action ?? ""),
     detail: String(row.detail ?? ""),
   };
+}
+
+/** Does Supabase already hold real RFPs? Bypasses the demo suspension; failures are logged, not hidden. */
+export async function supabaseProbeDesk(): Promise<{ hasRfps: boolean }> {
+  const db = rawClient();
+  if (!db) return { hasRfps: false };
+  try {
+    const { data, error } = await legalTable(db, "rfps").select("id").order("created_at", { ascending: false });
+    if (error) {
+      console.warn("[helix-legal] desk probe failed:", error.message);
+      return { hasRfps: false };
+    }
+    return { hasRfps: (data?.length ?? 0) > 0 };
+  } catch (err) {
+    console.warn("[helix-legal] desk probe threw:", err instanceof Error ? err.message : err);
+    return { hasRfps: false };
+  }
 }
 
 export async function supabaseListRfps(): Promise<StoredRfp[] | null> {

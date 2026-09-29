@@ -1,5 +1,6 @@
 import { getLead, patchLead } from "@/lib/store";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { requireOperatorOrGuest } from "@/lib/org-auth";
 import { checkActionToken, withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
@@ -28,7 +29,7 @@ async function clear(id: string, actor: string, orgId: string | undefined, note?
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   const { id } = await params;
   let note: string | undefined;
@@ -46,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   const { id } = await params;
   const actor = operatorActor(req);
@@ -77,7 +78,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return new Response("Approved. You can close this tab.", { headers: { "Content-Type": "text/plain" } });
   }
 
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   return withOrgScope(async (orgId) => {
     const lead = await clear(id, operatorActor(req), orgId);

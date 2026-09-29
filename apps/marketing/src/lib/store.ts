@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
-  autoSeedEnabled,
+  getSecret,
+  resolveDeskMode,
   buildMarketingSeed,
   dailySpendSeries,
   inWindow,
@@ -28,6 +29,8 @@ import {
   supabaseSaveDecision,
   supabaseSaveLeads,
   supabaseSaveSpend,
+  marketingGate,
+  supabaseProbeDesk,
 } from "@/lib/supabase-desk";
 
 type DeskState = {
@@ -83,6 +86,8 @@ function loadFile(): FileShape | null {
 }
 
 function saveFile(desk: DeskState) {
+  // Demo data is never persisted: a stale demo file must not be mistaken for real data on the next start.
+  if (marketingGate.mode() === "demo") return;
   try {
     const file = dataPath();
     mkdirSync(path.dirname(file), { recursive: true });
@@ -104,18 +109,54 @@ function seedDesk(desk: DeskState) {
   desk.leads = seeded.leads;
 }
 
+/** Meta credentials are what turns this desk live. */
+function metaConnected(): boolean {
+  return Boolean(getSecret("META_ACCESS_TOKEN") && getSecret("META_AD_ACCOUNT_ID"));
+}
+
+export function currentDeskMode(): "demo" | "live" {
+  const m = marketingGate.mode();
+  return m === "unknown" ? resolveDeskMode({ connected: metaConnected(), realRecords: 0 }) : m;
+}
+
+/** Demo spend rows are generated with "sp-" ids; anything else (CSV ingest, ads sync) is real data. */
+const hasRealSpend = (rows: { id: string }[]) => rows.some((r) => !r.id.startsWith("sp-"));
+
+const PROBE_TTL_MS = 10_000;
+let lastProbe = 0;
+
+/** Re-decides demo vs live. If the mode flips, the desk is rebuilt so demo and real data never mix. */
+async function ensureDeskMode(desk: DeskState): Promise<void> {
+  const connected = metaConnected();
+  let remoteRecords = marketingGate.mode() === "live" ? 1 : 0;
+  if (!connected && Date.now() - lastProbe > PROBE_TTL_MS) {
+    lastProbe = Date.now();
+    const file = loadFile();
+    remoteRecords = file && hasRealSpend(file.spend) ? 1 : (await supabaseProbeDesk()).hasSpend ? 1 : 0;
+  }
+  const changed = marketingGate.evaluate({ connected, remoteRecords });
+  if (changed) {
+    desk.spend = [];
+    desk.leads = [];
+    desk.decisions = new Map();
+    desk.remaps = [];
+    desk.ready = false;
+    desk.remoteBootstrapped = false;
+  }
+}
+
 async function hydrate(): Promise<DeskState> {
   const desk = getDesk();
+  await ensureDeskMode(desk);
   if (!desk.ready) {
     const file = loadFile();
-    if (file && (file.spend.length > 0 || file.leads.length > 0)) {
+    if (marketingGate.mode() === "live" && file && (file.spend.length > 0 || file.leads.length > 0)) {
       desk.spend = file.spend;
       desk.leads = file.leads;
       desk.decisions = new Map(file.decisions.map((d) => [d.campaignId, d]));
       desk.remaps = file.remaps ?? [];
-    } else if (autoSeedEnabled()) {
+    } else if (currentDeskMode() === "demo") {
       seedDesk(desk);
-      saveFile(desk);
     }
     desk.ready = true;
   }
@@ -254,6 +295,8 @@ export async function reviewCampaign(
 export type DeskModeStatus = {
   empty: boolean;
   demo: boolean;
+  mode: "demo" | "live";
+  connected: boolean;
   store: DeskSnapshot["store"];
   count: number;
 };
@@ -262,7 +305,9 @@ export async function deskStatus(): Promise<DeskModeStatus> {
   const desk = await hydrate();
   return {
     empty: desk.spend.length === 0 && desk.leads.length === 0,
-    demo: desk.spend.some((s) => s.campaignId.startsWith("ad-a-volume") || s.campaignId.startsWith("ad-b-quality")),
+    demo: currentDeskMode() === "demo",
+    mode: currentDeskMode(),
+    connected: metaConnected(),
     store: storeKind(),
     count: desk.spend.length + desk.leads.length,
   };
@@ -270,6 +315,9 @@ export async function deskStatus(): Promise<DeskModeStatus> {
 
 export async function loadDemoCatalog(): Promise<DeskModeStatus> {
   const desk = await hydrate();
+  if (currentDeskMode() !== "demo") {
+    throw new Error("Demo data is only available before Meta Ads is connected.");
+  }
   seedDesk(desk);
   desk.decisions = new Map();
   saveFile(desk);
@@ -277,6 +325,9 @@ export async function loadDemoCatalog(): Promise<DeskModeStatus> {
 }
 
 export async function clearDesk(): Promise<DeskModeStatus> {
+  // "Start with my own data": leave the demo for good so new spend persists.
+  marketingGate.goLive();
+  marketingGate.evaluate({ connected: false, remoteRecords: 0 });
   const g = globalThis as { __helixMarketing?: DeskState };
   g.__helixMarketing = {
     spend: [],
@@ -338,6 +389,20 @@ export async function remapCampaign(spendCampaignId: string, leadCampaignId: str
   desk.remaps = [...desk.remaps.filter((r) => r.spendCampaignId !== spendId), { spendCampaignId: spendId, leadCampaignId: leadId }];
   saveFile(desk);
   return snapshotFrom(desk, "90d");
+}
+
+/** Puts a campaign's HITL decision back exactly as it was (null = there was none). Used by Helix AI's Undo. */
+export async function restoreDecision(campaignId: string, decision: HitlDecision | null): Promise<void> {
+  const desk = await hydrate();
+  if (decision) desk.decisions.set(campaignId, decision);
+  else desk.decisions.delete(campaignId);
+  saveFile(desk);
+  if (decision) await supabaseSaveDecision(decision);
+}
+
+export async function getDecision(campaignId: string): Promise<HitlDecision | null> {
+  const desk = await hydrate();
+  return desk.decisions.get(campaignId) ?? null;
 }
 
 export async function listRemaps(): Promise<CampaignRemap[]> {

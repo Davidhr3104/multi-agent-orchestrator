@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import {
+  createDemoGate,
   getSecret,
   onSecretsChanged,
   type ReorderRequest,
@@ -23,7 +24,14 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
+/** Demo/live switch for this desk. While in demo, no order/product/inquiry data touches Supabase. */
+export const commerceGate = createDemoGate("commerce");
+
 export function getSupabase(): Client | null {
+  return commerceGate.suspended() ? null : rawClient();
+}
+
+function rawClient(): Client | null {
   if (cached !== undefined) return cached;
   const url = getSecret("NEXT_PUBLIC_SUPABASE_URL");
   const key =
@@ -208,6 +216,23 @@ async function upsertOne(
     return false;
   }
   return true;
+}
+
+/** Does Supabase already hold real orders? Bypasses the demo suspension; failures are logged, not hidden. */
+export async function supabaseProbeDesk(): Promise<{ hasOrders: boolean }> {
+  const db = rawClient();
+  if (!db) return { hasOrders: false };
+  try {
+    const { data, error } = await table(db, "orders").select("id").order("created_at", { ascending: false });
+    if (error) {
+      console.warn("[helix-commerce] desk probe failed:", error.message);
+      return { hasOrders: false };
+    }
+    return { hasOrders: (data?.length ?? 0) > 0 };
+  } catch (err) {
+    console.warn("[helix-commerce] desk probe threw:", err instanceof Error ? err.message : err);
+    return { hasOrders: false };
+  }
 }
 
 export const supabaseListOrders = () => listAll("orders", orderFromRow);

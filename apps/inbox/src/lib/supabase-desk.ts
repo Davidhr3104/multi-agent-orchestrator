@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getSecret, onSecretsChanged } from "@helix/core";
+import { DEFAULT_WORKSPACE_ID } from "@/lib/types";
+import { createDemoGate, getSecret, onSecretsChanged } from "@helix/core";
 import type {
   AiActionLog,
   DraftTone,
@@ -23,6 +24,14 @@ export function isSupabaseConfigured(): boolean {
     getSecret("NEXT_PUBLIC_SUPABASE_URL") &&
       (getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY"))
   );
+}
+
+/** Demo/live switch for this desk. While in demo, thread/message/log/preference data is never read from or written to Supabase. */
+export const inboxGate = createDemoGate("inbox");
+
+/** Data-table client: null while the desk is showing demo data. Account/OAuth storage keeps using getSupabase(). */
+function dataDb(): Client | null {
+  return inboxGate.suspended() ? null : getSupabase();
 }
 
 export function getSupabase(): Client | null {
@@ -212,7 +221,7 @@ function fromMessageRow(row: Record<string, unknown>): ThreadMessage {
 }
 
 export async function supabaseListThreads(): Promise<EmailThread[] | null> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return null;
   const { data, error } = await inboxTable(db, "email_threads").select("*").order("received_at", {
     ascending: false,
@@ -225,7 +234,7 @@ export async function supabaseListThreads(): Promise<EmailThread[] | null> {
 }
 
 export async function supabaseUpsertThread(thread: EmailThread): Promise<boolean> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return false;
   const { error } = await inboxTable(db, "email_threads").upsert(toThreadRow(thread));
   if (error) {
@@ -236,7 +245,7 @@ export async function supabaseUpsertThread(thread: EmailThread): Promise<boolean
 }
 
 export async function supabaseUpsertThreads(threads: EmailThread[]): Promise<boolean> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db || threads.length === 0) return false;
   const { error } = await inboxTable(db, "email_threads").upsert(threads.map(toThreadRow));
   if (error) {
@@ -247,7 +256,7 @@ export async function supabaseUpsertThreads(threads: EmailThread[]): Promise<boo
 }
 
 export async function supabaseListThreadMessages(threadId: string): Promise<ThreadMessage[] | null> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return null;
   const { data, error } = await inboxTable(db, "thread_messages")
     .select("*")
@@ -261,7 +270,7 @@ export async function supabaseListThreadMessages(threadId: string): Promise<Thre
 }
 
 export async function supabaseUpsertThreadMessages(messages: ThreadMessage[]): Promise<boolean> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db || messages.length === 0) return false;
   const { error } = await inboxTable(db, "thread_messages").upsert(messages.map(toMessageRow));
   if (error) {
@@ -272,7 +281,7 @@ export async function supabaseUpsertThreadMessages(messages: ThreadMessage[]): P
 }
 
 export async function supabaseInsertAiLog(log: Omit<AiActionLog, "id" | "createdAt"> & { id?: string }): Promise<boolean> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return false;
   const row = {
     id: log.id ?? `log-${Date.now().toString(36)}`,
@@ -293,7 +302,7 @@ export async function supabaseInsertAiLog(log: Omit<AiActionLog, "id" | "created
 }
 
 export async function supabaseListAiLogs(limit = 40): Promise<AiActionLog[] | null> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return null;
   const { data, error } = await inboxTable(db, "ai_actions_log").select("*").order("created_at", {
     ascending: false,
@@ -318,7 +327,7 @@ export async function supabaseListAiLogs(limit = 40): Promise<AiActionLog[] | nu
 }
 
 export async function supabaseGetPreferences(workspaceId: string): Promise<UserPreferences | null> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return null;
   const { data, error } = await inboxTable(db, "user_preferences")
     .select("*")
@@ -350,7 +359,7 @@ export async function supabaseGetPreferences(workspaceId: string): Promise<UserP
 }
 
 export async function supabaseUpsertPreferences(prefs: UserPreferences): Promise<boolean> {
-  const db = getSupabase();
+  const db = dataDb();
   if (!db) return false;
   const { error } = await inboxTable(db, "user_preferences").upsert(
     {
@@ -459,4 +468,23 @@ export async function supabaseUpdateAccessToken(
     { onConflict: "id" }
   );
   return !error;
+}
+
+/**
+ * Reads what decides demo vs live, bypassing the demo suspension: is a mailbox connected, and does
+ * Supabase already hold real threads? Failures count as "nothing found" but are logged, not hidden.
+ */
+export async function supabaseProbeDesk(): Promise<{ connected: boolean; hasThreads: boolean }> {
+  const db = getSupabase();
+  if (!db) return { connected: false, hasThreads: false };
+  let hasThreads = false;
+  try {
+    const { data, error } = await inboxTable(db, "email_threads").select("id").limit(1);
+    if (error) console.warn("[helix-inbox] desk probe (threads) failed:", error.message);
+    else hasThreads = (data?.length ?? 0) > 0;
+  } catch (err) {
+    console.warn("[helix-inbox] desk probe (threads) threw:", err instanceof Error ? err.message : err);
+  }
+  const accounts = await supabaseListEmailAccounts(DEFAULT_WORKSPACE_ID);
+  return { connected: accounts.some((a) => Boolean(a.accessToken)), hasThreads };
 }

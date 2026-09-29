@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { getSecret } from "@helix/core";
+import { demoAvailable, getSecret } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { verifyActionToken, type LeadAction } from "@helix/core/action-token";
 import { getSupabase } from "./supabase-leads";
 
@@ -129,11 +130,30 @@ export async function requireOrgScope(): Promise<
  */
 export async function resolveOrgScope(): Promise<string | undefined> {
   if (!anonSupabaseConfigured()) return undefined;
+  // A visitor with no session gets the demo sandbox (orgId undefined), never a tenant's data:
+  // the store gives orgId-less callers in a Supabase deployment only the in-memory demo.
+  if (demoAvailable() && !(await authedUser())) return undefined;
   const scope = await requireOrgScope();
   if (!scope) {
     throw new OrgScopeError("Sign in and join a workspace before using this desk.");
   }
   return scope.org.orgId;
+}
+
+/** True for a signed-out visitor on a deployment where auth is configured and demo is allowed. */
+export async function isGuestVisitor(): Promise<boolean> {
+  if (!anonSupabaseConfigured() || !demoAvailable()) return false;
+  return !(await authedUser());
+}
+
+/**
+ * Operator gate for routes that only ever touch the lead store. Guests pass because they can only
+ * reach the in-memory demo sandbox. Do NOT use this on routes with external side effects (CRM push).
+ */
+export async function requireOperatorOrGuest(req: Request): Promise<Response | null> {
+  const denied = requireOperator(req);
+  if (!denied) return null;
+  return (await isGuestVisitor()) ? null : denied;
 }
 
 export class OrgScopeError extends Error {}

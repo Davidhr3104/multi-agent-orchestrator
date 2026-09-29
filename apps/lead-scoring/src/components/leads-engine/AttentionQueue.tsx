@@ -5,12 +5,13 @@ import { initials } from "./lead-ui";
 
 type Props = {
   leads: StoredLead[];
+  flashIds?: string[];
   busyId: string | null;
   onApprove: (id: string) => void;
   onSpam: (id: string) => void;
 };
 
-export function AttentionQueue({ leads, busyId, onApprove, onSpam }: Props) {
+export function AttentionQueue({ leads, flashIds = [], busyId, onApprove, onSpam }: Props) {
   const queue = leads.filter((l) => l.needsReview);
 
   return (
@@ -29,7 +30,7 @@ export function AttentionQueue({ leads, busyId, onApprove, onSpam }: Props) {
       ) : (
         <ul className="divide-y divide-outline-variant/15">
           {queue.map((lead) => (
-            <li key={lead.id} className="px-5 py-4">
+            <li key={lead.id} className={"px-5 py-4" + (flashIds.includes(lead.id) ? " ai-flash" : "")}>
               <div className="flex items-start gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-error-container/40 text-xs font-bold text-error">
                   {initials(lead.name)}

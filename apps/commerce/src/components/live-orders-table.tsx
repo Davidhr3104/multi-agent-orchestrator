@@ -110,6 +110,7 @@ export function LiveOrdersTable({
               return (
                 <tr
                   key={order.id}
+                  data-ai-id={order.id}
                   onClick={() => onSelect(order)}
                   className={cn(
                     "h-14 cursor-pointer transition-colors duration-150",

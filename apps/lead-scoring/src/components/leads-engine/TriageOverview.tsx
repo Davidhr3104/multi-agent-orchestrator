@@ -17,16 +17,29 @@ export function TriageOverview() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [deskMode, setDeskMode] = useState<"demo" | "live" | null>(null);
+  const [flashIds, setFlashIds] = useState<string[]>([]);
   const [simBusy, setSimBusy] = useState(false);
   const [askAiDrawerOpen, setAskAiDrawerOpen] = useState(false);
   const [askAiInitialQuestion, setAskAiInitialQuestion] = useState<string | undefined>(undefined);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/leads");
+    const [res, desk] = await Promise.all([fetch("/api/leads"), fetch("/api/settings/desk").catch(() => null)]);
     const data = (await res.json()) as { leads?: StoredLead[] };
     setLeads(data.leads ?? []);
+    if (desk?.ok) setDeskMode(((await desk.json()) as { mode?: "demo" | "live" }).mode ?? null);
     setLoading(false);
   }, []);
+
+  async function resetDemo() {
+    await fetch("/api/settings/desk", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "demo" }),
+    });
+    await refresh();
+    showToast("Demo data restored");
+  }
 
   function showToast(msg: string) {
     setToast(msg);
@@ -73,10 +86,19 @@ export function TriageOverview() {
       const id = (e as CustomEvent<string>).detail;
       if (id) window.location.assign(`/leads/${id}/report`);
     }
+    function onAiAction(e: Event) {
+      const { message, ids } = (e as CustomEvent<{ message: string; ids: string[] }>).detail;
+      showToast(message);
+      setFlashIds(ids);
+      window.setTimeout(() => setFlashIds([]), 3500);
+      setLogs((prev) => [...prev.slice(-20), `[Helix AI] ${message}`]);
+    }
+    window.addEventListener("helix:ai-action", onAiAction);
     window.addEventListener("helix:leads-refresh", onRefresh);
     window.addEventListener("helix:new-lead", onNewLead);
     window.addEventListener("helix:open-lead", onOpenLead);
     return () => {
+      window.removeEventListener("helix:ai-action", onAiAction);
       window.removeEventListener("helix:leads-refresh", onRefresh);
       window.removeEventListener("helix:new-lead", onNewLead);
       window.removeEventListener("helix:open-lead", onOpenLead);
@@ -84,12 +106,13 @@ export function TriageOverview() {
   }, [refresh, simulateWebhook]);
 
   const kpis = useMemo(() => {
-    const scores = leads.map((l) => l.score);
+    // Archived ("lost") leads leave the live pipeline, so the KPIs track active leads only.
+    const active = leads.filter((l) => l.pipelineStage !== "lost");
     return {
       ingested: leads.length,
-      hotPercent: hotPct(leads),
-      median: medianScore(scores),
-      hitlPending: leads.filter((l) => l.needsReview).length,
+      hotPercent: hotPct(active),
+      median: medianScore(active.map((l) => l.score)),
+      hitlPending: active.filter((l) => l.needsReview).length,
     };
   }, [leads]);
 
@@ -148,7 +171,7 @@ export function TriageOverview() {
             </span>
           </div>
           <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
-            Real-time telemetry from the seeded desk — probabilistic validation and CRM sync.
+            Real-time telemetry from your desk — probabilistic validation and CRM sync.
           </p>
         </div>
         <button
@@ -161,6 +184,28 @@ export function TriageOverview() {
           {simBusy ? "Simulating…" : "Simulate Webhook"}
         </button>
       </div>
+
+      {deskMode === "demo" ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs">
+          <span className="rounded-full bg-primary-container px-2 py-0.5 text-[10px] font-bold tracking-wider text-on-primary-container uppercase">
+            Demo data
+          </span>
+          <p className="min-w-0 flex-1 text-on-surface-variant">
+            You are exploring a sample workspace. Connect GoHighLevel and this desk switches to your real leads —
+            the samples disappear.
+          </p>
+          <button
+            type="button"
+            onClick={() => void resetDemo()}
+            className="rounded-md border border-outline-variant/40 px-2.5 py-1 font-semibold text-on-surface-variant hover:bg-surface-container-high"
+          >
+            Reset demo
+          </button>
+          <a href="/settings" className="rounded-md bg-primary-container px-2.5 py-1 font-bold text-on-primary-container hover:brightness-110">
+            Connect →
+          </a>
+        </div>
+      ) : null}
 
       <AskAiCard
         onOpenDrawer={(initialQuestion) => {
@@ -180,7 +225,8 @@ export function TriageOverview() {
         <>
           {kpis.hitlPending > 0 ? (
             <AttentionQueue
-              leads={leads}
+              leads={leads.filter((l) => l.pipelineStage !== "lost")}
+              flashIds={flashIds}
               busyId={busyId}
               onApprove={(id) => void approveAndPush(id)}
               onSpam={(id) => void markSpam(id)}
@@ -199,7 +245,7 @@ export function TriageOverview() {
           <StreamChart leads={leads} />
           <div className="grid gap-4 lg:grid-cols-5">
             <div className="lg:col-span-3">
-              <PriorityTable leads={leads} />
+              <PriorityTable leads={leads} flashIds={flashIds} />
             </div>
             <div className="lg:col-span-2">
               <WebhookFeed leads={leads} logs={logs} />
@@ -209,7 +255,7 @@ export function TriageOverview() {
       )}
 
       {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm shadow-lg">
+        <div className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded-lg border border-outline-variant/40 bg-surface-container-high px-4 py-2 text-sm shadow-lg">
           {toast}
         </div>
       ) : null}

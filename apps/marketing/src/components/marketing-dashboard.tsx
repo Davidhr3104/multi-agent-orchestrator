@@ -11,6 +11,8 @@ import {
 } from "react";
 import type { AttributedLead, CampaignAction, DeskWasteSummary, SpendEvent, StoredCampaign } from "@helix/core";
 import { AskAiCard } from "@/components/ask-ai-card";
+import { AskAiDrawer } from "@/components/ask-ai-drawer";
+import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import { ScatterPlot } from "@/components/scatter-plot";
 import { SAMPLE_CSV } from "@/lib/sample-csv";
 import {
@@ -67,6 +69,8 @@ function sparkPath(values: number[]) {
 }
 
 export function MarketingDashboard() {
+  const [askAiOpen, setAskAiOpen] = useState(false);
+  const [askAiQuestion, setAskAiQuestion] = useState<string | undefined>(undefined);
   const [campaigns, setCampaigns] = useState<StoredCampaign[]>([]);
   const [leads, setLeads] = useState<AttributedLead[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
@@ -164,6 +168,8 @@ export function MarketingDashboard() {
     setWaste(data.waste ?? null);
     if (data.from && data.to) setBounds({ from: data.from, to: data.to });
   }
+
+  const { toast: aiToast } = useAiDeskEvents(() => refresh());
 
   useEffect(() => {
     void refresh(range);
@@ -398,7 +404,13 @@ export function MarketingDashboard() {
           </div>
         </div>
 
-        <AskAiCard />
+        <DemoBanner message="You are exploring sample campaigns. Connect Meta Ads and this desk switches to your real spend — the samples disappear." connectHref="/settings" connectLabel="Connect Meta →" />
+        <AskAiCard onOpenDrawer={(q) => {
+            setAskAiQuestion(q);
+            setAskAiOpen(true);
+          }} />
+        <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
+        <AiToast message={aiToast} />
 
         {unmatchedIds > 0 ? (
           <a
@@ -640,6 +652,7 @@ export function MarketingDashboard() {
                       return (
                         <CampaignBlock
                           key={c.id}
+                          data-ai-id={c.campaignId}
                           campaign={c}
                           hideHot={hideHot}
                           index={i}

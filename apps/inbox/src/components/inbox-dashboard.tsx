@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, RefreshCw, Search, Zap } from "lucide-react";
 import { AskAiCard } from "@/components/ask-ai-card";
+import { AskAiDrawer } from "@/components/ask-ai-drawer";
+import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,8 @@ function filterFromHash(): FilterTab {
 }
 
 export function InboxDashboard() {
+  const [askAiOpen, setAskAiOpen] = useState(false);
+  const [askAiQuestion, setAskAiQuestion] = useState<string | undefined>(undefined);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [history, setHistory] = useState<ThreadMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -95,6 +99,8 @@ export function InboxDashboard() {
     const data = (await res.json()) as { history?: ThreadMessage[] };
     setHistory(data.history ?? []);
   }
+
+  const { toast: aiToast } = useAiDeskEvents(refresh);
 
   useEffect(() => {
     setFilter(filterFromHash());
@@ -341,7 +347,13 @@ export function InboxDashboard() {
         </div>
       </div>
 
-      <AskAiCard threadId={selected?.id} />
+      <DemoBanner message="You are exploring sample email. Connect Gmail and this desk switches to your real mail — the samples disappear." connectHref="/settings" connectLabel="Connect Gmail →" />
+      <AskAiCard threadId={selected?.id} onOpenDrawer={(q) => {
+          setAskAiQuestion(q);
+          setAskAiOpen(true);
+        }} />
+      <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
+      <AiToast message={aiToast} />
 
       {sla.breachCount > 0 || sla.hoursSaved > 0 ? (
         <Link
@@ -527,6 +539,7 @@ export function InboxDashboard() {
               return (
                 <div
                   key={m.id}
+                  data-ai-id={m.id}
                   className={cn(
                     "queue-row flex w-full items-center gap-2 px-4 py-5 text-left transition-all",
                     on && "border-l-2 border-l-[#8B5CF6] bg-gradient-to-r from-[#8B5CF6]/[0.05] to-transparent",

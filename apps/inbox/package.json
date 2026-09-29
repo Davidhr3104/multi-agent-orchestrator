@@ -6,7 +6,8 @@
     "dev": "next dev --port 43151 --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start --port 43151",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

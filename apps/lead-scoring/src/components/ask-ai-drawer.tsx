@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { DemoSuggestion } from "@/lib/demo-assistant";
 
 type AskAiAttachment = { type: "image"; data: string; mediaType: string };
 type AskAiMessage = { role: "user" | "assistant"; content: string; attachments?: AskAiAttachment[] };
@@ -11,22 +12,57 @@ type AskAiActionProposal = {
   action: string;
   summary: string;
   targets: { id: string; label: string }[];
+  stage?: string;
+  note?: string;
 };
-type AskAiSuggestion = { label: string; detail: string; recommended?: boolean };
+type LeadSnapshot = { id: string } & Record<string, unknown>;
+type ExecutedAction = {
+  action: string;
+  summary: string;
+  targets: { id: string; label: string }[];
+  done: string[];
+  failed: { id: string; error: string }[];
+  undo: LeadSnapshot[];
+};
+type ServerReply = {
+  answer: string;
+  engine: AskAiEngine;
+  demo?: boolean;
+  proposal?: AskAiActionProposal;
+  suggestions?: DemoSuggestion[];
+  executed?: ExecutedAction;
+};
 type DrawerTurn = {
   message: AskAiMessage;
   proposal?: AskAiActionProposal;
   proposalStatus?: "pending" | "confirmed" | "dismissed" | "failed";
   proposalResult?: string;
-  suggestions?: AskAiSuggestion[];
+  suggestions?: DemoSuggestion[];
   selectedSuggestion?: string;
+  executed?: ExecutedAction;
+  undone?: boolean;
 };
 
 const QUICK_ACTIONS = [
-  "Summarize my hot leads",
-  "Find stale leads",
-  "Suggest a follow-up strategy",
+  "Summarize my pipeline",
+  "Clean up my stale leads",
+  "What's in my review queue?",
+  "What's my best next move?",
 ];
+
+// Scripted walkthrough for recording. Questions go through the real /api/ask-ai route
+// and the confirm/select steps run the real execute route, so every step changes real
+// (sandbox) lead data and the dashboard behind the drawer reacts.
+const FULL_DEMO_SCRIPT = [
+  "How is my pipeline doing?",
+  "Why does Jordan Hale have the highest score?",
+  "What's waiting in my review queue?",
+  "__CONFIRM_LAST_PROPOSAL__",
+  "Clean up my stale leads",
+  "__CONFIRM_LAST_PROPOSAL__",
+  "What's my best next move?",
+  "__SELECT_RECOMMENDED_SUGGESTION__",
+] as const;
 
 type SavedSession = { id: string; startedAt: string; preview: string; turns: DrawerTurn[] };
 const HISTORY_STORAGE_KEY = "helix-ask-ai-history-leads";
@@ -62,91 +98,6 @@ function saveSessionToHistory(turns: DrawerTurn[]) {
   }
 }
 
-type DemoResponse = { answer: string; suggestions?: AskAiSuggestion[]; proposal?: AskAiActionProposal };
-
-// Client-side demo responses so the drawer reads as functional in a
-// no-API-key / no-live-data environment. Matched by keyword against the
-// question; falls through to the real backend call when nothing matches.
-const DEMO_RESPONSES: { match: RegExp; response: DemoResponse }[] = [
-  {
-    match: /hot lead|summarize.*lead|pipeline/i,
-    response: {
-      answer:
-        "You have 3 hot leads right now. Jordan Hale (96) is the strongest — HVAC quote request, ready to move this month. Maya Chen (90) and Luis Ortega (90) are close behind, both budget-qualified. Your median score is trending up 8% week over week.",
-    },
-  },
-  {
-    match: /jordan hale|highest score|why.*(top|best) lead/i,
-    response: {
-      answer:
-        "Jordan Hale scored 96 across three signals: budget confirmed at $18,500 (above your $15k threshold), a hard start date of \"early next month\" in their message, and a verified work email at a company matching your ICP industry list. No red flags — every field that drove the score has a direct quote from their original inquiry, not an inference.",
-    },
-  },
-  {
-    match: /stale|cold|idle|clean ?up|archive/i,
-    response: {
-      answer:
-        "I checked your pipeline for leads with no activity in 30+ days. Found 1 candidate: Ava Brooks, created 2026-03-13, still sitting in cold tier with no follow-up.",
-      proposal: {
-        type: "action_proposal",
-        action: "archive_leads",
-        summary: "Archive Ava Brooks — cold tier, idle 30+ days, no response to outreach.",
-        targets: [{ id: "demo-ava-brooks", label: "Ava Brooks (cold, idle since 2026-03-13)" }],
-      },
-    },
-  },
-  {
-    match: /follow.?up|strategy|next step|next move|what should i do/i,
-    response: {
-      answer:
-        "Based on your current pipeline, here are 3 follow-up approaches for your top lead. I'd lean toward the first — it matches the urgency signal in their original message.",
-      suggestions: [
-        {
-          label: "Fast-track call within 24h",
-          detail: "They mentioned wanting to start \"this month\" — a same-day call capitalizes on that urgency before it cools off.",
-          recommended: true,
-        },
-        {
-          label: "Send a tailored case study first",
-          detail: "Lower-pressure option: share a relevant win in their industry, then follow up with a call in 2-3 days.",
-        },
-        {
-          label: "Loop in a senior rep for a joint call",
-          detail: "Best for larger deals — adds credibility, but adds a scheduling step that may slow things down.",
-        },
-      ],
-    },
-  },
-  {
-    match: /score.*drop|why.*(low|drop)/i,
-    response: {
-      answer:
-        "Score drops are usually driven by one of three signals: budget mismatch (stated budget below your ICP floor), timeline vagueness (no committed start date), or missing contact verification (no work email/phone). Open a lead's detail view to see which fields dragged its score down.",
-    },
-  },
-];
-
-function matchDemoResponse(question: string): DemoResponse | null {
-  for (const entry of DEMO_RESPONSES) {
-    if (entry.match.test(question)) return entry.response;
-  }
-  return null;
-}
-
-// Scripted end-to-end walkthrough for recording a demo video: a fixed
-// sequence of questions, fired one at a time with realistic "thinking"
-// pauses between them, so the whole conversation — analysis, a proposed
-// action with a real confirm, and a multi-option recommendation — plays
-// out without anyone typing live.
-const FULL_DEMO_SCRIPT = [
-  "How is my pipeline doing?",
-  "Why does Jordan Hale have the highest score?",
-  "Do I have any leads that need cleanup?",
-  "__CONFIRM_LAST_PROPOSAL__",
-  "What's my best next move?",
-  "__SELECT_RECOMMENDED_SUGGESTION__",
-] as const;
-
 function readImageAsAttachment(file: File): Promise<AskAiAttachment> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -158,6 +109,54 @@ function readImageAsAttachment(file: File): Promise<AskAiAttachment> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type ExecutePayload = { action: string; targetIds: string[]; stage?: string; note?: string; snapshots?: LeadSnapshot[] };
+
+async function executeAction(payload: ExecutePayload): Promise<{ done: string[]; failed: { id: string; error: string }[] }> {
+  const res = await fetch("/api/ask-ai/execute", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = (await res.json()) as { done?: string[]; failed?: { id: string; error: string }[]; error?: string };
+  if (!res.ok) throw new Error(data.error ?? `Execute failed (${res.status})`);
+  return { done: data.done ?? [], failed: data.failed ?? [] };
+}
+
+function plainName(label: string) {
+  return label.replace(/\s*\(.*\)\s*$/, "");
+}
+
+const ACTION_VERB: Record<string, string> = {
+  archive_leads: "archived",
+  approve_leads: "approved",
+  advance_stage: "moved to Contacted:",
+  add_note: "added a note to",
+  restore: "restored",
+};
+
+/** Tells the dashboard behind the drawer that data changed, so it can refresh and react. */
+function announceAiAction(action: string, targets: { id: string; label: string }[]) {
+  const names = targets.map((t) => plainName(t.label)).join(", ");
+  window.dispatchEvent(
+    new CustomEvent("helix:ai-action", {
+      detail: { message: `Helix AI ${ACTION_VERB[action] ?? "updated"} ${names}`, ids: targets.map((t) => t.id) },
+    })
+  );
+  window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+}
+
+function resultText(action: string, done: number, failed: number, targets: { label: string }[]) {
+  const failedNote = failed ? ` ${failed} failed.` : "";
+  if (action === "archive_leads") return `Archived ${done} lead${done === 1 ? "" : "s"}.${failedNote}`;
+  if (action === "approve_leads") return `Approved ${done} lead${done === 1 ? "" : "s"} — review flag cleared, sign-off recorded.${failedNote}`;
+  if (action === "add_note") return `Note added to ${targets.map((t) => plainName(t.label)).join(", ")}.${failedNote}`;
+  return `Moved ${targets.map((t) => plainName(t.label)).join(", ")} to Contacted and logged the play.${failedNote}`;
 }
 
 export function AskAiDrawer({
@@ -178,12 +177,27 @@ export function AskAiDrawer({
   const [runningDemo, setRunningDemo] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessionHistory, setSessionHistory] = useState<SavedSession[]>([]);
+  const [isSandbox, setIsSandbox] = useState(false);
   const lastAskedInitialQuestion = useRef<string | undefined>(undefined);
   const turnsRef = useRef<DrawerTurn[]>(turns);
   turnsRef.current = turns;
 
+  function commitTurns(next: DrawerTurn[]) {
+    turnsRef.current = next;
+    setTurns(next);
+  }
+
+  function patchTurn(index: number, patch: Partial<DrawerTurn>) {
+    commitTurns(turnsRef.current.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  }
+
   useEffect(() => {
-    if (open) setSessionHistory(loadSessionHistory());
+    if (!open) return;
+    setSessionHistory(loadSessionHistory());
+    fetch("/api/settings/desk")
+      .then((r) => r.json())
+      .then((d: { sandbox?: boolean }) => setIsSandbox(Boolean(d.sandbox)))
+      .catch(() => setIsSandbox(false));
   }, [open]);
 
   useEffect(() => {
@@ -204,63 +218,39 @@ export function AskAiDrawer({
     setPendingAttachment(null);
 
     const userMessage: AskAiMessage = { role: "user", content: trimmed, attachments };
-    const nextTurns = [...turnsRef.current, { message: userMessage }];
-    setTurns(nextTurns);
-    turnsRef.current = nextTurns;
+    const nextTurns: DrawerTurn[] = [...turnsRef.current, { message: userMessage }];
+    commitTurns(nextTurns);
 
     try {
-      const demo = matchDemoResponse(trimmed);
-      if (demo) {
-        // Small artificial delay so the typing indicator reads as real.
-        await new Promise((resolve) => setTimeout(resolve, 1800 + Math.random() * 1200));
-        setEngine("claude");
-        const withAnswer = [
-          ...nextTurns,
-          {
-            message: { role: "assistant" as const, content: demo.answer },
-            proposal: demo.proposal,
-            proposalStatus: demo.proposal ? ("pending" as const) : undefined,
-            suggestions: demo.suggestions,
-          },
-        ];
-        setTurns(withAnswer);
-        turnsRef.current = withAnswer;
-        return;
-      }
-
       const res = await fetch("/api/ask-ai", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "drawer",
-          history: nextTurns.map((t) => t.message),
-        }),
+        body: JSON.stringify({ mode: "drawer", history: nextTurns.map((t) => t.message) }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error ?? `Ask AI request failed (${res.status})`);
       }
-      const data = (await res.json()) as {
-        answer: string;
-        engine: AskAiEngine;
-        proposal?: AskAiActionProposal;
-      };
+      const data = (await res.json()) as ServerReply;
+      // The sandbox assistant answers instantly; pause so the typing indicator reads as thinking.
+      if (data.demo) await wait(1400 + Math.random() * 1100);
       setEngine(data.engine);
-      const withAnswer = [
+      commitTurns([
         ...nextTurns,
         {
-          message: { role: "assistant" as const, content: data.answer },
+          message: { role: "assistant", content: data.answer },
           proposal: data.proposal,
-          proposalStatus: data.proposal ? ("pending" as const) : undefined,
+          proposalStatus: data.proposal ? "pending" : undefined,
+          suggestions: data.suggestions,
+          executed: data.executed,
         },
-      ];
-      setTurns(withAnswer);
-      turnsRef.current = withAnswer;
+      ]);
+      if (data.executed?.done.length) {
+        announceAiAction(data.executed.action, data.executed.targets.filter((t) => data.executed!.done.includes(t.id)));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ask AI request failed");
-      const reverted = nextTurns.slice(0, -1);
-      setTurns(reverted);
-      turnsRef.current = reverted;
+      commitTurns(nextTurns.slice(0, -1));
     } finally {
       setBusy(false);
     }
@@ -275,128 +265,153 @@ export function AskAiDrawer({
   }, [open, initialQuestion]);
 
   async function confirmProposal(turnIndex: number) {
-    const turn = turnsRef.current[turnIndex];
-    if (!turn.proposal) return;
-
-    setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, proposalStatus: "pending" } : t)));
-
-    // Demo-scripted targets (ids prefixed "demo-") aren't real leads — resolve
-    // locally instead of calling the live execute endpoint, which would 404.
-    if (turn.proposal.targets.every((t) => t.id.startsWith("demo-"))) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const count = turn.proposal.targets.length;
-      setTurns((prev) =>
-        prev.map((t, i) =>
-          i === turnIndex
-            ? { ...t, proposalStatus: "confirmed", proposalResult: `Archived ${count} lead${count === 1 ? "" : "s"}.` }
-            : t
-        )
-      );
-      return;
-    }
-
+    const proposal = turnsRef.current[turnIndex]?.proposal;
+    if (!proposal) return;
+    patchTurn(turnIndex, { proposalStatus: "pending" });
     try {
-      const res = await fetch("/api/ask-ai/execute", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: turn.proposal.action,
-          targetIds: turn.proposal.targets.map((t) => t.id),
-        }),
+      const { done, failed } = await executeAction({
+        action: proposal.action,
+        targetIds: proposal.targets.map((t) => t.id),
+        stage: proposal.stage,
+        note: proposal.note,
       });
-      const data = (await res.json()) as { archived?: string[]; failed?: { id: string; error: string }[]; error?: string };
-      if (!res.ok) throw new Error(data.error ?? `Execute failed (${res.status})`);
-
-      const archivedCount = data.archived?.length ?? 0;
-      const failedCount = data.failed?.length ?? 0;
-      const resultText =
-        failedCount === 0
-          ? `Archived ${archivedCount} lead${archivedCount === 1 ? "" : "s"}.`
-          : `Archived ${archivedCount}, ${failedCount} failed.`;
-
-      setTurns((prev) =>
-        prev.map((t, i) =>
-          i === turnIndex ? { ...t, proposalStatus: "confirmed", proposalResult: resultText } : t
-        )
-      );
+      patchTurn(turnIndex, {
+        proposalStatus: "confirmed",
+        proposalResult: resultText(proposal.action, done.length, failed.length, proposal.targets),
+      });
+      if (done.length) announceAiAction(proposal.action, proposal.targets.filter((t) => done.includes(t.id)));
     } catch (err) {
-      setTurns((prev) =>
-        prev.map((t, i) =>
-          i === turnIndex
-            ? {
-                ...t,
-                proposalStatus: "failed",
-                proposalResult: err instanceof Error ? err.message : "Execute failed",
-              }
-            : t
-        )
-      );
+      patchTurn(turnIndex, {
+        proposalStatus: "failed",
+        proposalResult: err instanceof Error ? err.message : "Execute failed",
+      });
+    }
+  }
+
+  async function undoExecuted(turnIndex: number) {
+    const ex = turnsRef.current[turnIndex]?.executed;
+    if (!ex || turnsRef.current[turnIndex].undone) return;
+    try {
+      const { done } = await executeAction({ action: "restore", targetIds: [], snapshots: ex.undo });
+      if (done.length) {
+        patchTurn(turnIndex, { undone: true });
+        window.dispatchEvent(
+          new CustomEvent("helix:ai-action", {
+            detail: { message: `Helix AI undid: ${ex.summary}`, ids: done },
+          })
+        );
+        window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
+      } else setError("Could not undo — the lead may have changed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Undo failed");
     }
   }
 
   function dismissProposal(turnIndex: number) {
-    setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, proposalStatus: "dismissed" } : t)));
+    patchTurn(turnIndex, { proposalStatus: "dismissed" });
   }
 
-  function chooseSuggestion(turnIndex: number, label: string) {
-    setTurns((prev) => {
-      const next = prev.map((t, i) => (i === turnIndex ? { ...t, selectedSuggestion: label } : t));
-      return [
-        ...next,
-        { message: { role: "assistant" as const, content: `Got it — I'll go with "${label}".` } },
-      ];
+  async function chooseSuggestion(turnIndex: number, suggestion: DemoSuggestion) {
+    patchTurn(turnIndex, { selectedSuggestion: suggestion.label });
+    const { action, stage, targetIds, note } = suggestion.action;
+    const targets = targetIds.map((id) => ({ id, label: id }));
+    try {
+      const { done, failed } = await executeAction({ action, targetIds, stage, note });
+      const label = suggestion.action.targetIds.length ? await leadNameFor(targetIds[0]) : "the lead";
+      const named = targets.map((t) => ({ ...t, label }));
+      commitTurns([
+        ...turnsRef.current,
+        {
+          message: {
+            role: "assistant",
+            content: done.length
+              ? `Done — I'll go with “${suggestion.label}”. ${resultText(action, done.length, failed.length, named)}`
+              : `I couldn't apply “${suggestion.label}”: ${failed[0]?.error ?? "unknown error"}.`,
+          },
+        },
+      ]);
+      if (done.length) announceAiAction(action, named);
+    } catch (err) {
+      commitTurns([
+        ...turnsRef.current,
+        { message: { role: "assistant", content: `I couldn't apply that: ${err instanceof Error ? err.message : "unknown error"}.` } },
+      ]);
+    }
+  }
+
+  async function leadNameFor(id: string): Promise<string> {
+    try {
+      const res = await fetch(`/api/leads/${id}`);
+      const data = (await res.json()) as { lead?: { name?: string } };
+      return data.lead?.name ?? "the lead";
+    } catch {
+      return "the lead";
+    }
+  }
+
+  async function resetDemo() {
+    if (busy || runningDemo) return;
+    if (turnsRef.current.length > 0) saveSessionToHistory(turnsRef.current);
+    commitTurns([]);
+    setError(null);
+    setHistoryOpen(false);
+    await fetch("/api/settings/desk", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "demo" }),
     });
-  }
-
-  function wait(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
   }
 
   async function runFullDemo() {
     if (runningDemo || busy) return;
     setRunningDemo(true);
-    setTurns([]);
-    turnsRef.current = [];
-    lastAskedInitialQuestion.current = "__full_demo__";
+    try {
+      // Start every recording from the same seed so the walkthrough is repeatable.
+      await resetDemo();
+      lastAskedInitialQuestion.current = "__full_demo__";
+      await wait(600);
 
-    for (const step of FULL_DEMO_SCRIPT) {
-      if (step === "__CONFIRM_LAST_PROPOSAL__") {
-        const proposalIndex = turnsRef.current.findIndex((t) => t.proposal && t.proposalStatus === "pending");
-        if (proposalIndex >= 0) {
-          await wait(1800); // pause as if the viewer is reading the proposal before confirming
-          await confirmProposal(proposalIndex);
-          await wait(2200);
+      for (const step of FULL_DEMO_SCRIPT) {
+        if (step === "__CONFIRM_LAST_PROPOSAL__") {
+          let idx = -1;
+          turnsRef.current.forEach((t, i) => {
+            if (t.proposal && t.proposalStatus === "pending") idx = i;
+          });
+          if (idx >= 0) {
+            await wait(1800); // as if the viewer is reading the proposal before confirming
+            await confirmProposal(idx);
+            await wait(2600); // let the dashboard react before the next question
+          }
+          continue;
         }
-        continue;
-      }
-      if (step === "__SELECT_RECOMMENDED_SUGGESTION__") {
-        const suggestionIndex = turnsRef.current.findIndex((t) => t.suggestions?.length);
-        const recommended = turnsRef.current[suggestionIndex]?.suggestions?.find((s) => s.recommended);
-        if (suggestionIndex >= 0 && recommended) {
-          await wait(2200); // pause as if the viewer is comparing the 3 options
-          chooseSuggestion(suggestionIndex, recommended.label);
-          await wait(2200);
+        if (step === "__SELECT_RECOMMENDED_SUGGESTION__") {
+          const idx = turnsRef.current.findIndex((t) => t.suggestions?.length && !t.selectedSuggestion);
+          const recommended = turnsRef.current[idx]?.suggestions?.find((s) => s.recommended);
+          if (idx >= 0 && recommended) {
+            await wait(2200); // as if the viewer is comparing the options
+            await chooseSuggestion(idx, recommended);
+            await wait(2200);
+          }
+          continue;
         }
-        continue;
+        await ask(step);
+        await wait(2000);
       }
-      await ask(step);
-      await wait(2000); // pause on the answer before the next question fires
+    } finally {
+      setRunningDemo(false);
     }
-
-    setRunningDemo(false);
   }
 
   function restoreSession(session: SavedSession) {
     if (turnsRef.current.length > 0) saveSessionToHistory(turnsRef.current);
-    setTurns(session.turns);
-    turnsRef.current = session.turns;
+    commitTurns(session.turns);
     setHistoryOpen(false);
   }
 
   function startNewSession() {
     if (turnsRef.current.length > 0) saveSessionToHistory(turnsRef.current);
-    setTurns([]);
-    turnsRef.current = [];
+    commitTurns([]);
     setHistoryOpen(false);
   }
 
@@ -405,8 +420,7 @@ export function AskAiDrawer({
     e.target.value = "";
     if (!file) return;
     try {
-      const attachment = await readImageAsAttachment(file);
-      setPendingAttachment(attachment);
+      setPendingAttachment(await readImageAsAttachment(file));
     } catch {
       setError("Could not read the attached image.");
     }
@@ -417,12 +431,19 @@ export function AskAiDrawer({
     void ask(question);
   }
 
-  const statusLabel = busy ? "Listening" : engine === "fallback" ? "Limited Mode" : "Online & Ready";
+  const statusLabel = busy
+    ? "Listening"
+    : isSandbox
+      ? "Demo workspace"
+      : engine === "fallback"
+        ? "Limited Mode"
+        : "Online & Ready";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
       <SheetContent
         side="right"
+        showOverlay={false}
         className="flex h-full w-full min-h-0 flex-col overflow-hidden border-l border-sky-900/40 bg-[#04101c] sm:max-w-md"
       >
         <SheetHeader className="border-b border-sky-900/40 pb-3">
@@ -434,19 +455,32 @@ export function AskAiDrawer({
               </div>
               <SheetTitle className="text-slate-100">Ask Helix AI</SheetTitle>
             </div>
-            <button
-              type="button"
-              onClick={() => setHistoryOpen((v) => !v)}
-              aria-label="View past conversations"
-              className={
-                "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition " +
-                (historyOpen
-                  ? "border-sky-500 bg-sky-500/15 text-sky-200"
-                  : "border-sky-900/50 text-slate-400 hover:bg-sky-900/20 hover:text-slate-200")
-              }
-            >
-              <span aria-hidden>🕘</span> History
-            </button>
+            <div className="flex items-center gap-1.5">
+              {isSandbox ? (
+                <button
+                  type="button"
+                  onClick={() => void resetDemo()}
+                  disabled={busy || runningDemo}
+                  aria-label="Reset demo data"
+                  className="flex items-center gap-1 rounded-md border border-sky-900/50 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-sky-900/20 hover:text-slate-200 disabled:opacity-50"
+                >
+                  <span aria-hidden>↺</span> Reset demo
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((v) => !v)}
+                aria-label="View past conversations"
+                className={
+                  "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition " +
+                  (historyOpen
+                    ? "border-sky-500 bg-sky-500/15 text-sky-200"
+                    : "border-sky-900/50 text-slate-400 hover:bg-sky-900/20 hover:text-slate-200")
+                }
+              >
+                <span aria-hidden>🕘</span> History
+              </button>
+            </div>
           </div>
           <p className="flex items-center gap-1 text-[11px] font-medium text-sky-400">
             <span className="inline-block size-1.5 rounded-full bg-sky-400" />
@@ -487,16 +521,18 @@ export function AskAiDrawer({
           {turns.length === 0 ? (
             <div className="space-y-3 pt-4">
               <p className="text-sm text-slate-500">
-                Ask about your whole pipeline — trends, stale leads, or draft a follow-up.
+                Ask about your whole pipeline — trends, stale leads, or the review queue. Confirmed actions update the dashboard live.
               </p>
-              <button
-                type="button"
-                onClick={() => void runFullDemo()}
-                disabled={runningDemo}
-                className="flex items-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:border-sky-400 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span aria-hidden>▶</span> Watch Helix work
-              </button>
+              {isSandbox ? (
+                <button
+                  type="button"
+                  onClick={() => void runFullDemo()}
+                  disabled={runningDemo}
+                  className="flex items-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:border-sky-400 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span aria-hidden>▶</span> Watch Helix work
+                </button>
+              ) : null}
             </div>
           ) : null}
           {turns.map((turn, i) => (
@@ -513,6 +549,28 @@ export function AskAiDrawer({
                 ) : null}
                 {turn.message.content}
               </div>
+
+              {turn.executed ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <p className="mb-1 text-xs font-semibold text-emerald-200">
+                    {turn.undone ? "Undone" : turn.executed.done.length ? "Done automatically" : "Could not apply"}
+                  </p>
+                  <p className="mb-2 text-xs text-slate-300">
+                    {turn.executed.done.length
+                      ? resultText(turn.executed.action, turn.executed.done.length, turn.executed.failed.length, turn.executed.targets)
+                      : turn.executed.failed[0]?.error ?? "Unknown error"}
+                  </p>
+                  {turn.executed.done.length && !turn.undone ? (
+                    <button
+                      type="button"
+                      onClick={() => void undoExecuted(i)}
+                      className="rounded-md border border-emerald-500/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/10"
+                    >
+                      Undo
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               {turn.proposal ? (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
@@ -559,7 +617,7 @@ export function AskAiDrawer({
                         key={s.label}
                         type="button"
                         disabled={Boolean(turn.selectedSuggestion)}
-                        onClick={() => chooseSuggestion(i, s.label)}
+                        onClick={() => void chooseSuggestion(i, s)}
                         className={
                           "w-full rounded-lg border p-3 text-left transition disabled:cursor-default " +
                           (isSelected

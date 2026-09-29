@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PartnerVerdict, PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
 import { AskAiCard } from "@/components/ask-ai-card";
+import { AskAiDrawer } from "@/components/ask-ai-drawer";
+import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,6 +126,8 @@ function matchTextClass(tier: StoredRfp["tier"]) {
 }
 
 export function LegalDashboard() {
+  const [askAiOpen, setAskAiOpen] = useState(false);
+  const [askAiQuestion, setAskAiQuestion] = useState<string | undefined>(undefined);
   const [rfps, setRfps] = useState<StoredRfp[]>([]);
   const [nowMs, setNowMs] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -162,6 +166,8 @@ export function LegalDashboard() {
     if (data.pricing) setPricing(data.pricing);
     if (data.clientProfile) setStructured(parseProfile(data.clientProfile));
   }
+
+  const { toast } = useAiDeskEvents(refresh);
 
   useEffect(() => {
     setMounted(true);
@@ -692,7 +698,13 @@ export function LegalDashboard() {
           </div>
         </section>
 
-        <AskAiCard rfpId={selected?.id} />
+        <DemoBanner message="You are exploring sample RFPs. Start with your own data and the samples disappear." ownDataLabel="Use my own data" />
+        <AskAiCard rfpId={selected?.id} onOpenDrawer={(q) => {
+            setAskAiQuestion(q);
+            setAskAiOpen(true);
+          }} />
+        <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
+        <AiToast message={toast} />
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
           <div className="animate-entrance stagger-5 space-y-4 lg:col-span-8">
@@ -825,6 +837,7 @@ export function LegalDashboard() {
                       return (
                         <tr
                           key={rfp.id}
+                          data-ai-id={rfp.id}
                           className="table-row-interactive group relative cursor-pointer transition-colors hover:bg-white/[0.03]"
                           style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.08)" }}
                           onClick={() => openRfp(rfp, "overview")}

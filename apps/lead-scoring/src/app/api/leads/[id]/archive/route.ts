@@ -1,5 +1,6 @@
 import { patchLead } from "@/lib/store";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { requireOperatorOrGuest } from "@/lib/org-auth";
 import { checkActionToken, withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
@@ -20,7 +21,7 @@ export async function archive(id: string, actor: string, orgId: string | undefin
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   const { id } = await params;
   return withOrgScope((orgId) => archive(id, operatorActor(req), orgId));
@@ -37,7 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return new Response("Archived. You can close this tab.", { headers: { "Content-Type": "text/plain" } });
   }
 
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   return withOrgScope(async (orgId) => {
     const res = await archive(id, operatorActor(req), orgId);

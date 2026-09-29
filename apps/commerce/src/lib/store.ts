@@ -1,5 +1,5 @@
 import {
-  autoSeedEnabled,
+  resolveDeskMode,
   runFraudScoring,
   runInquiryClassification,
   runInventoryPrediction,
@@ -14,6 +14,8 @@ import {
 } from "@helix/core";
 import { getMockShopifyClient, getLiveShopifyClient } from "./shopify";
 import {
+  commerceGate,
+  supabaseProbeDesk,
   supabaseListInquiries,
   supabaseListOrders,
   supabaseListProducts,
@@ -118,10 +120,49 @@ async function applyDemoCatalog(): Promise<void> {
   return seeding;
 }
 
+/** Shopify credentials are what turns this desk live. */
+function shopifyConnected(): boolean {
+  return Boolean(getLiveShopifyClient());
+}
+
+const PROBE_TTL_MS = 10_000;
+let lastProbe = 0;
+
+/**
+ * Decides demo vs live. Connection is checked on every call (cheap); the Supabase probe for real
+ * orders is throttled. If the mode flips, memory is dropped so demo and real data never mix.
+ */
+async function ensureDeskMode(): Promise<void> {
+  const connected = shopifyConnected();
+  let remoteRecords = commerceGate.mode() === "live" ? 1 : 0;
+  if (!connected && Date.now() - lastProbe > PROBE_TTL_MS) {
+    lastProbe = Date.now();
+    remoteRecords = (await supabaseProbeDesk()).hasOrders ? 1 : 0;
+  } else if (!connected && commerceGate.mode() !== "live") {
+    remoteRecords = 0;
+  }
+  const changed = commerceGate.evaluate({ connected, remoteRecords });
+  if (changed) {
+    orders.clear();
+    products.clear();
+    inquiries.clear();
+    reorders.clear();
+    returns.clear();
+    seeded = false;
+    seeding = null;
+  }
+}
+
+export function currentDeskMode(): "demo" | "live" {
+  const m = commerceGate.mode();
+  return m === "unknown" ? resolveDeskMode({ connected: shopifyConnected(), realRecords: 0 }) : m;
+}
+
 async function seedIfNeeded(): Promise<void> {
+  await ensureDeskMode();
   if (seeded) return;
   if (seeding) return seeding;
-  if (!autoSeedEnabled()) {
+  if (currentDeskMode() !== "demo") {
     seeded = true;
     return;
   }
@@ -328,6 +369,8 @@ export async function patchInquiry(
 export type DeskModeStatus = {
   empty: boolean;
   demo: boolean;
+  mode: "demo" | "live";
+  connected: boolean;
   store: "supabase" | "memory";
   count: number;
 };
@@ -336,13 +379,19 @@ export async function deskStatus(): Promise<DeskModeStatus> {
   const [o, p, i] = await Promise.all([listOrders(), listProducts(), listInquiries()]);
   return {
     empty: o.length === 0 && p.length === 0,
-    demo: o.some((ord) => ord.shopifyOrderId.includes("gid://shopify/Order/1001")),
+    demo: currentDeskMode() === "demo",
+    mode: currentDeskMode(),
+    connected: shopifyConnected(),
     store: process.env.NEXT_PUBLIC_SUPABASE_URL ? "supabase" : "memory",
     count: o.length + p.length + i.length,
   };
 }
 
 export async function loadDemoCatalog(): Promise<DeskModeStatus> {
+  await ensureDeskMode();
+  if (currentDeskMode() !== "demo") {
+    throw new Error("Demo data is only available before Shopify is connected.");
+  }
   seeded = false;
   seeding = null;
   await applyDemoCatalog();

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getSecret, onSecretsChanged, type AttributedLead, type HitlDecision, type SpendEvent } from "@helix/core";
+import { getSecret, onSecretsChanged, type AttributedLead, type HitlDecision, type SpendEvent, createDemoGate } from "@helix/core";
 
 type Client = SupabaseClient;
 
@@ -15,7 +15,14 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
+/** Demo/live switch for this desk. While in demo, no spend/lead/decision data touches Supabase. */
+export const marketingGate = createDemoGate("marketing");
+
 export function getSupabase(): Client | null {
+  return marketingGate.suspended() ? null : rawClient();
+}
+
+function rawClient(): Client | null {
   if (cached !== undefined) return cached;
   const url = getSecret("NEXT_PUBLIC_SUPABASE_URL");
   const key = getSecret("SUPABASE_SERVICE_ROLE_KEY") || getSecret("NEXT_PUBLIC_SUPABASE_ANON_KEY");
@@ -156,6 +163,23 @@ export async function supabaseLoadDesk(): Promise<{
     leads: (leadRes.data ?? []).map((row) => fromLeadRow(row as Record<string, unknown>)),
     decisions: (decRes.data ?? []).map((row) => fromDecisionRow(row as Record<string, unknown>)),
   };
+}
+
+/** Does Supabase already hold real spend? Bypasses the demo suspension; failures are logged, not hidden. */
+export async function supabaseProbeDesk(): Promise<{ hasSpend: boolean }> {
+  const db = rawClient();
+  if (!db) return { hasSpend: false };
+  try {
+    const { data, error } = await table(db, "spend_events").select("*").order("occurred_at", { ascending: true });
+    if (error) {
+      console.warn("[helix-marketing] desk probe failed:", error.message);
+      return { hasSpend: false };
+    }
+    return { hasSpend: (data?.length ?? 0) > 0 };
+  } catch (err) {
+    console.warn("[helix-marketing] desk probe threw:", err instanceof Error ? err.message : err);
+    return { hasSpend: false };
+  }
 }
 
 export async function supabaseSaveSpend(events: SpendEvent[]): Promise<boolean> {

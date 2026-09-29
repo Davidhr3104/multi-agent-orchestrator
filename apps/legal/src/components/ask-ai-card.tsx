@@ -11,7 +11,13 @@ const QUICK_CHIPS = [
   { label: "Explain Go/No-Go", icon: "rule", question: "How does the Go/No-Go recommendation work?" },
 ];
 
-export function AskAiCard({ rfpId }: { rfpId?: string }) {
+export function AskAiCard({
+  rfpId,
+  onOpenDrawer,
+}: {
+  rfpId?: string;
+  onOpenDrawer?: (initialQuestion?: string) => void;
+}) {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -52,6 +58,11 @@ export function AskAiCard({ rfpId }: { rfpId?: string }) {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (onOpenDrawer) {
+      onOpenDrawer(question.trim() || undefined);
+      setQuestion("");
+      return;
+    }
     void ask(question);
   }
 
@@ -81,7 +92,7 @@ export function AskAiCard({ rfpId }: { rfpId?: string }) {
               style={{ backgroundColor: dotColor, boxShadow: dotGlow }}
             />
             <span className="text-[11px] font-semibold tracking-wider text-slate-200 uppercase">
-              Helix Copilot • {statusLabel}
+              Helix AI • {statusLabel}
             </span>
           </div>
 
@@ -132,7 +143,7 @@ export function AskAiCard({ rfpId }: { rfpId?: string }) {
                   border: "1px solid rgba(255,255,255,0.5)",
                 }}
               >
-                <span>{busy ? "Asking…" : "Ask Copilot"}</span>
+                <span>{busy ? "Asking…" : "Ask Helix"}</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </button>
             </div>
@@ -178,6 +189,13 @@ export function AskAiCard({ rfpId }: { rfpId?: string }) {
 
         <div className="flex justify-center lg:col-span-5 lg:justify-end">
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Open Ask Helix AI assistant"
+            onClick={() => onOpenDrawer?.()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") onOpenDrawer?.();
+            }}
             className="group relative w-full max-w-sm cursor-pointer overflow-hidden rounded-xl p-1"
             style={{
               background:

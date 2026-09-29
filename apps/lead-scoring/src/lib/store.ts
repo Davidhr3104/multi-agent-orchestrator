@@ -1,8 +1,26 @@
-import { attachIntelligence, autoSeedEnabled, scoreLeadHeuristic, type LeadIngestInput, type StoredLead } from "@helix/core";
-import { supabaseListLeads, supabaseUpsertLead } from "./supabase-leads";
+import {
+  attachIntelligence,
+  demoAvailable,
+  getSecret,
+  isDemoRecordId,
+  resolveDeskMode,
+  scoreLeadHeuristic,
+  type DeskMode,
+  type LeadIngestInput,
+  type StoredLead,
+} from "@helix/core";
+import { isSupabaseConfigured, supabaseListLeads, supabaseUpsertLead } from "./supabase-leads";
 
-const memory = new Map<string, StoredLead>();
-let seeded = false;
+/**
+ * Two stores, never mixed:
+ *  - `real`    what a workspace actually owns (cache in front of Supabase, or the local desk).
+ *  - `sandbox` demonstration data. Lives in memory only and is never written to Supabase.
+ * Which one a request sees is decided by resolveView(), from one rule: an integration is
+ * connected or real records exist -> live; otherwise demo. See resolveDeskMode() in helix-core.
+ */
+const real = new Map<string, StoredLead>();
+const sandbox = new Map<string, StoredLead>();
+let sandboxSeeded = false;
 
 const SAMPLES: LeadIngestInput[] = [
   {
@@ -35,6 +53,15 @@ const SAMPLES: LeadIngestInput[] = [
     message: "Buy followers and crypto nft drop click here free money",
   },
   {
+    // Mid-band on purpose: lands in the human-review queue so the demo has a real approve flow.
+    name: "Priya Nair",
+    email: "priya@brightpath-roofing.com",
+    source: "website",
+    timeline: "next quarter",
+    message:
+      "We run a roofing company and are exploring options for lead qualification. Could be a fit later this year, still comparing vendors.",
+  },
+  {
     name: "Jordan Hale",
     email: "jordan.hale@bookedjobs.example",
     source: "Upwork",
@@ -46,7 +73,7 @@ const SAMPLES: LeadIngestInput[] = [
 ];
 
 function applyDemoCatalog() {
-  memory.clear();
+  sandbox.clear();
   for (const sample of SAMPLES) {
     const scored = scoreLeadHeuristic(sample);
     const lead: StoredLead = attachIntelligence(
@@ -59,9 +86,9 @@ function applyDemoCatalog() {
               ? 200 * 86400000
               : sample.email.startsWith("luis@")
                 ? 190 * 86400000
-                : memory.size * 36e5)
+                : sandbox.size * 36e5)
         ).toISOString(),
-        runId: `seed-run-${memory.size}`,
+        runId: `seed-run-${sandbox.size}`,
         crmStatus: "not_sent",
         pipelineStage:
           scored.classification === "spam"
@@ -77,57 +104,98 @@ function applyDemoCatalog() {
         timeline: sample.timeline,
       },
       null,
-      [...memory.values()]
+      [...sandbox.values()]
     );
-    memory.set(lead.id, lead);
+    sandbox.set(lead.id, lead);
   }
-  seeded = true;
+  sandboxSeeded = true;
 }
 
-function seedIfNeeded() {
-  if (seeded) return;
-  if (!autoSeedEnabled()) {
-    seeded = true;
+function ensureSandbox() {
+  if (sandboxSeeded) return;
+  if (!demoAvailable()) {
+    sandboxSeeded = true;
     return;
   }
   applyDemoCatalog();
 }
 
+/** GoHighLevel is this desk's outbound integration: both fields set means the operator connected it. */
+export function isCrmConnected(): boolean {
+  return Boolean(getSecret("GHL_API_KEY") && getSecret("GHL_LOCATION_ID"));
+}
+
+type View = { mode: DeskMode; store: Map<string, StoredLead>; remote: StoredLead[] | null };
+
+const VIEW_TTL_MS = 5_000;
+const viewCache = new Map<string, { mode: DeskMode; at: number }>();
+
 /**
- * orgId is required whenever Supabase is configured — it's the real tenant
- * boundary (see supabase-leads.ts; the server client bypasses RLS via the
- * service-role key, so this explicit filter IS the isolation).
- *
- * The in-memory fallback (no Supabase configured) stays single-tenant: it's
- * the local/demo path, not multi-org production. orgId is accepted there
- * for signature symmetry but ignored — this is intentional, not a leak,
- * since there is no second tenant to leak data to in that mode.
+ * Decides which store a request sees. Key safety property: with no orgId in a Supabase-backed
+ * (multi-tenant) deployment the caller is a guest, and a guest is only ever given the demo
+ * sandbox — never the `real` cache, which holds other tenants' leads.
+ */
+async function resolveView(orgId?: string): Promise<View> {
+  ensureSandbox();
+  if (!orgId) {
+    if (isSupabaseConfigured()) return { mode: "demo", store: sandbox, remote: null };
+    const mode = resolveDeskMode({ connected: isCrmConnected(), realRecords: 0 });
+    return { mode, store: mode === "demo" ? sandbox : real, remote: null };
+  }
+
+  const cached = viewCache.get(orgId);
+  const remote = await supabaseListLeads(orgId);
+  if (remote === null) {
+    // Supabase did not answer for a signed-in org: fall back to the local desk rather than guess.
+    const mode = resolveDeskMode({ connected: isCrmConnected(), realRecords: 0 });
+    return { mode, store: mode === "demo" ? sandbox : real, remote: null };
+  }
+  const owned = remote.filter((l) => !isDemoRecordId(l.id));
+  const mode = resolveDeskMode({ connected: isCrmConnected(), realRecords: owned.length });
+  viewCache.set(orgId, { mode, at: Date.now() });
+  void cached;
+  return { mode, store: mode === "demo" ? sandbox : real, remote: owned };
+}
+
+async function modeFor(orgId?: string): Promise<DeskMode> {
+  if (orgId) {
+    const hit = viewCache.get(orgId);
+    if (hit && Date.now() - hit.at < VIEW_TTL_MS) return hit.mode;
+  }
+  return (await resolveView(orgId)).mode;
+}
+
+/**
+ * orgId is required whenever Supabase is configured and the caller is signed in — it's the real
+ * tenant boundary (the server client bypasses RLS via the service-role key, so this explicit
+ * filter IS the isolation). Guests (no orgId) only ever see the demo sandbox.
  */
 export async function listLeads(orgId?: string): Promise<StoredLead[]> {
-  seedIfNeeded();
-  if (orgId) {
-    const remote = await supabaseListLeads(orgId);
-    if (remote && remote.length > 0) {
-      for (const lead of remote) memory.set(lead.id, lead);
-      return remote;
-    }
-    if (remote !== null) return []; // Supabase configured and answered: an empty org has zero leads, not the demo seed.
+  const view = await resolveView(orgId);
+  if (view.mode === "live" && view.remote) {
+    for (const lead of view.remote) real.set(lead.id, lead);
+    return view.remote;
   }
-  return [...memory.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return [...view.store.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function saveLead(lead: StoredLead, orgId?: string): Promise<StoredLead> {
-  seedIfNeeded();
-  memory.set(lead.id, lead);
+  const mode = await modeFor(orgId);
+  if (mode === "demo" || isDemoRecordId(lead.id)) {
+    // Demo records never reach Supabase, whoever is signed in.
+    sandbox.set(lead.id, lead);
+    return lead;
+  }
+  real.set(lead.id, lead);
   if (orgId) await supabaseUpsertLead(lead, orgId);
   return lead;
 }
 
 export async function getLead(id: string, orgId?: string): Promise<StoredLead | null> {
-  seedIfNeeded();
-  if (memory.has(id)) return memory.get(id) ?? null;
-  const all = await listLeads(orgId);
-  return all.find((l) => l.id === id) ?? null;
+  const view = await resolveView(orgId);
+  if (view.store.has(id)) return view.store.get(id) ?? null;
+  if (view.mode === "live") return view.remote?.find((l) => l.id === id) ?? null;
+  return null;
 }
 
 export async function patchLead(
@@ -141,11 +209,11 @@ export async function patchLead(
   return saveLead(next, orgId);
 }
 
-export async function deleteLeads(ids: string[]): Promise<number> {
-  seedIfNeeded();
+export async function deleteLeads(ids: string[], orgId?: string): Promise<number> {
+  const view = await resolveView(orgId);
   let n = 0;
   for (const id of ids) {
-    if (memory.delete(id)) n += 1;
+    if (view.store.delete(id)) n += 1;
   }
   return n;
 }
@@ -166,27 +234,41 @@ export async function patchLeads(
 export type DeskModeStatus = {
   empty: boolean;
   demo: boolean;
+  /** True while the desk is showing the demo sandbox (drives the "Demo data" label and Reset). */
+  sandbox: boolean;
+  mode: DeskMode;
+  /** Whether the integration that turns the desk live is connected. */
+  connected: boolean;
   store: "supabase" | "memory";
   count: number;
 };
 
-export async function deskStatus(): Promise<DeskModeStatus> {
-  const leads = await listLeads();
+export async function deskStatus(orgId?: string): Promise<DeskModeStatus> {
+  const view = await resolveView(orgId);
+  const leads = await listLeads(orgId);
   return {
     empty: leads.length === 0,
-    demo: leads.some((l) => l.id.startsWith("seed-")),
+    demo: view.mode === "demo",
+    sandbox: view.mode === "demo",
+    mode: view.mode,
+    connected: isCrmConnected(),
     store: process.env.NEXT_PUBLIC_SUPABASE_URL ? "supabase" : "memory",
     count: leads.length,
   };
 }
 
-export async function loadDemoCatalog(): Promise<DeskModeStatus> {
-  applyDemoCatalog();
-  return deskStatus();
+export async function deskModeFor(orgId?: string): Promise<DeskMode> {
+  return modeFor(orgId);
 }
 
-export async function clearDesk(): Promise<DeskModeStatus> {
-  memory.clear();
-  seeded = true;
-  return deskStatus();
+export async function loadDemoCatalog(orgId?: string): Promise<DeskModeStatus> {
+  applyDemoCatalog();
+  return deskStatus(orgId);
+}
+
+export async function clearDesk(orgId?: string): Promise<DeskModeStatus> {
+  const view = await resolveView(orgId);
+  view.store.clear();
+  if (view.store === sandbox) sandboxSeeded = true;
+  return deskStatus(orgId);
 }

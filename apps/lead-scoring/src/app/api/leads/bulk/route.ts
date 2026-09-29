@@ -1,13 +1,14 @@
 import { deleteLeads, getLead, patchLead, patchLeads } from "@/lib/store";
 import { sendLeadToGhl } from "@/lib/ghl";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { requireOperatorOrGuest } from "@/lib/org-auth";
 import { supabaseDeleteLeads } from "@/lib/supabase-leads";
 import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   let body: unknown;
   try {
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
 
   return withOrgScope(async (orgId) => {
     if (action === "delete") {
-      const removed = await deleteLeads(ids);
+      const removed = await deleteLeads(ids, orgId);
       await supabaseDeleteLeads(ids);
       return Response.json({ ok: true, removed });
     }

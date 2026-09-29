@@ -1,12 +1,12 @@
 import { getLead, patchLead, deleteLeads } from "@/lib/store";
 import { attachIntelligence } from "@helix/core";
-import { requireOperator } from "@helix/core/operator";
+import { requireOperatorOrGuest } from "@/lib/org-auth";
 import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = await requireOperatorOrGuest(req);
   if (denied) return denied;
   const { id } = await params;
   let body: { intoId?: string } = {};
@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const merged = attachIntelligence(losing, winning, []);
     merged.duplicateOf = undefined;
     const saved = await patchLead(intoId, merged, orgId);
-    await deleteLeads([id]);
+    await deleteLeads([id], orgId);
     return Response.json({ lead: saved, mergedFromId: id });
   });
 }

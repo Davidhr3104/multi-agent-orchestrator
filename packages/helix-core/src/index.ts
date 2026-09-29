@@ -27,7 +27,47 @@ export {
   type SecretStatus,
 } from "./secrets";
 export { citeSpan, hydrateScoredField, missingCite } from "./fact";
-export { autoSeedEnabled } from "./desk-mode";
+export { createDemoGate, type DemoGate } from "./demo-gate";
+export {
+  handleExecuteBody,
+  restoreDeskActions,
+  runDeskAction,
+  runWithPolicy,
+  type ActionParams,
+  type ActionProposal,
+  type ActionTarget,
+  type DeskAction,
+  type DeskActionRegistry,
+  type ExecutedAction,
+  type RiskAssessment,
+  type RunResult,
+  type UndoEntry,
+} from "./desk-actions";
+export {
+  autoSeedEnabled,
+  DEMO_ID_PREFIX,
+  demoAvailable,
+  isDemoRecordId,
+  resolveDeskMode,
+  type DeskMode,
+} from "./desk-mode";
+export {
+  resumeAgent,
+  runAgent,
+  type AgentConfig,
+  type AgentMessage,
+  type AgentModel,
+  type AgentResult,
+  type AgentStep,
+  type AgentTool,
+  type ModelRequest,
+  type ModelTurn,
+  type PendingConfirmation,
+  type RiskDecision,
+  type ToolCall,
+  type ToolResult,
+} from "./agent";
+export { anthropicAgentModel, DEFAULT_AGENT_MODEL, toAnthropicMessages } from "./agent-anthropic";
 export { encodeSse } from "./sse";
 export { scoreLeadHeuristic, type ScoreThresholds } from "./lead/heuristic";
 export {
