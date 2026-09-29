@@ -96,7 +96,7 @@ const DEMO_RESPONSES: { match: RegExp; response: DemoResponse }[] = [
     },
   },
   {
-    match: /follow.?up|strategy|next step|what should i do/i,
+    match: /follow.?up|strategy|next step|next move|what should i do/i,
     response: {
       answer:
         "Based on your current pipeline, here are 3 follow-up approaches for your top lead. I'd lean toward the first — it matches the urgency signal in their original message.",
@@ -204,8 +204,9 @@ export function AskAiDrawer({
     setPendingAttachment(null);
 
     const userMessage: AskAiMessage = { role: "user", content: trimmed, attachments };
-    const nextTurns = [...turns, { message: userMessage }];
+    const nextTurns = [...turnsRef.current, { message: userMessage }];
     setTurns(nextTurns);
+    turnsRef.current = nextTurns;
 
     try {
       const demo = matchDemoResponse(trimmed);
@@ -213,15 +214,17 @@ export function AskAiDrawer({
         // Small artificial delay so the typing indicator reads as real.
         await new Promise((resolve) => setTimeout(resolve, 1800 + Math.random() * 1200));
         setEngine("claude");
-        setTurns([
+        const withAnswer = [
           ...nextTurns,
           {
-            message: { role: "assistant", content: demo.answer },
+            message: { role: "assistant" as const, content: demo.answer },
             proposal: demo.proposal,
-            proposalStatus: demo.proposal ? "pending" : undefined,
+            proposalStatus: demo.proposal ? ("pending" as const) : undefined,
             suggestions: demo.suggestions,
           },
-        ]);
+        ];
+        setTurns(withAnswer);
+        turnsRef.current = withAnswer;
         return;
       }
 
@@ -243,17 +246,21 @@ export function AskAiDrawer({
         proposal?: AskAiActionProposal;
       };
       setEngine(data.engine);
-      setTurns([
+      const withAnswer = [
         ...nextTurns,
         {
-          message: { role: "assistant", content: data.answer },
+          message: { role: "assistant" as const, content: data.answer },
           proposal: data.proposal,
-          proposalStatus: data.proposal ? "pending" : undefined,
+          proposalStatus: data.proposal ? ("pending" as const) : undefined,
         },
-      ]);
+      ];
+      setTurns(withAnswer);
+      turnsRef.current = withAnswer;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ask AI request failed");
-      setTurns(turns);
+      const reverted = nextTurns.slice(0, -1);
+      setTurns(reverted);
+      turnsRef.current = reverted;
     } finally {
       setBusy(false);
     }
