@@ -19,6 +19,7 @@ type DrawerTurn = {
   proposalStatus?: "pending" | "confirmed" | "dismissed" | "failed";
   proposalResult?: string;
   suggestions?: AskAiSuggestion[];
+  selectedSuggestion?: string;
 };
 
 const QUICK_ACTIONS = [
@@ -245,6 +246,16 @@ export function AskAiDrawer({
     setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, proposalStatus: "dismissed" } : t)));
   }
 
+  function chooseSuggestion(turnIndex: number, label: string) {
+    setTurns((prev) => {
+      const next = prev.map((t, i) => (i === turnIndex ? { ...t, selectedSuggestion: label } : t));
+      return [
+        ...next,
+        { message: { role: "assistant" as const, content: `Got it — I'll go with "${label}".` } },
+      ];
+    });
+  }
+
   async function onAttachChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -272,9 +283,10 @@ export function AskAiDrawer({
       >
         <SheetHeader className="border-b border-sky-900/40 pb-3">
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-sky-900/50 px-2 py-0.5 text-[10px] font-bold tracking-wider text-sky-300 uppercase">
-              Copilot
-            </span>
+            <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/helix-leads-icon.png" alt="" className="h-full w-full object-contain" />
+            </div>
             <SheetTitle className="text-slate-100">Ask Helix AI</SheetTitle>
           </div>
           <p className="flex items-center gap-1 text-[11px] font-medium text-sky-400">
@@ -341,26 +353,39 @@ export function AskAiDrawer({
 
               {turn.suggestions?.length ? (
                 <div className="space-y-1.5">
-                  {turn.suggestions.map((s) => (
-                    <div
-                      key={s.label}
-                      className={
-                        s.recommended
-                          ? "rounded-lg border border-sky-500/50 bg-sky-500/10 p-3"
-                          : "rounded-lg border border-sky-900/30 bg-[#0a1e30] p-3"
-                      }
-                    >
-                      <div className="mb-1 flex items-center gap-1.5">
-                        <p className="text-xs font-semibold text-slate-100">{s.label}</p>
-                        {s.recommended ? (
-                          <span className="rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#04101c] uppercase">
-                            Recommended
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-[11px] text-slate-400">{s.detail}</p>
-                    </div>
-                  ))}
+                  {turn.suggestions.map((s) => {
+                    const isSelected = turn.selectedSuggestion === s.label;
+                    const isDisabled = Boolean(turn.selectedSuggestion) && !isSelected;
+                    return (
+                      <button
+                        key={s.label}
+                        type="button"
+                        disabled={Boolean(turn.selectedSuggestion)}
+                        onClick={() => chooseSuggestion(i, s.label)}
+                        className={
+                          "w-full rounded-lg border p-3 text-left transition disabled:cursor-default " +
+                          (isSelected
+                            ? "border-sky-400 bg-sky-500/20"
+                            : isDisabled
+                              ? "border-sky-900/20 bg-[#0a1e30] opacity-40"
+                              : s.recommended
+                                ? "border-sky-500/50 bg-sky-500/10 hover:border-sky-400 hover:bg-sky-500/15"
+                                : "border-sky-900/30 bg-[#0a1e30] hover:border-sky-700 hover:bg-sky-900/20")
+                        }
+                      >
+                        <div className="mb-1 flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-slate-100">{s.label}</p>
+                          {s.recommended ? (
+                            <span className="rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#04101c] uppercase">
+                              Recommended
+                            </span>
+                          ) : null}
+                          {isSelected ? <span className="text-[11px] text-sky-300">✓ Selected</span> : null}
+                        </div>
+                        <p className="text-[11px] text-slate-400">{s.detail}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
