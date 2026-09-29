@@ -4,7 +4,7 @@ import { checkActionToken, withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
-async function archive(id: string, actor: string, orgId: string | undefined) {
+export async function archive(id: string, actor: string, orgId: string | undefined) {
   const lead = await patchLead(
     id,
     {

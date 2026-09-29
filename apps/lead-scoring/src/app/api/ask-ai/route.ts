@@ -1,7 +1,7 @@
-import { askAi, type AskAiMessage } from "@helix/core";
-import { getLead } from "@/lib/store";
+import { askAi, askAiWithProposal, type AskAiMessage } from "@helix/core";
+import { getLead, listLeads } from "@/lib/store";
 import { withOrgScope } from "@/lib/org-auth";
-import type { ScoredField } from "@helix/core";
+import type { ScoredField, StoredLead } from "@helix/core";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,12 @@ How the app works:
 - "Pipeline stage" tracks a lead's position after being pushed to the CRM (e.g. new, contacted, qualified).
 
 When a specific lead's data is provided below, answer using that data — do not invent facts not present in it. When no lead data is provided, answer only using the description above.`;
+
+const PROPOSAL_INSTRUCTION = `If, and only if, the operator explicitly asks you to clean up, remove, or archive stale/cold leads, respond with ONLY a fenced json block (no other text) matching this exact shape:
+\`\`\`json
+{"type":"action_proposal","action":"archive_leads","summary":"<one sentence describing what you found and will archive>","targets":[{"id":"<lead id>","label":"<lead name>"}]}
+\`\`\`
+Only include leads from the "Cold candidates" list below in targets — never invent a lead id that wasn't provided. For any other question, answer normally in plain text; do not emit a json block.`;
 
 function buildRecordContext(lead: {
   classification: string;
@@ -39,9 +45,46 @@ function buildRecordContext(lead: {
   ].join("\n");
 }
 
+function buildSnapshotContext(leads: StoredLead[]): string {
+  if (leads.length === 0) return "There are currently no leads in the system.";
+
+  const byTier = { hot: 0, warm: 0, cold: 0, disqualified: 0 } as Record<string, number>;
+  for (const l of leads) byTier[l.tier] = (byTier[l.tier] ?? 0) + 1;
+
+  const topByScore = [...leads]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10)
+    .map((l) => `- ${l.name} (${l.id}): score ${l.score}, tier ${l.tier}, created ${l.createdAt}`)
+    .join("\n");
+
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const coldCandidates = leads.filter((l) => {
+    const ageMs = now - Date.parse(l.createdAt);
+    return l.tier === "cold" && ageMs > THIRTY_DAYS_MS;
+  });
+
+  const coldLines = coldCandidates.length
+    ? coldCandidates.map((l) => `- ${l.name} (${l.id}): created ${l.createdAt}`).join("\n")
+    : "None.";
+
+  return [
+    `Total leads: ${leads.length}`,
+    `By tier: ${Object.entries(byTier).map(([t, n]) => `${t}=${n}`).join(", ")}`,
+    `Top leads by score:`,
+    topByScore,
+    `Cold candidates (cold tier, idle 30+ days) — these are the ONLY leads you may ever propose archiving:`,
+    coldLines,
+  ].join("\n");
+}
+
 export async function POST(req: Request) {
   return withOrgScope(async (orgId): Promise<Response> => {
-    const body = (await req.json()) as { leadId?: string; history?: AskAiMessage[] };
+    const body = (await req.json()) as {
+      leadId?: string;
+      history?: AskAiMessage[];
+      mode?: "card" | "drawer";
+    };
 
     if (!Array.isArray(body.history) || body.history.length === 0) {
       return Response.json({ error: "history must be a non-empty array" }, { status: 400 });
@@ -52,6 +95,19 @@ export async function POST(req: Request) {
       const lead = await getLead(body.leadId, orgId);
       if (!lead) return Response.json({ error: "Lead not found" }, { status: 404 });
       recordContext = buildRecordContext(lead);
+    } else if (body.mode === "drawer") {
+      const leads = await listLeads(orgId);
+      recordContext = buildSnapshotContext(leads);
+    }
+
+    if (body.mode === "drawer") {
+      const result = await askAiWithProposal({
+        systemPrompt: SYSTEM_PROMPT,
+        recordContext,
+        history: body.history,
+        proposalInstruction: PROPOSAL_INSTRUCTION,
+      });
+      return Response.json(result);
     }
 
     const result = await askAi({
