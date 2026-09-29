@@ -178,7 +178,8 @@ export async function supabaseProbeDesk(): Promise<{ hasRfps: boolean }> {
       console.warn("[helix-legal] desk probe failed:", error.message);
       return { hasRfps: false };
     }
-    return { hasRfps: (data?.length ?? 0) > 0 };
+    // Older versions persisted the demo RFPs (ids "seed-…") into Supabase; those are not the operator's data.
+    return { hasRfps: (data ?? []).some((r) => !String((r as { id?: unknown }).id ?? "").startsWith("seed-")) };
   } catch (err) {
     console.warn("[helix-legal] desk probe threw:", err instanceof Error ? err.message : err);
     return { hasRfps: false };

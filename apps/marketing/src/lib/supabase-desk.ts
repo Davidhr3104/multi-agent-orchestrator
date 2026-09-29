@@ -175,7 +175,8 @@ export async function supabaseProbeDesk(): Promise<{ hasSpend: boolean }> {
       console.warn("[helix-marketing] desk probe failed:", error.message);
       return { hasSpend: false };
     }
-    return { hasSpend: (data?.length ?? 0) > 0 };
+    // Older versions persisted the demo spend (ids "sp-…") into Supabase; those are not the operator's data.
+    return { hasSpend: (data ?? []).some((r) => !String((r as { id?: unknown }).id ?? "").startsWith("sp-")) };
   } catch (err) {
     console.warn("[helix-marketing] desk probe threw:", err instanceof Error ? err.message : err);
     return { hasSpend: false };

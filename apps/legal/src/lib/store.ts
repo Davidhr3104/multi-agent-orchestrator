@@ -278,8 +278,10 @@ async function hydrateFromRemote(): Promise<void> {
   const d = desk();
   if (d.remoteBootstrapped || !isSupabaseConfigured()) return;
 
-  const remoteRfps = await supabaseListRfps();
-  if (remoteRfps === null) return; // schema missing / network — retry next call
+  const remoteAll = await supabaseListRfps();
+  if (remoteAll === null) return; // schema missing / network — retry next call
+  // Older versions stored the demo RFPs (ids "seed-…") in Supabase; a live desk never shows them.
+  const remoteRfps = remoteAll.filter((r) => !r.id.startsWith("seed-"));
 
   d.remoteBootstrapped = true;
 
