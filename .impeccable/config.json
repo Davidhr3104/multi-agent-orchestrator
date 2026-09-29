@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "apps/lead-scoring/src/components/ask-ai-drawer.tsx"
+        ],
+        "createdAt": "2026-09-29T03:20:40.110Z",
+        "reason": "20% opacity dark-blue hover overlay over an already-dark panel keeps slate-300/400 text at high contrast; same low-opacity-hover pattern used elsewhere in this app's dark theme"
+      }
+    ]
+  }
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StoredLead } from "@helix/core";
 import { AskAiCard } from "@/components/ask-ai-card";
+import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { AttentionQueue } from "./AttentionQueue";
 import { KpiStrip } from "./KpiStrip";
 import { PriorityTable } from "./PriorityTable";
@@ -17,6 +18,7 @@ export function TriageOverview() {
   const [logs, setLogs] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [simBusy, setSimBusy] = useState(false);
+  const [askAiDrawerOpen, setAskAiDrawerOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -159,7 +161,8 @@ export function TriageOverview() {
         </button>
       </div>
 
-      <AskAiCard />
+      <AskAiCard onOpenDrawer={() => setAskAiDrawerOpen(true)} />
+      <AskAiDrawer open={askAiDrawerOpen} onOpenChange={setAskAiDrawerOpen} />
 
       {loading ? (
         <p className="text-sm text-outline">Loading triage…</p>

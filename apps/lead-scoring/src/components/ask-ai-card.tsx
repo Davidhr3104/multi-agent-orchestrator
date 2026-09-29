@@ -11,7 +11,7 @@ const QUICK_CHIPS = [
   { label: "Predict next week spend", question: "What should I expect from next week's lead volume?" },
 ];
 
-export function AskAiCard() {
+export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: () => void }) {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -165,12 +165,25 @@ export function AskAiCard() {
           ) : null}
         </div>
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/ask-ai/ask-ai-visual.png"
-          alt=""
-          className="hidden h-44 w-auto shrink-0 rounded-lg object-contain lg:block"
-        />
+        <button
+          type="button"
+          onClick={onOpenDrawer}
+          disabled={!onOpenDrawer}
+          className="group relative hidden shrink-0 rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100 lg:block"
+          aria-label="Open Ask Helix AI assistant"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/ask-ai/ask-ai-visual.png"
+            alt=""
+            className="h-44 w-auto rounded-lg object-contain"
+          />
+          {onOpenDrawer ? (
+            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+              Ask Helix <span aria-hidden>→</span>
+            </span>
+          ) : null}
+        </button>
       </div>
     </div>
   );
