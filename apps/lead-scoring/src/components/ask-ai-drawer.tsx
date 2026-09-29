@@ -42,6 +42,13 @@ const DEMO_RESPONSES: { match: RegExp; response: DemoResponse }[] = [
     },
   },
   {
+    match: /jordan hale|highest score|why.*(top|best) lead/i,
+    response: {
+      answer:
+        "Jordan Hale scored 96 across three signals: budget confirmed at $18,500 (above your $15k threshold), a hard start date of \"early next month\" in their message, and a verified work email at a company matching your ICP industry list. No red flags — every field that drove the score has a direct quote from their original inquiry, not an inference.",
+    },
+  },
+  {
     match: /stale|cold|idle|clean ?up|archive/i,
     response: {
       answer:
@@ -92,6 +99,20 @@ function matchDemoResponse(question: string): DemoResponse | null {
   return null;
 }
 
+// Scripted end-to-end walkthrough for recording a demo video: a fixed
+// sequence of questions, fired one at a time with realistic "thinking"
+// pauses between them, so the whole conversation — analysis, a proposed
+// action with a real confirm, and a multi-option recommendation — plays
+// out without anyone typing live.
+const FULL_DEMO_SCRIPT = [
+  "How is my pipeline doing?",
+  "Why does Jordan Hale have the highest score?",
+  "Do I have any leads that need cleanup?",
+  "__CONFIRM_LAST_PROPOSAL__",
+  "What's my best next move?",
+  "__SELECT_RECOMMENDED_SUGGESTION__",
+] as const;
+
 function readImageAsAttachment(file: File): Promise<AskAiAttachment> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -120,7 +141,10 @@ export function AskAiDrawer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<AskAiEngine | null>(null);
+  const [runningDemo, setRunningDemo] = useState(false);
   const lastAskedInitialQuestion = useRef<string | undefined>(undefined);
+  const turnsRef = useRef<DrawerTurn[]>(turns);
+  turnsRef.current = turns;
 
   async function ask(text: string) {
     const trimmed = text.trim();
@@ -198,10 +222,25 @@ export function AskAiDrawer({
   }, [open, initialQuestion]);
 
   async function confirmProposal(turnIndex: number) {
-    const turn = turns[turnIndex];
+    const turn = turnsRef.current[turnIndex];
     if (!turn.proposal) return;
 
     setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, proposalStatus: "pending" } : t)));
+
+    // Demo-scripted targets (ids prefixed "demo-") aren't real leads — resolve
+    // locally instead of calling the live execute endpoint, which would 404.
+    if (turn.proposal.targets.every((t) => t.id.startsWith("demo-"))) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const count = turn.proposal.targets.length;
+      setTurns((prev) =>
+        prev.map((t, i) =>
+          i === turnIndex
+            ? { ...t, proposalStatus: "confirmed", proposalResult: `Archived ${count} lead${count === 1 ? "" : "s"}.` }
+            : t
+        )
+      );
+      return;
+    }
 
     try {
       const res = await fetch("/api/ask-ai/execute", {
@@ -256,6 +295,42 @@ export function AskAiDrawer({
     });
   }
 
+  function wait(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function runFullDemo() {
+    if (runningDemo || busy) return;
+    setRunningDemo(true);
+    setTurns([]);
+    turnsRef.current = [];
+    lastAskedInitialQuestion.current = "__full_demo__";
+
+    for (const step of FULL_DEMO_SCRIPT) {
+      if (step === "__CONFIRM_LAST_PROPOSAL__") {
+        const proposalIndex = turnsRef.current.findIndex((t) => t.proposal && t.proposalStatus === "pending");
+        if (proposalIndex >= 0) {
+          await confirmProposal(proposalIndex);
+          await wait(600);
+        }
+        continue;
+      }
+      if (step === "__SELECT_RECOMMENDED_SUGGESTION__") {
+        const suggestionIndex = turnsRef.current.findIndex((t) => t.suggestions?.length);
+        const recommended = turnsRef.current[suggestionIndex]?.suggestions?.find((s) => s.recommended);
+        if (suggestionIndex >= 0 && recommended) {
+          chooseSuggestion(suggestionIndex, recommended.label);
+          await wait(600);
+        }
+        continue;
+      }
+      await ask(step);
+      await wait(500);
+    }
+
+    setRunningDemo(false);
+  }
+
   async function onAttachChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -297,9 +372,19 @@ export function AskAiDrawer({
 
         <div className="thin-scrollbar flex-1 space-y-3 overflow-y-auto px-4">
           {turns.length === 0 ? (
-            <p className="pt-4 text-sm text-slate-500">
-              Ask about your whole pipeline — trends, stale leads, or draft a follow-up.
-            </p>
+            <div className="space-y-3 pt-4">
+              <p className="text-sm text-slate-500">
+                Ask about your whole pipeline — trends, stale leads, or draft a follow-up.
+              </p>
+              <button
+                type="button"
+                onClick={() => void runFullDemo()}
+                disabled={runningDemo}
+                className="flex items-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:border-sky-400 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span aria-hidden>▶</span> Watch Helix work
+              </button>
+            </div>
           ) : null}
           {turns.map((turn, i) => (
             <div key={i} className="space-y-2">
@@ -406,7 +491,7 @@ export function AskAiDrawer({
               <button
                 key={action}
                 type="button"
-                disabled={busy}
+                disabled={busy || runningDemo}
                 onClick={() => void ask(action)}
                 className="rounded-full border border-sky-900/50 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-sky-900/20 disabled:opacity-50"
               >
@@ -433,12 +518,12 @@ export function AskAiDrawer({
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask Helix AI to summarize, find, or draft…"
-              disabled={busy}
+              disabled={busy || runningDemo}
               className="h-9 w-full min-w-0 rounded-md border border-sky-900/50 bg-[#0a1e30] px-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
             />
             <button
               type="submit"
-              disabled={busy || (!question.trim() && !pendingAttachment)}
+              disabled={busy || runningDemo || (!question.trim() && !pendingAttachment)}
               className="shrink-0 rounded-md bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Send
