@@ -11,7 +11,7 @@ const QUICK_CHIPS = [
   { label: "Predict next week spend", question: "What should I expect from next week's lead volume?" },
 ];
 
-export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: () => void }) {
+export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: string) => void }) {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -52,6 +52,11 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: () => void }) {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (onOpenDrawer) {
+      onOpenDrawer(question.trim() || undefined);
+      setQuestion("");
+      return;
+    }
     void ask(question);
   }
 
@@ -124,7 +129,7 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: () => void }) {
               disabled={busy || !question.trim()}
               className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg bg-primary-container px-4 text-xs font-bold text-on-primary-container transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {busy ? "Asking…" : "Ask Copilot →"}
+              {busy ? "Asking…" : "Ask Helix →"}
             </button>
           </form>
 
@@ -165,25 +170,37 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: () => void }) {
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenDrawer}
-          disabled={!onOpenDrawer}
-          className="group relative hidden shrink-0 rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100 lg:block"
-          aria-label="Open Ask Helix AI assistant"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/ask-ai/ask-ai-visual.png"
-            alt=""
-            className="h-44 w-auto rounded-lg object-contain"
-          />
+        <div className="relative hidden shrink-0 lg:block">
+          <button
+            type="button"
+            onClick={() => onOpenDrawer?.()}
+            disabled={!onOpenDrawer}
+            className="group relative block rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100"
+            aria-label="Open Ask Helix AI assistant"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/ask-ai/ask-ai-visual.png"
+              alt=""
+              className="h-44 w-auto rounded-lg object-contain"
+            />
+            {onOpenDrawer ? (
+              <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+                Ask Helix <span aria-hidden>→</span>
+              </span>
+            ) : null}
+          </button>
           {onOpenDrawer ? (
-            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
-              Ask Helix <span aria-hidden>→</span>
-            </span>
+            <button
+              type="button"
+              onClick={() => onOpenDrawer()}
+              aria-label="Open Ask Helix AI assistant"
+              className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-primary text-on-primary-container shadow-md transition hover:brightness-110"
+            >
+              <span aria-hidden className="text-sm">→</span>
+            </button>
           ) : null}
-        </button>
+        </div>
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ export function TriageOverview() {
   const [toast, setToast] = useState<string | null>(null);
   const [simBusy, setSimBusy] = useState(false);
   const [askAiDrawerOpen, setAskAiDrawerOpen] = useState(false);
+  const [askAiInitialQuestion, setAskAiInitialQuestion] = useState<string | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -161,8 +162,17 @@ export function TriageOverview() {
         </button>
       </div>
 
-      <AskAiCard onOpenDrawer={() => setAskAiDrawerOpen(true)} />
-      <AskAiDrawer open={askAiDrawerOpen} onOpenChange={setAskAiDrawerOpen} />
+      <AskAiCard
+        onOpenDrawer={(initialQuestion) => {
+          setAskAiInitialQuestion(initialQuestion);
+          setAskAiDrawerOpen(true);
+        }}
+      />
+      <AskAiDrawer
+        open={askAiDrawerOpen}
+        onOpenChange={setAskAiDrawerOpen}
+        initialQuestion={askAiInitialQuestion}
+      />
 
       {loading ? (
         <p className="text-sm text-outline">Loading triage…</p>

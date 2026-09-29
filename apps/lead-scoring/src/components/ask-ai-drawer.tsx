@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type AskAiAttachment = { type: "image"; data: string; mediaType: string };
@@ -38,13 +38,22 @@ function readImageAsAttachment(file: File): Promise<AskAiAttachment> {
   });
 }
 
-export function AskAiDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function AskAiDrawer({
+  open,
+  onOpenChange,
+  initialQuestion,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialQuestion?: string;
+}) {
   const [turns, setTurns] = useState<DrawerTurn[]>([]);
   const [question, setQuestion] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState<AskAiAttachment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<AskAiEngine | null>(null);
+  const lastAskedInitialQuestion = useRef<string | undefined>(undefined);
 
   async function ask(text: string) {
     const trimmed = text.trim();
@@ -95,6 +104,14 @@ export function AskAiDrawer({ open, onOpenChange }: { open: boolean; onOpenChang
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!open || !initialQuestion) return;
+    if (lastAskedInitialQuestion.current === initialQuestion) return;
+    lastAskedInitialQuestion.current = initialQuestion;
+    void ask(initialQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialQuestion]);
 
   async function confirmProposal(turnIndex: number) {
     const turn = turns[turnIndex];
