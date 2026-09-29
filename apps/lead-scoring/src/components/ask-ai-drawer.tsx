@@ -28,6 +28,40 @@ const QUICK_ACTIONS = [
   "Suggest a follow-up strategy",
 ];
 
+type SavedSession = { id: string; startedAt: string; preview: string; turns: DrawerTurn[] };
+const HISTORY_STORAGE_KEY = "helix-ask-ai-history-leads";
+const MAX_SAVED_SESSIONS = 20;
+
+function loadSessionHistory(): SavedSession[] {
+  try {
+    const raw = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedSession[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessionToHistory(turns: DrawerTurn[]) {
+  const firstUserTurn = turns.find((t) => t.message.role === "user");
+  if (!firstUserTurn) return;
+  try {
+    const existing = loadSessionHistory();
+    const session: SavedSession = {
+      id: `${Date.now()}`,
+      startedAt: new Date().toISOString(),
+      preview: firstUserTurn.message.content.slice(0, 80),
+      turns,
+    };
+    const next = [session, ...existing].slice(0, MAX_SAVED_SESSIONS);
+    window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // best-effort only — localStorage can be unavailable (private window, quota) and
+    // losing session history is not worth surfacing an error for
+  }
+}
+
 type DemoResponse = { answer: string; suggestions?: AskAiSuggestion[]; proposal?: AskAiActionProposal };
 
 // Client-side demo responses so the drawer reads as functional in a
@@ -142,9 +176,21 @@ export function AskAiDrawer({
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<AskAiEngine | null>(null);
   const [runningDemo, setRunningDemo] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState<SavedSession[]>([]);
   const lastAskedInitialQuestion = useRef<string | undefined>(undefined);
   const turnsRef = useRef<DrawerTurn[]>(turns);
   turnsRef.current = turns;
+
+  useEffect(() => {
+    if (open) setSessionHistory(loadSessionHistory());
+  }, [open]);
+
+  useEffect(() => {
+    if (open) return;
+    // Drawer just closed — archive this conversation before it's wiped on next open.
+    if (turnsRef.current.length > 0) saveSessionToHistory(turnsRef.current);
+  }, [open]);
 
   async function ask(text: string) {
     const trimmed = text.trim();
@@ -333,6 +379,20 @@ export function AskAiDrawer({
     setRunningDemo(false);
   }
 
+  function restoreSession(session: SavedSession) {
+    if (turnsRef.current.length > 0) saveSessionToHistory(turnsRef.current);
+    setTurns(session.turns);
+    turnsRef.current = session.turns;
+    setHistoryOpen(false);
+  }
+
+  function startNewSession() {
+    if (turnsRef.current.length > 0) saveSessionToHistory(turnsRef.current);
+    setTurns([]);
+    turnsRef.current = [];
+    setHistoryOpen(false);
+  }
+
   async function onAttachChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -359,12 +419,27 @@ export function AskAiDrawer({
         className="flex w-full flex-col border-l border-sky-900/40 bg-[#04101c] sm:max-w-md"
       >
         <SheetHeader className="border-b border-sky-900/40 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/helix-leads-icon.png" alt="" className="h-full w-full object-contain" />
+          <div className="flex items-center justify-between gap-2 pr-8">
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/helix-leads-icon.png" alt="" className="h-full w-full object-contain" />
+              </div>
+              <SheetTitle className="text-slate-100">Ask Helix AI</SheetTitle>
             </div>
-            <SheetTitle className="text-slate-100">Ask Helix AI</SheetTitle>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              aria-label="View past conversations"
+              className={
+                "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition " +
+                (historyOpen
+                  ? "border-sky-500 bg-sky-500/15 text-sky-200"
+                  : "border-sky-900/50 text-slate-400 hover:bg-sky-900/20 hover:text-slate-200")
+              }
+            >
+              <span aria-hidden>🕘</span> History
+            </button>
           </div>
           <p className="flex items-center gap-1 text-[11px] font-medium text-sky-400">
             <span className="inline-block size-1.5 rounded-full bg-sky-400" />
@@ -372,7 +447,36 @@ export function AskAiDrawer({
           </p>
         </SheetHeader>
 
-        <div className="thin-scrollbar flex-1 space-y-3 overflow-y-auto px-4">
+        {historyOpen ? (
+          <div className="thin-scrollbar max-h-56 space-y-1 overflow-y-auto border-b border-sky-900/40 px-4 py-3">
+            <button
+              type="button"
+              onClick={startNewSession}
+              className="w-full rounded-md border border-sky-900/50 px-2.5 py-1.5 text-left text-[11px] font-medium text-sky-300 hover:bg-sky-900/20"
+            >
+              + Start new conversation
+            </button>
+            {sessionHistory.length === 0 ? (
+              <p className="px-1 py-2 text-[11px] text-slate-500">No past conversations yet.</p>
+            ) : (
+              sessionHistory.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => restoreSession(session)}
+                  className="w-full rounded-md border border-sky-900/30 bg-[#0a1e30] px-2.5 py-1.5 text-left hover:border-sky-700 hover:bg-sky-900/20"
+                >
+                  <p className="truncate text-[11px] font-medium text-slate-200">{session.preview}</p>
+                  <p className="text-[10px] text-slate-500">
+                    {new Date(session.startedAt).toLocaleString()} · {session.turns.length} messages
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+        ) : null}
+
+        <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4">
           {turns.length === 0 ? (
             <div className="space-y-3 pt-4">
               <p className="text-sm text-slate-500">
