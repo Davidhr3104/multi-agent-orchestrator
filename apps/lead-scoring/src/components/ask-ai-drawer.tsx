@@ -165,7 +165,7 @@ export function AskAiDrawer({
       const demo = matchDemoResponse(trimmed);
       if (demo) {
         // Small artificial delay so the typing indicator reads as real.
-        await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
+        await new Promise((resolve) => setTimeout(resolve, 1800 + Math.random() * 1200));
         setEngine("claude");
         setTurns([
           ...nextTurns,
@@ -310,8 +310,9 @@ export function AskAiDrawer({
       if (step === "__CONFIRM_LAST_PROPOSAL__") {
         const proposalIndex = turnsRef.current.findIndex((t) => t.proposal && t.proposalStatus === "pending");
         if (proposalIndex >= 0) {
+          await wait(1800); // pause as if the viewer is reading the proposal before confirming
           await confirmProposal(proposalIndex);
-          await wait(600);
+          await wait(2200);
         }
         continue;
       }
@@ -319,13 +320,14 @@ export function AskAiDrawer({
         const suggestionIndex = turnsRef.current.findIndex((t) => t.suggestions?.length);
         const recommended = turnsRef.current[suggestionIndex]?.suggestions?.find((s) => s.recommended);
         if (suggestionIndex >= 0 && recommended) {
+          await wait(2200); // pause as if the viewer is comparing the 3 options
           chooseSuggestion(suggestionIndex, recommended.label);
-          await wait(600);
+          await wait(2200);
         }
         continue;
       }
       await ask(step);
-      await wait(500);
+      await wait(2000); // pause on the answer before the next question fires
     }
 
     setRunningDemo(false);
