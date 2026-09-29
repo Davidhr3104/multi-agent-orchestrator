@@ -391,3 +391,43 @@
     animation: none !important;
   }
 }
+
+/* Material 3 tokens for the redesigned dashboard sections (Phase 1). Scoped
+   under a `--legal-md3-` prefix so they never collide with the existing
+   hardcoded-hex dark theme used elsewhere in Legal, or with other Helix
+   apps' own tokens. */
+:root {
+  --legal-md3-surface-container-lowest: #0c0e12;
+  --legal-md3-surface-container-low: #1a1c20;
+  --legal-md3-surface-container: #1e2024;
+  --legal-md3-surface-container-high: #282a2e;
+  --legal-md3-surface-container-highest: #333539;
+  --legal-md3-surface-bright: #37393e;
+  --legal-md3-on-surface: #e2e2e8;
+  --legal-md3-on-surface-variant: #c4c7c9;
+  --legal-md3-outline: #8e9193;
+  --legal-md3-outline-variant: #444749;
+  --legal-md3-primary: #ffffff;
+  --legal-md3-on-primary: #2d3133;
+  --legal-md3-primary-container: #e0e3e5;
+  --legal-md3-on-primary-container: #626567;
+  --legal-md3-primary-fixed: #e0e3e5;
+  --legal-md3-primary-fixed-dim: #c4c7c9;
+  --legal-md3-secondary: #b9c8de;
+  --legal-md3-secondary-container: #39485a;
+  --legal-md3-on-secondary-container: #a7b6cc;
+  --legal-md3-tertiary: #ffffff;
+  --legal-md3-tertiary-container: #c4e7ff;
+  --legal-md3-on-tertiary-container: #006c93;
+  --legal-md3-error: #ffb4ab;
+  --legal-md3-error-container: #93000a;
+  --legal-md3-on-error-container: #ffdad6;
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 350,
+    "GRAD" 0,
+    "opsz" 20;
+}

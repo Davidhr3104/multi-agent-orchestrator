@@ -62,9 +62,6 @@ import { LEGAL_HELP } from "@helix/help";
 import {
   Database,
   Download,
-  Eye,
-  FileUp,
-  Pencil,
 } from "lucide-react";
 
 type Filter = "all" | "hot" | "warm" | "cold" | "review" | "BEAR" | "SPI" | "other";
@@ -489,18 +486,43 @@ export function LegalDashboard() {
   return (
     <>
       <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5">
-        <section id="legal-dashboard" data-tour="legal-metrics" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div className="animate-entrance stagger-1 flex flex-col justify-between rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">HOT SHARE</span>
-              <span className="rounded-[3px] bg-[#064E3B] px-1.5 py-0.5 text-[10px] font-medium text-[#6EE7B7]">
-                {metrics.delta}
+        <section
+          id="legal-dashboard"
+          data-tour="legal-metrics"
+          className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
+        >
+          <div
+            className="group animate-entrance stagger-1 relative overflow-hidden rounded-xl p-4 transition-all duration-300"
+            style={{
+              background:
+                "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(226, 232, 240, 0.12)",
+              boxShadow:
+                "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+            }}
+          >
+            <div className="pointer-events-none absolute -top-12 -right-12 size-28 rounded-full bg-white/5 blur-2xl transition-colors group-hover:bg-white/10" />
+            <div className="relative z-10 flex items-center justify-between">
+              <span className="text-[10px] font-medium tracking-widest text-slate-400 uppercase">Hot Share</span>
+              <span className="material-symbols-outlined text-[18px] text-slate-400 transition-colors group-hover:text-white">
+                local_fire_department
               </span>
             </div>
-            <div className="font-mono-numbers mt-2 text-[28px] leading-none font-bold text-[#F3F4F6]">
-              {metrics.hotShare}%
+            <div className="relative z-10 my-2 flex items-baseline gap-2">
+              <span
+                className="text-[28px] font-bold tracking-tight"
+                style={{
+                  background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                {metrics.hotShare}%
+              </span>
+              <span className="font-mono-numbers text-[10px] text-slate-400">{metrics.delta} vs last week</span>
             </div>
-            <div className="mt-3 flex h-8 w-full items-end">
+            <div className="relative z-10 mt-3 flex h-8 w-full items-end">
               <svg
                 className="h-7 w-full overflow-visible"
                 fill="none"
@@ -509,7 +531,7 @@ export function LegalDashboard() {
                 <path
                   className="sparkline-line"
                   d={goldSpark.line}
-                  stroke="#F59E0B"
+                  stroke="#e2e8f0"
                   strokeLinecap="square"
                   strokeLinejoin="miter"
                   strokeWidth="1.5"
@@ -519,91 +541,153 @@ export function LegalDashboard() {
             </div>
           </div>
 
-          <div className="animate-entrance stagger-2 flex flex-col justify-between rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">AVG MATCH</span>
+          <div
+            className="group animate-entrance stagger-2 relative overflow-hidden rounded-xl p-4 transition-all duration-300"
+            style={{
+              background:
+                "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(226, 232, 240, 0.12)",
+              boxShadow:
+                "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+            }}
+          >
+            <div className="pointer-events-none absolute -top-12 -right-12 size-28 rounded-full bg-white/5 blur-2xl transition-colors group-hover:bg-white/10" />
+            <div className="relative z-10 flex items-center justify-between">
+              <span className="text-[10px] font-medium tracking-widest text-slate-400 uppercase">Avg Match</span>
+              <span className="material-symbols-outlined text-[18px] text-slate-400 transition-colors group-hover:text-white">
+                auto_graph
+              </span>
             </div>
-            <div className="font-mono-numbers mt-2 text-[28px] leading-none font-bold text-[#F3F4F6]">
-              {metrics.avgMatch}
+            <div className="relative z-10 my-2 flex items-baseline gap-2">
+              <span
+                className="text-[28px] font-bold tracking-tight"
+                style={{
+                  background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                {metrics.avgMatch}
+              </span>
+              <span className="font-mono-numbers text-[10px] text-slate-400">/ 100 pt index</span>
             </div>
-            <div className="mt-3 space-y-1.5 text-[10px]">
-              {(
-                [
-                  ["Hot", metrics.hot, "bg-[#10B981]"],
-                  ["Warm", metrics.warm, "bg-[#F59E0B]"],
-                  ["Cold", metrics.cold, "bg-[#EF4444]"],
-                ] as const
-              ).map(([label, count, bar]) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-[#9CA3AF]">{label}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="h-[3px] w-[60px] bg-[#1F2937]">
-                      <div
-                        className={cn("bar-animate h-full", bar)}
-                        style={{ width: `${(count / totalTier) * 100}%` }}
-                      />
-                    </div>
-                    <span className="font-mono-numbers w-16 text-right text-[#9CA3AF]">
-                      {count} {label.toLowerCase()} ({Math.round((count / totalTier) * 100)}%)
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="relative z-10 space-y-1.5">
+              <div className="flex items-center justify-between font-mono-numbers text-[10px]">
+                <span className="font-medium text-slate-200">{metrics.hot} Hot ({Math.round((metrics.hot / totalTier) * 100)}%)</span>
+                <span className="font-medium text-slate-400">{metrics.warm} Warm ({Math.round((metrics.warm / totalTier) * 100)}%)</span>
+                <span className="text-slate-500">{metrics.cold} Cold ({Math.round((metrics.cold / totalTier) * 100)}%)</span>
+              </div>
+              <div
+                className="flex h-1.5 gap-0.5 overflow-hidden rounded-full p-0.5"
+                style={{ background: "rgba(15, 20, 30, 0.9)", border: "1px solid rgba(226, 232, 240, 0.08)" }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${(metrics.hot / totalTier) * 100}%`, background: "linear-gradient(90deg, #e2e8f0, #ffffff)" }}
+                />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${(metrics.warm / totalTier) * 100}%`, background: "#64748b" }}
+                />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${(metrics.cold / totalTier) * 100}%`, background: "#334155" }}
+                />
+              </div>
             </div>
           </div>
 
           <div
             id="legal-deadlines"
-            className="animate-entrance stagger-3 flex flex-col justify-between rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle"
+            className="group animate-entrance stagger-3 relative overflow-hidden rounded-xl p-4 transition-all duration-300"
+            style={{
+              background:
+                "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(226, 232, 240, 0.12)",
+              boxShadow:
+                "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+            }}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">DUE IN 14D</span>
+            <div className="pointer-events-none absolute -top-12 -right-12 size-28 rounded-full bg-white/5 blur-2xl transition-colors group-hover:bg-white/10" />
+            <div className="relative z-10 flex items-center justify-between">
+              <span className="text-[10px] font-medium tracking-widest text-slate-400 uppercase">Due in 14D</span>
+              <span className="material-symbols-outlined text-[18px] text-slate-400 transition-colors group-hover:text-white">
+                schedule
+              </span>
             </div>
-            <div className="font-mono-numbers mt-2 text-[28px] leading-none font-bold text-[#F3F4F6]">
-              {metrics.close}
+            <div className="relative z-10 my-2 flex items-baseline gap-2">
+              <span
+                className="text-[28px] font-bold tracking-tight"
+                style={{
+                  background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                {metrics.close}
+              </span>
+              <span className="text-[11px] text-slate-300">RFP{metrics.close === 1 ? "" : "s"} expiring soon</span>
             </div>
-            <div className="mt-3 border-t border-[#1F2937] pt-2">
-              <div className="mb-2 h-[3px] w-full bg-[#1F2937]">
-                <div
-                  className="bar-animate h-full bg-[#374151]"
-                  style={{ width: `${Math.min(100, metrics.close * 25)}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-[#6B7280]">Next deadline:</span>
-                <span className="font-mono-numbers text-[#F3F4F6]">{metrics.nextDue?.date ?? "—"}</span>
-              </div>
+            <div
+              className="relative z-10 flex items-center gap-1.5 rounded font-mono-numbers text-[10px]"
+              style={{ background: "rgba(226, 232, 240, 0.05)", border: "1px solid rgba(226, 232, 240, 0.1)", padding: "4px 10px" }}
+            >
+              <span className="material-symbols-outlined text-[14px] text-slate-300">calendar_today</span>
+              <span className="text-slate-400">Next:</span>
+              <span className="font-medium text-white">{metrics.nextDue?.date ?? "—"}</span>
             </div>
           </div>
 
-          <div className="animate-entrance stagger-4 flex flex-col justify-between rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">REVIEW QUEUE</span>
-                {metrics.review > 0 ? (
-                  <span className="rounded-[3px] bg-[#7F1D1D] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#FCA5A5] uppercase">
-                    URGENT
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="font-mono-numbers text-[28px] leading-none font-bold text-[#F3F4F6]">
-                  {metrics.review}
+          <div
+            className="animate-entrance stagger-4 relative flex flex-col justify-between overflow-hidden rounded-xl p-4 transition-all duration-300"
+            style={{
+              background:
+                metrics.review > 0
+                  ? "linear-gradient(145deg, rgba(32, 24, 28, 0.75) 0%, rgba(18, 14, 18, 0.85) 100%)"
+                  : "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+              backdropFilter: "blur(12px)",
+              border:
+                metrics.review > 0 ? "1px solid rgba(248, 113, 113, 0.25)" : "1px solid rgba(226, 232, 240, 0.12)",
+              boxShadow:
+                "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.12)",
+            }}
+          >
+            <div className="relative z-10 flex items-center justify-between">
+              <span className="text-[10px] font-medium tracking-widest text-slate-400 uppercase">Review Queue</span>
+              {metrics.review > 0 ? (
+                <span
+                  className="rounded px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase"
+                  style={{ background: "rgba(239, 68, 68, 0.18)", color: "#fca5a5", border: "1px solid rgba(239, 68, 68, 0.35)" }}
+                >
+                  Urgent
                 </span>
-                <span className="text-[11px] text-[#6B7280]">item awaiting partner sign-off</span>
-              </div>
+              ) : null}
+            </div>
+            <div className="relative z-10 my-2 flex items-baseline gap-2">
+              <span className="text-[28px] font-bold tracking-tight text-white">{metrics.review}</span>
+              <span className="text-[11px] text-slate-300">
+                item{metrics.review === 1 ? "" : "s"} awaiting partner sign-off
+              </span>
             </div>
             <button
               type="button"
               disabled={!firstReview}
-              className="btn-tactile mt-3 flex h-[28px] w-full items-center justify-center gap-1 rounded-[4px] bg-[#F59E0B] px-3 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-[#D97706] disabled:opacity-40"
+              className="relative z-10 flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%)",
+                color: "#090b10",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.9)",
+                border: "1px solid rgba(255,255,255,0.4)",
+              }}
               onClick={() => {
                 if (!firstReview) return;
                 openRfp(firstReview, "overview");
               }}
             >
               <span>Review now</span>
-              <span>→</span>
+              <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
             </button>
           </div>
         </section>
@@ -615,32 +699,54 @@ export function LegalDashboard() {
             <section
               id="legal-opportunities"
               data-tour="legal-opportunities"
-              className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle"
+              className="relative overflow-hidden rounded-xl p-4"
+              style={{
+                background:
+                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(226, 232, 240, 0.12)",
+                boxShadow:
+                  "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+              }}
             >
-              <div className="flex flex-col justify-between gap-3 border-b border-[#1F2937] pb-3 sm:flex-row sm:items-center">
+              <div
+                className="flex flex-col justify-between gap-3 pb-3 sm:flex-row sm:items-center"
+                style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.1)" }}
+              >
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-[14px] font-semibold text-[#F3F4F6]">Opportunities</h2>
-                    <span className="font-mono-numbers rounded-[3px] border border-[#F59E0B] px-1.5 py-0.5 text-[10px] text-[#F59E0B]">
+                    <h2 className="text-[14px] font-semibold text-slate-100">Opportunities</h2>
+                    <span
+                      className="font-mono-numbers rounded-[3px] px-1.5 py-0.5 text-[10px] text-slate-300"
+                      style={{ border: "1px solid rgba(226, 232, 240, 0.25)" }}
+                    >
                       {rfps.length} total
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-[#6B7280]">Match bars, formatted amounts, hover actions.</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Match bars, formatted amounts, hover actions.</p>
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-auto">
                   <button
                     type="button"
-                    className="btn-tactile rounded-[4px] border border-[#374151] bg-[#1F2937] px-3 py-1.5 text-[11px] font-medium text-[#9CA3AF] hover:border-[#4B5563] hover:text-[#F3F4F6]"
+                    className="btn-tactile rounded-[4px] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-colors hover:text-white"
+                    style={{ border: "1px solid rgba(226, 232, 240, 0.18)", background: "rgba(226, 232, 240, 0.06)" }}
                     onClick={exportCsv}
                   >
                     Export CSV
                   </button>
                   <button
                     type="button"
-                    className="btn-tactile rounded-[4px] bg-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#0B0F19] hover:bg-[#D97706]"
+                    className="btn-tactile flex items-center gap-1 rounded-[4px] px-3 py-1.5 text-[11px] font-semibold transition-all"
+                    style={{
+                      background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%)",
+                      color: "#090b10",
+                      boxShadow: "0 2px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.9)",
+                      border: "1px solid rgba(255,255,255,0.4)",
+                    }}
                     onClick={() => goNav("documents")}
                   >
-                    + New Target
+                    <span className="material-symbols-outlined text-[14px]">add</span>
+                    New Target
                   </button>
                 </div>
               </div>
@@ -648,15 +754,21 @@ export function LegalDashboard() {
               <div className="flex flex-wrap items-center gap-2 pt-3 pb-2">
                 {filters.map((f) => (
                   <span key={f.id} className="contents">
-                    {f.id === "BEAR" ? <div className="mx-0.5 h-4 w-px bg-[#1F2937]" /> : null}
+                    {f.id === "BEAR" ? <div className="mx-0.5 h-4 w-px" style={{ background: "rgba(226, 232, 240, 0.12)" }} /> : null}
                     <button
                       type="button"
                       className={cn(
-                        "btn-tactile rounded-[4px] px-2.5 py-1 text-[11px]",
-                        filter === f.id
-                          ? "bg-[#F59E0B] font-semibold text-[#0B0F19]"
-                          : "border border-[#374151] bg-transparent text-[#9CA3AF] hover:border-[#6B7280] hover:bg-[#1F2937]/50 hover:text-[#F3F4F6]"
+                        "btn-tactile rounded-[4px] px-2.5 py-1 text-[11px] transition-colors",
+                        filter === f.id ? "font-semibold" : "text-slate-400 hover:text-slate-100"
                       )}
+                      style={
+                        filter === f.id
+                          ? {
+                              background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%)",
+                              color: "#0b0d12",
+                            }
+                          : { border: "1px solid rgba(226, 232, 240, 0.14)", background: "transparent" }
+                      }
                       onClick={() => setFilter(f.id)}
                     >
                       {f.label}
@@ -666,15 +778,13 @@ export function LegalDashboard() {
               </div>
 
               <div className="group relative my-2 h-[32px]">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-[#6B7280] transition-colors duration-150 group-focus-within:text-[#F59E0B]">
-                  <svg className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" x2="16.65" y1="21" y2="16.65" />
-                  </svg>
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400 transition-colors duration-150 group-focus-within:text-white">
+                  <span className="material-symbols-outlined text-[16px]">search</span>
                 </div>
                 <input
                   ref={searchRef}
-                  className="h-full w-full rounded-[4px] border border-[#1F2937] bg-[#0B0F19] py-0 pr-3 pl-8 text-xs text-[#F3F4F6] placeholder-[#6B7280] transition-colors duration-150 focus:border-[#F59E0B] focus:outline-none"
+                  className="h-full w-full rounded-[4px] py-0 pr-3 pl-8 text-xs text-slate-100 placeholder-slate-500 transition-colors duration-150 focus:outline-none"
+                  style={{ background: "rgba(9, 11, 16, 0.85)", border: "1px solid rgba(226, 232, 240, 0.14)" }}
                   placeholder="Filter title, issuer, method..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -684,7 +794,10 @@ export function LegalDashboard() {
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[760px] border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-[#1F2937] bg-[#0B0F19] text-[9px] font-semibold tracking-wider text-[#6B7280] uppercase">
+                    <tr
+                      className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase"
+                      style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.1)", background: "rgba(9, 11, 16, 0.6)" }}
+                    >
                       <th className="px-3 py-2">Title</th>
                       <th className="px-2 py-2">Issuer</th>
                       <th className="px-2 py-2">Method</th>
@@ -712,7 +825,8 @@ export function LegalDashboard() {
                       return (
                         <tr
                           key={rfp.id}
-                          className="table-row-interactive group relative cursor-pointer border-b border-[#1F2937]"
+                          className="table-row-interactive group relative cursor-pointer transition-colors hover:bg-white/[0.03]"
+                          style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.08)" }}
                           onClick={() => openRfp(rfp, "overview")}
                         >
                           <td className="relative max-w-[280px] min-w-0 px-3 py-2">
@@ -723,7 +837,7 @@ export function LegalDashboard() {
                               )}
                             />
                             <div
-                              className="max-w-[280px] truncate text-[12px] font-semibold text-[#F3F4F6]"
+                              className="max-w-[280px] truncate text-[12px] font-semibold text-slate-100"
                               title={rfp.title}
                             >
                               {rfp.title}
@@ -768,7 +882,8 @@ export function LegalDashboard() {
                               {quote ? (
                                 <button
                                   type="button"
-                                  className="font-mono-numbers rounded-[3px] border border-[#374151] bg-[#1F2937] px-1.5 py-[2px] leading-none text-[#9CA3AF]"
+                                  className="font-mono-numbers rounded-[3px] px-1.5 py-[2px] leading-none text-slate-300"
+                                  style={{ border: "1px solid rgba(226, 232, 240, 0.16)", background: "rgba(226, 232, 240, 0.06)" }}
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -778,12 +893,15 @@ export function LegalDashboard() {
                                   Bid {formatUsdNumber(quote.target)}
                                 </button>
                               ) : null}
-                              <span className="rounded-[3px] bg-[#1F2937] px-1.5 py-[2px] leading-none text-[#6B7280]">
+                              <span
+                                className="rounded-[3px] px-1.5 py-[2px] leading-none text-slate-400"
+                                style={{ background: "rgba(226, 232, 240, 0.06)" }}
+                              >
                                 {assign.initials} · {assign.role}
                               </span>
                             </div>
                           </td>
-                          <td className="min-w-[130px] truncate px-2 py-2 text-[12px] text-[#9CA3AF]">
+                          <td className="min-w-[130px] truncate px-2 py-2 text-[12px] text-slate-400">
                             {rfp.issuer || "Unspecified"}
                           </td>
                           <td className="whitespace-nowrap px-2 py-2">
@@ -796,7 +914,7 @@ export function LegalDashboard() {
                               {rfp.method}
                             </span>
                           </td>
-                          <td className="font-mono-numbers whitespace-nowrap px-2 py-2 text-[13px] font-semibold text-[#F3F4F6]">
+                          <td className="font-mono-numbers whitespace-nowrap px-2 py-2 text-[13px] font-semibold text-slate-100">
                             {formatUsdAmount(rfp.amount)}
                           </td>
                           <td className="whitespace-nowrap px-2 py-2">
@@ -820,10 +938,10 @@ export function LegalDashboard() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="flex items-center justify-end gap-1.5">
-                              <div className="flex items-center gap-1 text-[#6B7280]">
+                              <div className="flex items-center gap-1 text-slate-400">
                                 <button
                                   type="button"
-                                  className="btn-tactile rounded-[4px] p-1 hover:bg-[#1F2937] hover:text-[#F3F4F6]"
+                                  className="btn-tactile rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100"
                                   title="View"
                                   onClick={(e) => {
                                     e.preventDefault();
@@ -831,11 +949,11 @@ export function LegalDashboard() {
                                     openRfp(rfp, "overview");
                                   }}
                                 >
-                                  <Eye className="size-3" />
+                                  <span className="material-symbols-outlined text-[14px]">visibility</span>
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn-tactile rounded-[4px] p-1 hover:bg-[#1F2937] hover:text-[#F3F4F6]"
+                                  className="btn-tactile rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100"
                                   title="Edit"
                                   onClick={(e) => {
                                     e.preventDefault();
@@ -843,11 +961,11 @@ export function LegalDashboard() {
                                     openRfp(rfp, "overview");
                                   }}
                                 >
-                                  <Pencil className="size-3" />
+                                  <span className="material-symbols-outlined text-[14px]">edit</span>
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn-tactile rounded-[4px] p-1 hover:bg-[#1F2937] hover:text-[#F3F4F6]"
+                                  className="btn-tactile rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100"
                                   title="Download"
                                   onClick={(e) => {
                                     e.preventDefault();
@@ -855,12 +973,13 @@ export function LegalDashboard() {
                                     exportRfp(rfp);
                                   }}
                                 >
-                                  <Download className="size-3" />
+                                  <span className="material-symbols-outlined text-[14px]">download</span>
                                 </button>
                               </div>
                               <button
                                 type="button"
-                                className="btn-tactile rounded-[3px] border border-[#F59E0B] px-2 py-[3px] text-[10px] leading-none font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0B0F19]"
+                                className="btn-tactile rounded-[3px] px-2 py-[3px] text-[10px] leading-none font-semibold text-slate-100 transition-all hover:brightness-110"
+                                style={{ border: "1px solid rgba(226, 232, 240, 0.3)", background: "rgba(226, 232, 240, 0.08)" }}
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
@@ -877,53 +996,66 @@ export function LegalDashboard() {
                   </tbody>
                 </table>
                 {visible.length === 0 ? (
-                  <p className="px-4 py-8 text-sm text-[#6B7280]">No RFPs in this filter.</p>
+                  <p className="px-4 py-8 text-sm text-slate-400">No RFPs in this filter.</p>
                 ) : null}
               </div>
 
-              <div className="mt-1 flex flex-col items-center justify-between border-t border-[#1F2937] pt-3 text-[10px] sm:flex-row">
-                <span className="text-[#6B7280]">
+              <div
+                className="mt-1 flex flex-col items-center justify-between pt-3 text-[10px] sm:flex-row"
+                style={{ borderTop: "1px solid rgba(226, 232, 240, 0.1)" }}
+              >
+                <span className="text-slate-400">
                   Showing {visible.length} matching legal RFP opportunit{visible.length === 1 ? "y" : "ies"}
                 </span>
-                <span className="font-mono-numbers text-[#10B981]">All models up-to-date: BEAR v2.4 / SPI v1.8</span>
+                <span className="font-mono-numbers text-[#6EE7B7]">All models up-to-date: BEAR v2.4 / SPI v1.8</span>
               </div>
             </section>
 
             <div
               id="legal-analytics"
-              className="flex flex-col items-start justify-between gap-3 rounded-[6px] border border-[#1F2937] bg-[#111827] p-3 shadow-subtle md:flex-row md:items-center"
+              className="relative flex flex-col items-start justify-between gap-3 overflow-hidden rounded-xl p-3 md:flex-row md:items-center"
+              style={{
+                background:
+                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(226, 232, 240, 0.12)",
+                boxShadow:
+                  "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+              }}
             >
               <div className="flex items-center gap-2.5">
-                <div className="shrink-0 text-[#F59E0B]">
-                  <svg className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <line x1="18" x2="18" y1="20" y2="10" />
-                    <line x1="12" x2="12" y1="20" y2="4" />
-                    <line x1="6" x2="6" y1="20" y2="14" />
-                  </svg>
+                <div className="shrink-0 text-slate-300">
+                  <span className="material-symbols-outlined text-[18px]">bar_chart</span>
                 </div>
                 <div className="text-[11px] leading-snug">
-                  <span className="font-semibold text-[#F3F4F6]">Win / Loss (modeled):</span>
-                  <span className="ml-1 text-[10px] text-[#6B7280]">
+                  <span className="font-semibold text-slate-100">Win / Loss (modeled):</span>
+                  <span className="ml-1 text-[10px] text-slate-400">
                     {modeledWin}% desk alignment
                     {bearWin ? ` · BEAR ${bearWin}%` : ""}. Hot = modeled win, not a closed-file archive.
                   </span>
-                  <p className="mt-1 text-[10px] text-[#6B7280]">{analytics.insight}</p>
+                  <p className="mt-1 text-[10px] text-slate-400">{analytics.insight}</p>
                 </div>
               </div>
               <div className="w-full shrink-0 space-y-1 text-[10px] md:w-56">
                 {analytics.slices.map((row) => (
                   <div key={row.key} className="flex items-center justify-between">
-                    <span className="font-mono-numbers w-10 text-[#9CA3AF]">{row.key}</span>
-                    <div className="mx-2 h-[3px] flex-1 bg-[#1F2937]">
+                    <span className="font-mono-numbers w-10 text-slate-400">{row.key}</span>
+                    <div
+                      className="mx-2 h-[3px] flex-1 rounded-full"
+                      style={{ background: "rgba(226, 232, 240, 0.1)" }}
+                    >
                       <div
-                        className={cn("h-full", row.rate > 0 ? "bar-animate bg-[#F59E0B]" : "bg-[#1F2937]")}
-                        style={{ width: `${row.rate}%` }}
+                        className={cn("h-full rounded-full", row.rate > 0 ? "bar-animate" : "")}
+                        style={{
+                          width: `${row.rate}%`,
+                          background: row.rate > 0 ? "linear-gradient(90deg, #e2e8f0, #ffffff)" : "transparent",
+                        }}
                       />
                     </div>
                     <span
                       className={cn(
                         "font-mono-numbers whitespace-nowrap",
-                        row.rate > 0 ? "font-semibold text-[#F59E0B]" : "text-[#6B7280]"
+                        row.rate > 0 ? "font-semibold text-slate-100" : "text-slate-500"
                       )}
                     >
                       {row.rate}% · {row.n}
@@ -938,24 +1070,30 @@ export function LegalDashboard() {
             <section
               id="legal-documents"
               data-tour="legal-ingest"
-              className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle"
+              className="relative overflow-hidden rounded-xl p-4"
+              style={{
+                background:
+                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(226, 232, 240, 0.12)",
+                boxShadow:
+                  "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+              }}
             >
               <div className="flex items-center gap-1.5">
-                <svg className="size-3.5 text-[#F59E0B]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                <h3 className="text-[13px] font-semibold text-[#F3F4F6]">Ingest RFP</h3>
+                <span className="material-symbols-outlined text-[16px] text-slate-300">description</span>
+                <h3 className="text-[13px] font-semibold text-slate-100">Ingest RFP</h3>
               </div>
-              <p className="mt-0.5 mb-3 text-[11px] text-[#6B7280]">
+              <p className="mt-0.5 mb-3 text-[11px] text-slate-400">
                 Drop PDF / DOCX / TXT — extract text, then run the match pipeline.
               </p>
               <form className="space-y-2" onSubmit={(e) => void ingest(e)}>
                 <div
-                  className={cn(
-                    "dropzone-box group relative flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-[4px] border border-dashed border-[#374151] bg-[#0B0F19] p-4 text-center",
-                    dragOver ? "border-[#F59E0B]" : null
-                  )}
+                  className="dropzone-box group relative flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-[6px] border border-dashed p-4 text-center transition-colors"
+                  style={{
+                    background: "rgba(9, 11, 16, 0.6)",
+                    borderColor: dragOver ? "rgba(255,255,255,0.6)" : "rgba(226, 232, 240, 0.2)",
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setDragOver(true);
@@ -968,11 +1106,13 @@ export function LegalDashboard() {
                     if (file) void ingestFile(file);
                   }}
                 >
-                  <FileUp className="mb-1.5 size-5 text-[#6B7280] transition-all duration-150 group-hover:-translate-y-0.5 group-hover:text-[#F59E0B]" />
-                  <span className="text-xs text-[#9CA3AF] transition-colors duration-150 group-hover:text-[#F3F4F6]">
+                  <span className="material-symbols-outlined mb-1.5 text-[22px] text-slate-400 transition-all duration-150 group-hover:-translate-y-0.5 group-hover:text-white">
+                    upload_file
+                  </span>
+                  <span className="text-xs text-slate-300 transition-colors duration-150 group-hover:text-white">
                     {pdfBusy ? "Reading document…" : running ? "Scoring…" : "Drop RFP or click to upload"}
                   </span>
-                  <span className="font-mono-numbers mt-1 text-[10px] text-[#4B5563]">
+                  <span className="font-mono-numbers mt-1 text-[10px] text-slate-500">
                     PDF · DOCX · TXT · max 8MB
                   </span>
                   <input
@@ -989,55 +1129,64 @@ export function LegalDashboard() {
                 </div>
                 {pdfBusy || pdfProgress > 0 ? (
                   <div>
-                    <p className="mb-1 text-[11px] text-[#6B7280]">Extraction {pdfProgress}%</p>
-                    <div className="h-[3px] overflow-hidden bg-[#1F2937]">
-                      <div className="h-full bg-[#F59E0B] transition-all" style={{ width: `${pdfProgress}%` }} />
+                    <p className="mb-1 text-[11px] text-slate-400">Extraction {pdfProgress}%</p>
+                    <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "rgba(226, 232, 240, 0.1)" }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pdfProgress}%`, background: "linear-gradient(90deg, #e2e8f0, #ffffff)" }}
+                      />
                     </div>
                   </div>
                 ) : null}
                 {pdfPreview ? (
-                  <div className="rounded-[4px] border border-[#1F2937] bg-[#0B0F19] p-2.5">
-                    <p className="mb-1 text-[10px] tracking-wide text-[#F59E0B] uppercase">
+                  <div className="rounded-[6px] p-2.5" style={{ border: "1px solid rgba(226, 232, 240, 0.14)", background: "rgba(9, 11, 16, 0.6)" }}>
+                    <p className="mb-1 text-[10px] tracking-wide text-slate-300 uppercase">
                       Preview · {pdfPreview.name}
                     </p>
-                    <p className="max-h-28 overflow-y-auto text-[11px] leading-relaxed whitespace-pre-wrap text-[#9CA3AF]">
+                    <p className="max-h-28 overflow-y-auto text-[11px] leading-relaxed whitespace-pre-wrap text-slate-400">
                       {pdfPreview.text}
                     </p>
                   </div>
                 ) : null}
                 {running ? (
                   <div>
-                    <p className="mb-1 text-[11px] text-[#6B7280]">Pipeline {extractPct}%</p>
-                    <div className="h-[3px] overflow-hidden bg-[#1F2937]">
-                      <div className="h-full bg-[#10B981] transition-all" style={{ width: `${extractPct}%` }} />
+                    <p className="mb-1 text-[11px] text-slate-400">Pipeline {extractPct}%</p>
+                    <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "rgba(226, 232, 240, 0.1)" }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${extractPct}%`, background: "linear-gradient(90deg, #6EE7B7, #10B981)" }}
+                      />
                     </div>
                   </div>
                 ) : null}
                 <div>
-                  <label className="mb-1 block text-[10px] font-medium text-[#6B7280]">Title</label>
+                  <label className="mb-1 block text-[10px] font-medium text-slate-400">Title</label>
                   <Input
                     required
-                    className="h-[32px] rounded-[4px] border-[#1F2937] bg-[#0B0F19] px-2.5 py-0 text-xs text-[#F3F4F6] placeholder-[#4B5563] focus-visible:border-[#F59E0B]"
+                    className="h-[32px] rounded-[6px] border-0 px-2.5 py-0 text-xs text-slate-100 placeholder-slate-500 focus-visible:ring-1 focus-visible:ring-white/40"
+                    style={{ background: "rgba(9, 11, 16, 0.6)", border: "1px solid rgba(226, 232, 240, 0.14)" }}
                     placeholder="e.g. Mass Tort Intake Automation RFP"
                     value={form.title}
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[10px] font-medium text-[#6B7280]">Issuer</label>
+                  <label className="mb-1 block text-[10px] font-medium text-slate-400">Issuer</label>
                   <Input
-                    className="h-[32px] rounded-[4px] border-[#1F2937] bg-[#0B0F19] px-2.5 py-0 text-xs text-[#F3F4F6] placeholder-[#4B5563] focus-visible:border-[#F59E0B]"
+                    className="h-[32px] rounded-[6px] border-0 px-2.5 py-0 text-xs text-slate-100 placeholder-slate-500 focus-visible:ring-1 focus-visible:ring-white/40"
+                    style={{ background: "rgba(9, 11, 16, 0.6)", border: "1px solid rgba(226, 232, 240, 0.14)" }}
                     placeholder="e.g. State Department of Justice"
                     value={form.issuer}
                     onChange={(e) => setForm({ ...form, issuer: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[10px] font-medium text-[#6B7280]">RFP body</label>
+                  <label className="mb-1 block text-[10px] font-medium text-slate-400">RFP body</label>
                   <Textarea
                     required
                     rows={2}
-                    className="min-h-[64px] resize-none rounded-[4px] border-[#1F2937] bg-[#0B0F19] px-2.5 py-1.5 text-xs text-[#F3F4F6] placeholder-[#4B5563] focus-visible:border-[#F59E0B]"
+                    className="min-h-[64px] resize-none rounded-[6px] border-0 px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus-visible:ring-1 focus-visible:ring-white/40"
+                    style={{ background: "rgba(9, 11, 16, 0.6)", border: "1px solid rgba(226, 232, 240, 0.14)" }}
                     placeholder="Paste solicitation text or executive summary..."
                     value={form.body}
                     onChange={(e) => setForm({ ...form, body: e.target.value })}
@@ -1047,7 +1196,13 @@ export function LegalDashboard() {
                 <button
                   type="submit"
                   disabled={running}
-                  className="btn-tactile h-[28px] w-full rounded-[4px] bg-[#F59E0B] px-3 py-1 text-[11px] leading-none font-semibold text-[#0B0F19] hover:bg-[#D97706] disabled:opacity-50"
+                  className="btn-tactile h-[30px] w-full rounded-[6px] px-3 py-1 text-[11px] leading-none font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%)",
+                    color: "#090b10",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.9)",
+                    border: "1px solid rgba(255,255,255,0.4)",
+                  }}
                 >
                   {running ? "Extracting…" : "Extract & match"}
                 </button>
@@ -1056,16 +1211,24 @@ export function LegalDashboard() {
 
             <section
               id="legal-settings"
-              className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle"
+              className="relative overflow-hidden rounded-xl p-4"
+              style={{
+                background:
+                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(226, 232, 240, 0.12)",
+                boxShadow:
+                  "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+              }}
             >
               <form onSubmit={(e) => void saveProfile(e)}>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[13px] font-semibold text-[#F3F4F6]">Client profile</h3>
-                  <a className="text-[11px] text-[#F59E0B] hover:underline" href="#legal-settings">
+                  <h3 className="text-[13px] font-semibold text-slate-100">Client profile</h3>
+                  <a className="text-[11px] text-slate-300 hover:text-white hover:underline" href="#legal-settings">
                     Desk
                   </a>
                 </div>
-                <p className="mt-0.5 mb-2.5 text-[11px] text-[#6B7280]">
+                <p className="mt-0.5 mb-2.5 text-[11px] text-slate-400">
                   Custom scoring weights & qualification rules
                 </p>
                 <div className="mb-3 flex flex-wrap gap-1">
@@ -1077,10 +1240,13 @@ export function LegalDashboard() {
                         type="button"
                         className={cn(
                           "rounded-[3px] px-2 py-0.5 text-[10px] transition-colors duration-150",
-                          on
-                            ? "border border-[#F59E0B] bg-[#422006] font-semibold text-[#FCD34D]"
-                            : "border border-[#374151] bg-[#1F2937] text-[#9CA3AF] hover:border-[#6B7280]"
+                          on ? "font-semibold text-white" : "text-slate-400 hover:text-slate-100"
                         )}
+                        style={
+                          on
+                            ? { border: "1px solid rgba(255,255,255,0.35)", background: "rgba(226, 232, 240, 0.14)" }
+                            : { border: "1px solid rgba(226, 232, 240, 0.14)", background: "rgba(226, 232, 240, 0.04)" }
+                        }
                         onClick={() =>
                           setStructured((p) => ({
                             ...p,
@@ -1095,18 +1261,21 @@ export function LegalDashboard() {
                     );
                   })}
                 </div>
-                <div className="mb-3 grid grid-cols-3 gap-2 border-y border-[#1F2937] py-2 text-center">
+                <div
+                  className="mb-3 grid grid-cols-3 gap-2 py-2 text-center"
+                  style={{ borderTop: "1px solid rgba(226, 232, 240, 0.1)", borderBottom: "1px solid rgba(226, 232, 240, 0.1)" }}
+                >
                   <div>
-                    <span className="text-[9px] font-semibold tracking-wider text-[#6B7280] uppercase">BUDGET</span>
-                    <div className="font-mono-numbers mt-0.5 text-[11px] font-semibold text-[#F3F4F6]">
+                    <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">BUDGET</span>
+                    <div className="font-mono-numbers mt-0.5 text-[11px] font-semibold text-slate-100">
                       {formatUsdAmount(String(structured.budgetMin))}–{formatUsdAmount(String(structured.budgetMax))}
                     </div>
                   </div>
                   <div>
-                    <span className="text-[9px] font-semibold tracking-wider text-[#6B7280] uppercase">
+                    <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">
                       JURISDICTION
                     </span>
-                    <div className="mt-0.5 flex items-center justify-center gap-1 text-[11px] font-medium text-[#F3F4F6]">
+                    <div className="mt-0.5 flex items-center justify-center gap-1 text-[11px] font-medium text-slate-100">
                       <select
                         className="max-w-full truncate bg-transparent text-center outline-none"
                         value={structured.jurisdiction}
@@ -1121,8 +1290,8 @@ export function LegalDashboard() {
                     </div>
                   </div>
                   <div>
-                    <span className="text-[9px] font-semibold tracking-wider text-[#6B7280] uppercase">WIN RATE</span>
-                    <div className="font-mono-numbers mt-0.5 text-[11px] font-semibold text-[#10B981]">
+                    <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">WIN RATE</span>
+                    <div className="font-mono-numbers mt-0.5 text-[11px] font-semibold text-[#6EE7B7]">
                       {modeledWin}%
                     </div>
                   </div>
@@ -1146,7 +1315,8 @@ export function LegalDashboard() {
                 </div>
                 <div className="mb-3">
                   <textarea
-                    className="w-full resize-none rounded-[4px] border border-[#1F2937] bg-[#0B0F19] px-2.5 py-1.5 text-xs leading-normal text-[#F3F4F6] focus:border-[#374151] focus:outline-none"
+                    className="w-full resize-none rounded-[6px] border-0 px-2.5 py-1.5 text-xs leading-normal text-slate-100 focus:outline-none focus:ring-1 focus:ring-white/40"
+                    style={{ background: "rgba(9, 11, 16, 0.6)", border: "1px solid rgba(226, 232, 240, 0.14)" }}
                     rows={2}
                     placeholder="Key practice notes, exclusions..."
                     value={structured.exclusions.join(", ")}
@@ -1162,13 +1332,14 @@ export function LegalDashboard() {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[#10B981]">
+                  <div className="flex items-center gap-1.5 text-[11px] text-[#6EE7B7]">
                     <span className="pulse-dot-green size-[6px] rounded-full bg-[#10B981]" />
                     <span>{profileSaved ? "Saved" : "Synced"}</span>
                   </div>
                   <button
                     type="submit"
-                    className="btn-tactile rounded-[4px] border border-[#F59E0B] px-2.5 py-1 text-[11px] font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0B0F19]"
+                    className="btn-tactile rounded-[6px] px-2.5 py-1 text-[11px] font-semibold text-slate-100 transition-all hover:brightness-110"
+                    style={{ border: "1px solid rgba(226, 232, 240, 0.3)", background: "rgba(226, 232, 240, 0.08)" }}
                   >
                     Save changes
                   </button>
@@ -1178,27 +1349,43 @@ export function LegalDashboard() {
 
             <div
               id="legal-audit"
-              className="space-y-2.5 rounded-[6px] border border-[#1F2937] bg-[#111827] p-3 shadow-subtle"
+              className="relative space-y-2.5 overflow-hidden rounded-xl p-3"
+              style={{
+                background:
+                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(226, 232, 240, 0.12)",
+                boxShadow:
+                  "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
+              }}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="pulse-dot-amber size-[6px] rounded-full bg-[#F59E0B]" />
-                  <span className="text-xs font-semibold text-[#F3F4F6]">Live pipeline</span>
+                  <span
+                    className={cn("size-[6px] rounded-full bg-white", running ? "pulse-dot-amber" : "")}
+                  />
+                  <span className="text-xs font-semibold text-slate-100">Live pipeline</span>
                 </div>
-                <span className="font-mono-numbers live-status-pulse text-[10px] text-[#F59E0B]">
+                <span className="font-mono-numbers live-status-pulse text-[10px] text-slate-300">
                   {running ? "Extracting…" : "Waiting for next batch..."}
                 </span>
               </div>
               {logs.length === 0 ? (
-                <div className="flex items-center justify-between border-t border-[#1F2937] pt-2 text-[11px]">
-                  <div className="flex items-center gap-2 text-[#9CA3AF]">
-                    <span className="size-[6px] rounded-full bg-[#F59E0B] opacity-70" />
+                <div
+                  className="flex items-center justify-between pt-2 text-[11px]"
+                  style={{ borderTop: "1px solid rgba(226, 232, 240, 0.1)" }}
+                >
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <span className="material-symbols-outlined text-[14px] text-slate-500">hourglass_empty</span>
                     <span>Waiting for ingest</span>
                   </div>
-                  <span className="font-mono-numbers text-[10px] text-[#6B7280]">idle</span>
+                  <span className="font-mono-numbers text-[10px] text-slate-500">idle</span>
                 </div>
               ) : (
-                <div className="space-y-1.5 border-t border-[#1F2937] pt-2 text-[11px] text-[#9CA3AF]">
+                <div
+                  className="space-y-1.5 pt-2 text-[11px] text-slate-400"
+                  style={{ borderTop: "1px solid rgba(226, 232, 240, 0.1)" }}
+                >
                   {logs
                     .slice(-4)
                     .reverse()
@@ -1208,10 +1395,10 @@ export function LegalDashboard() {
                           <span
                             className={cn(
                               "size-[6px] shrink-0 rounded-full",
-                              i === 0 ? "bg-[#F59E0B]" : "bg-[#10B981]"
+                              i === 0 ? "bg-white" : "bg-[#6EE7B7]"
                             )}
                           />
-                          <span className="truncate text-[#F3F4F6]">
+                          <span className="truncate text-slate-100">
                             [{log.agent}] {log.message}
                           </span>
                         </div>

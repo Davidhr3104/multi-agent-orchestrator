@@ -262,7 +262,7 @@ export function LegalChrome({
       >
         <div>
           <div className={cn("flex h-12 items-center gap-2.5 border-b border-[#1F2937]", collapsed ? "justify-center px-2" : "px-3.5")}>
-            <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-[3px] bg-white p-px transition-transform duration-150 hover:scale-105">
+            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden transition-transform duration-150 hover:scale-105">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/helix-legal-icon.png" alt="" className="h-full w-full object-contain" />
             </div>
@@ -270,7 +270,7 @@ export function LegalChrome({
               <div className="min-w-0 overflow-hidden" aria-label="Helix for Legal">
                 <div className="flex items-center gap-1.5 leading-none">
                   <span className="text-[14px] font-semibold text-[#F3F4F6]">HELIX</span>
-                  <span className="text-[9px] font-medium tracking-widest text-[#F59E0B] uppercase">FOR LEGAL</span>
+                  <span className="text-[9px] font-medium tracking-widest text-[#cbd5e1] uppercase">FOR LEGAL</span>
                 </div>
                 <p className="mt-1 truncate text-[10px] leading-none font-normal text-[#6B7280]">Enterprise Suite</p>
               </div>
@@ -293,13 +293,13 @@ export function LegalChrome({
                   className={cn(
                     "flex h-9 w-full items-center justify-between rounded-[4px] px-2.5 transition-colors duration-150",
                     on
-                      ? "border-l-2 border-[#F59E0B] bg-[#1F2937] font-semibold text-[#F59E0B]"
+                      ? "border-l-2 border-[#e2e8f0] bg-[#1F2937] font-semibold text-[#e2e8f0]"
                       : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F3F4F6]",
                     collapsed && "justify-center px-0"
                   )}
                 >
                   <span className="flex items-center gap-2">
-                    <NavIcon name={item.icon} className={on ? "text-[#F59E0B]" : "text-[#6B7280]"} />
+                    <NavIcon name={item.icon} className={on ? "text-[#e2e8f0]" : "text-[#6B7280]"} />
                     {collapsed ? null : <span className="text-xs">{item.label}</span>}
                   </span>
                   {!collapsed && badge > 0 ? (
@@ -395,9 +395,9 @@ export function LegalChrome({
             <button
               type="button"
               onClick={onSearch}
-              className="group relative hidden h-8 w-[260px] rounded-[4px] border border-[#1F2937] bg-[#111827] pr-10 pl-8 text-left text-xs text-[#6B7280] transition-colors duration-150 hover:border-[#F59E0B] hover:text-[#F3F4F6] lg:block"
+              className="group relative hidden h-8 w-[260px] rounded-[4px] border border-[#1F2937] bg-[#111827] pr-10 pl-8 text-left text-xs text-[#6B7280] transition-colors duration-150 hover:border-[#e2e8f0] hover:text-[#F3F4F6] lg:block"
             >
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-[#6B7280] transition-colors group-hover:text-[#F59E0B]">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-[#6B7280] transition-colors group-hover:text-[#e2e8f0]">
                 <svg className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" x2="16.65" y1="21" y2="16.65" />
@@ -412,8 +412,8 @@ export function LegalChrome({
               <span className="pulse-dot-green size-[5px] rounded-full bg-[#10B981]" />
               Engine Active
             </div>
-            <div className="hidden items-center gap-1.5 rounded-[4px] border border-[#F59E0B] bg-transparent px-2 py-0.5 text-[10px] font-medium text-[#F59E0B] sm:flex">
-              <span className="size-[5px] rounded-full bg-[#F59E0B]" />
+            <div className="hidden items-center gap-1.5 rounded-[4px] border border-[#e2e8f0] bg-transparent px-2 py-0.5 text-[10px] font-medium text-[#e2e8f0] sm:flex">
+              <span className="size-[5px] rounded-full bg-[#e2e8f0]" />
               Enterprise
             </div>
             <Link
@@ -421,7 +421,7 @@ export function LegalChrome({
               aria-label="Notifications"
               className={cn(
                 "btn-tactile relative rounded-[4px] p-1.5 text-[#6B7280] hover:text-[#F3F4F6]",
-                pathname.startsWith("/notifications") && "text-[#F59E0B]"
+                pathname.startsWith("/notifications") && "text-[#e2e8f0]"
               )}
             >
               <svg className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">

@@ -29,6 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`dark ${inter.variable} ${ibmPlexMono.variable} h-full bg-[#0B0F19] text-[#9CA3AF] antialiased`}
     >
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+          rel="stylesheet"
+        />
+      </head>
       <body className="flex min-h-full flex-col bg-[#0B0F19] font-sans text-xs text-[#9CA3AF]">
         <TooltipProvider>
           <MaybeDeskShell>{children}</MaybeDeskShell>
