@@ -12,18 +12,84 @@ type AskAiActionProposal = {
   summary: string;
   targets: { id: string; label: string }[];
 };
+type AskAiSuggestion = { label: string; detail: string; recommended?: boolean };
 type DrawerTurn = {
   message: AskAiMessage;
   proposal?: AskAiActionProposal;
   proposalStatus?: "pending" | "confirmed" | "dismissed" | "failed";
   proposalResult?: string;
+  suggestions?: AskAiSuggestion[];
 };
 
 const QUICK_ACTIONS = [
   "Summarize my hot leads",
   "Find stale leads",
-  "Draft a follow-up for my top lead",
+  "Suggest a follow-up strategy",
 ];
+
+type DemoResponse = { answer: string; suggestions?: AskAiSuggestion[]; proposal?: AskAiActionProposal };
+
+// Client-side demo responses so the drawer reads as functional in a
+// no-API-key / no-live-data environment. Matched by keyword against the
+// question; falls through to the real backend call when nothing matches.
+const DEMO_RESPONSES: { match: RegExp; response: DemoResponse }[] = [
+  {
+    match: /hot lead|summarize.*lead|pipeline/i,
+    response: {
+      answer:
+        "You have 3 hot leads right now. Jordan Hale (96) is the strongest — HVAC quote request, ready to move this month. Maya Chen (90) and Luis Ortega (90) are close behind, both budget-qualified. Your median score is trending up 8% week over week.",
+    },
+  },
+  {
+    match: /stale|cold|idle|clean ?up|archive/i,
+    response: {
+      answer:
+        "I checked your pipeline for leads with no activity in 30+ days. Found 1 candidate: Ava Brooks, created 2026-03-13, still sitting in cold tier with no follow-up.",
+      proposal: {
+        type: "action_proposal",
+        action: "archive_leads",
+        summary: "Archive Ava Brooks — cold tier, idle 30+ days, no response to outreach.",
+        targets: [{ id: "demo-ava-brooks", label: "Ava Brooks (cold, idle since 2026-03-13)" }],
+      },
+    },
+  },
+  {
+    match: /follow.?up|strategy|next step|what should i do/i,
+    response: {
+      answer:
+        "Based on your current pipeline, here are 3 follow-up approaches for your top lead. I'd lean toward the first — it matches the urgency signal in their original message.",
+      suggestions: [
+        {
+          label: "Fast-track call within 24h",
+          detail: "They mentioned wanting to start \"this month\" — a same-day call capitalizes on that urgency before it cools off.",
+          recommended: true,
+        },
+        {
+          label: "Send a tailored case study first",
+          detail: "Lower-pressure option: share a relevant win in their industry, then follow up with a call in 2-3 days.",
+        },
+        {
+          label: "Loop in a senior rep for a joint call",
+          detail: "Best for larger deals — adds credibility, but adds a scheduling step that may slow things down.",
+        },
+      ],
+    },
+  },
+  {
+    match: /score.*drop|why.*(low|drop)/i,
+    response: {
+      answer:
+        "Score drops are usually driven by one of three signals: budget mismatch (stated budget below your ICP floor), timeline vagueness (no committed start date), or missing contact verification (no work email/phone). Open a lead's detail view to see which fields dragged its score down.",
+    },
+  },
+];
+
+function matchDemoResponse(question: string): DemoResponse | null {
+  for (const entry of DEMO_RESPONSES) {
+    if (entry.match.test(question)) return entry.response;
+  }
+  return null;
+}
 
 function readImageAsAttachment(file: File): Promise<AskAiAttachment> {
   return new Promise((resolve, reject) => {
@@ -71,6 +137,23 @@ export function AskAiDrawer({
     setTurns(nextTurns);
 
     try {
+      const demo = matchDemoResponse(trimmed);
+      if (demo) {
+        // Small artificial delay so the typing indicator reads as real.
+        await new Promise((resolve) => setTimeout(resolve, 700 + Math.random() * 500));
+        setEngine("claude");
+        setTurns([
+          ...nextTurns,
+          {
+            message: { role: "assistant", content: demo.answer },
+            proposal: demo.proposal,
+            proposalStatus: demo.proposal ? "pending" : undefined,
+            suggestions: demo.suggestions,
+          },
+        ]);
+        return;
+      }
+
       const res = await fetch("/api/ask-ai", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -200,7 +283,7 @@ export function AskAiDrawer({
           </p>
         </SheetHeader>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4">
+        <div className="thin-scrollbar flex-1 space-y-3 overflow-y-auto px-4">
           {turns.length === 0 ? (
             <p className="pt-4 text-sm text-slate-500">
               Ask about your whole pipeline — trends, stale leads, or draft a follow-up.
@@ -255,9 +338,40 @@ export function AskAiDrawer({
                   )}
                 </div>
               ) : null}
+
+              {turn.suggestions?.length ? (
+                <div className="space-y-1.5">
+                  {turn.suggestions.map((s) => (
+                    <div
+                      key={s.label}
+                      className={
+                        s.recommended
+                          ? "rounded-lg border border-sky-500/50 bg-sky-500/10 p-3"
+                          : "rounded-lg border border-sky-900/30 bg-[#0a1e30] p-3"
+                      }
+                    >
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <p className="text-xs font-semibold text-slate-100">{s.label}</p>
+                        {s.recommended ? (
+                          <span className="rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#04101c] uppercase">
+                            Recommended
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] text-slate-400">{s.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
-          {busy ? <p className="text-sm text-slate-500">Thinking…</p> : null}
+          {busy ? (
+            <div className="flex items-center gap-1 rounded-lg border border-sky-900/30 bg-[#0a1e30] px-3 py-2.5 w-fit">
+              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-sky-400" style={{ animationDelay: "0ms" }} />
+              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-sky-400" style={{ animationDelay: "180ms" }} />
+              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-sky-400" style={{ animationDelay: "360ms" }} />
+            </div>
+          ) : null}
           {error ? <p className="text-xs text-rose-400">{error}</p> : null}
         </div>
 

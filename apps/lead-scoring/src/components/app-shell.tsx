@@ -276,7 +276,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="thin-scrollbar flex-1 overflow-y-auto px-3 py-4">
         <NavGroup title="Overview" items={overview} />
         <NavGroup title="Configuration" items={configuration} />
         <NavGroup title="System" items={system} />
