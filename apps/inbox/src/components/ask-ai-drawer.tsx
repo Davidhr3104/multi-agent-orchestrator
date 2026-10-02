@@ -119,10 +119,12 @@ export function AskAiDrawer({
   open,
   onOpenChange,
   initialQuestion,
+  seed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialQuestion?: string;
+  seed?: number;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState("");
@@ -207,11 +209,13 @@ export function AskAiDrawer({
   }
 
   useEffect(() => {
-    if (!open || !initialQuestion || lastInitial.current === initialQuestion) return;
-    lastInitial.current = initialQuestion;
+    if (!open || !initialQuestion) return;
+    const key = `${seed ?? 0}:${initialQuestion}`;
+    if (lastInitial.current === key) return;
+    lastInitial.current = key;
     void ask(initialQuestion);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialQuestion]);
+  }, [open, initialQuestion, seed]);
 
   async function confirm(i: number) {
     const p = turnsRef.current[i]?.proposal;

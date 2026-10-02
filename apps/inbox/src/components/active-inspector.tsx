@@ -1,8 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { InboxMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
+import { confidenceBand } from "@/lib/desk-ui";
+import { toneHint } from "@/lib/tone";
+import { readKnowledgeLinks } from "@/lib/knowledge-links";
+import type { InboxPersona } from "@/lib/agent-profile";
+import { SlaCountdown } from "@/components/sla-countdown";
+import { DraftDiff } from "@/components/draft-diff";
+import { cn } from "@/lib/utils";
+
+const BAND = {
+  high: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  mid: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  low: "border-red-500/40 bg-red-500/15 text-red-600 dark:text-red-300",
+} as const;
 
 export function ActiveInspector({
   thread,
@@ -13,15 +26,27 @@ export function ActiveInspector({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [whyOpen, setWhyOpen] = useState(true);
+  const [persona, setPersona] = useState<InboxPersona>("executive");
+  const band = confidenceBand(thread.aiConfidence);
 
-  async function act(action: string) {
+  useEffect(() => {
+    void fetch("/api/studio")
+      .then((r) => r.json())
+      .then((d: { profile?: { persona?: InboxPersona } }) => {
+        if (d.profile?.persona) setPersona(d.profile.persona);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  async function act(action: string, extra?: Record<string, string | string[]>) {
     setBusy(action);
     setError(null);
     try {
       await fetch(`/api/messages/${thread.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...extra }),
       }).then(async (res) => {
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -53,17 +78,27 @@ export function ActiveInspector({
           <span className="size-2 animate-pulse rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
           <h3 className="text-sm font-semibold text-foreground">Active inspector</h3>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-gradient-to-r from-[#10B981]/20 to-[#059669]/20 px-2.5 py-1 text-emerald-700 dark:text-[#34D399]">
+        <div className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1", BAND[band])}>
           <span className="font-mono text-[10px] font-semibold tracking-wider uppercase">Conf</span>
           <span className="font-mono text-xs font-bold">{Math.round(thread.aiConfidence)}%</span>
         </div>
       </div>
-      <h4 className="mb-1 text-sm leading-snug font-semibold text-foreground">{thread.subject}</h4>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h4 className="text-sm leading-snug font-semibold text-foreground">{thread.subject}</h4>
+        <SlaCountdown thread={thread} />
+        {persona === "sales" || thread.leadIntent ? (
+          <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+            Match {thread.urgencyScore}
+          </span>
+        ) : null}
+      </div>
       <div className="mb-3 text-xs text-muted-foreground">
         <span className="text-accent dark:text-purple-200">{thread.fromName}</span>
         <span className="text-muted-foreground"> &lt;{thread.fromEmail}&gt;</span>
       </div>
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      <details className="mb-3">
+        <summary className="cursor-pointer text-[11px] text-muted-foreground">Category, route, and signals</summary>
+      <div className="mt-2 flex flex-wrap gap-1.5">
         <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-[#34D399]">
           {categoryLabel(thread.category)}
         </span>
@@ -82,16 +117,42 @@ export function ActiveInspector({
           {thread.routeTo}
         </span>
       </div>
-      {thread.reasoning ? (
-        <div className="mb-3 rounded-lg border border-[#8B5CF6]/20 bg-gradient-to-r from-surface-muted to-accent/5 dark:from-[#080412]/80 dark:to-[#140D26]/80 p-3 text-xs text-foreground/80 italic">
-          &ldquo;{thread.reasoning}&rdquo;
-        </div>
+      </details>
+      <div className="mb-3 rounded-lg border border-[#8B5CF6]/20 bg-surface-muted">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] font-semibold text-foreground"
+          onClick={() => setWhyOpen((v) => !v)}
+        >
+          Why Helix classified this as {categoryLabel(thread.category)}
+          <span className="text-muted-foreground">{whyOpen ? "Hide" : "Show"}</span>
+        </button>
+        {whyOpen ? (
+          <p className="px-3 pb-3 text-xs text-foreground/80 italic">
+            {thread.reasoning || "No written reason was stored for this message."}
+          </p>
+        ) : null}
+      </div>
+      {thread.kbHits?.length ? (
+        <ul className="mb-3 space-y-1 text-[11px] text-muted-foreground">
+          {thread.kbHits.slice(0, 3).map((hit) => (
+            <li key={hit.chunkId}>
+              Source: {hit.docTitle} — {hit.quote || hit.excerpt}
+            </li>
+          ))}
+        </ul>
       ) : null}
-      {thread.draftReply ? (
-        <p className="mb-3 rounded-lg border border-border bg-surface-muted p-3 text-[11px] leading-relaxed text-muted-foreground">
-          {thread.draftReply}
-        </p>
-      ) : null}
+      <DraftDiff
+        incoming={thread.snippet || thread.body}
+        draft={thread.draftReply}
+        tone={toneHint({
+          category: thread.category,
+          sentiment: thread.sentiment,
+          leadIntent: thread.leadIntent,
+          persona,
+          draftTone: thread.draftTone,
+        })}
+      />
       {error ? (
         <p className="mb-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-2 text-[11px] text-red-600 dark:text-[#FCA5A5]">
           {error}
@@ -154,6 +215,47 @@ export function ActiveInspector({
           onClick={() => void act("block")}
         >
           {busy === "block" ? "…" : "Block"}
+        </button>
+        <button
+          type="button"
+          disabled={busy != null}
+          className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] text-muted-foreground disabled:opacity-50"
+          onClick={() => void act("feedback")}
+        >
+          {busy === "feedback" ? "…" : "Wrong classification"}
+        </button>
+        <button type="button" disabled={busy != null} className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] disabled:opacity-50" onClick={() => void act("meeting")}>
+          {busy === "meeting" ? "…" : "Add Meet link"}
+        </button>
+        <button
+          type="button"
+          disabled={busy != null}
+          className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] disabled:opacity-50"
+          onClick={() => void act("meeting", { provider: "zoom" })}
+        >
+          {busy === "meeting" ? "…" : "Add Zoom link"}
+        </button>
+        <button type="button" disabled={busy != null} className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] disabled:opacity-50" onClick={() => void act("attach_kb", { links: readKnowledgeLinks() })}>
+          {busy === "attach_kb" ? "…" : "Attach company file"}
+        </button>
+        <button
+          type="button"
+          disabled={busy != null}
+          className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] disabled:opacity-50"
+          onClick={() => {
+            let token = "";
+            try {
+              token = (JSON.parse(localStorage.getItem("helix-inbox-integration-tokens") ?? "{}") as { hubspot?: string }).hubspot ?? "";
+            } catch {
+              token = "";
+            }
+            void act("crm", { token });
+          }}
+        >
+          {busy === "crm" ? "…" : "Create HubSpot deal"}
+        </button>
+        <button type="button" disabled={busy != null} className="btn-tactile h-8 rounded-md border border-accent/40 px-3 text-[11px] text-accent disabled:opacity-50" onClick={() => void act("save_style")}>
+          {busy === "save_style" ? "…" : "Save my style"}
         </button>
       </div>
     </section>

@@ -25,7 +25,7 @@ export function HowToUsePanel({
           </h2>
           <div className="overflow-hidden rounded-lg border border-border bg-black/80">
             <video
-              className="aspect-video w-full"
+              className="max-h-56 w-full bg-black object-contain"
               controls
               playsInline
               preload="metadata"

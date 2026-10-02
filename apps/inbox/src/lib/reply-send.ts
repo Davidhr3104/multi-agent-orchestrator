@@ -4,6 +4,7 @@ import { sendReply } from "@/lib/send";
 import { sendGmailReply } from "@/lib/gmail";
 import { supabaseGetEmailAccount, supabaseGetEmailAccountById } from "@/lib/supabase-desk";
 import { DEFAULT_TO_EMAIL, DEFAULT_WORKSPACE_ID } from "@/lib/types";
+import { guardrailReason } from "@/lib/agent-profile";
 
 export type SendResult =
   | { ok: true; message: InboxMessage; sentId: string; sentVia: "gmail" | "resend" }
@@ -13,9 +14,11 @@ export type SendResult =
  * One implementation of "send this thread's reply", shared by the inspector's Send button and
  * Helix AI. It never fails silently and never falls back to a different provider without saying so.
  */
-export async function sendThreadReply(id: string, actor: string): Promise<SendResult> {
+export async function sendThreadReply(id: string, actor: string, opts?: { human?: boolean }): Promise<SendResult> {
   const current = await getMessage(id);
   if (!current) return { ok: false, status: 404, error: "Not found" };
+  const blocked = guardrailReason({ subject: current.subject, body: current.body, draft: current.draftReply });
+  if (blocked && !opts?.human) return { ok: false, status: 409, error: blocked };
 
   const text = current.draftReply || current.body;
   // Reply from the exact mailbox that received this thread — a workspace can have several connected

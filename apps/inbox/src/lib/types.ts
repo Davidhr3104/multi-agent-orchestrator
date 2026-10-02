@@ -58,8 +58,11 @@ export type UserPreferences = {
 export type CustomRule = {
   id: string;
   ifContains: string;
-  then: "urgent" | "vip_route" | "block" | "review";
+  then: "urgent" | "vip_route" | "block" | "review" | "route";
   enabled: boolean;
+  minAmount?: number;
+  routeTo?: string;
+  tagUrgent?: boolean;
 };
 
 export type EmailTemplate = {

@@ -2,7 +2,14 @@
 
 import type { InboxMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
+import { confidenceBand } from "@/lib/desk-ui";
 import { cn } from "@/lib/utils";
+
+const BAND = {
+  high: "text-emerald-700 dark:text-emerald-300",
+  mid: "text-amber-700 dark:text-amber-300",
+  low: "text-red-600 dark:text-red-300",
+} as const;
 
 function initials(name: string) {
   return name
@@ -17,10 +24,14 @@ export function QueueTable({
   threads,
   selectedId,
   onSelect,
+  checkedIds,
+  onToggle,
 }: {
   threads: InboxMessage[];
   selectedId: string | null;
   onSelect: (thread: InboxMessage) => void;
+  checkedIds?: Set<string>;
+  onToggle?: (id: string) => void;
 }) {
   if (threads.length === 0) return null;
 
@@ -30,30 +41,59 @@ export function QueueTable({
         {threads.map((thread) => {
           const on = thread.id === selectedId;
           return (
-            <button
+            <div
               key={thread.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(thread)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(thread);
+                }
+              }}
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors",
                 on ? "bg-[#8B5CF6]/12" : "hover:bg-surface-muted"
               )}
             >
+              {onToggle ? (
+                <input
+                  type="checkbox"
+                  checked={checkedIds?.has(thread.id) ?? false}
+                  aria-label={`Select ${thread.subject}`}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => onToggle(thread.id)}
+                />
+              ) : null}
               <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/15 text-[10px] font-semibold text-accent dark:text-[#C4B5FD]">
                 {initials(thread.fromName)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-foreground">{thread.subject}</div>
+                <div className="flex items-center gap-2">
+                  <div className="truncate text-sm font-medium text-foreground">{thread.subject}</div>
+                  {thread.status === "blocked" || thread.category === "spam" ? (
+                    <span className="shrink-0 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-600">BLOCKED</span>
+                  ) : thread.priority === "urgent" ? (
+                    <span className="shrink-0 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-600">URGENT</span>
+                  ) : thread.needsReview ? (
+                    <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">REVIEW</span>
+                  ) : thread.status === "sent" || thread.status === "routed" ? (
+                    <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">RESOLVED</span>
+                  ) : null}
+                </div>
                 <div className="truncate text-xs text-muted-foreground">
                   {thread.fromName} · {categoryLabel(thread.category)} · conf{" "}
-                  <span className="font-mono text-accent">{Math.round(thread.aiConfidence)}%</span>
+                  <span className={cn("font-mono", BAND[confidenceBand(thread.aiConfidence)])}>
+                    {Math.round(thread.aiConfidence)}%
+                  </span>
                 </div>
               </div>
               <div className="shrink-0 text-right">
                 <div className="font-mono text-[11px] text-amber-600 dark:text-[#FBBF24]">{thread.urgencyScore}</div>
                 <div className="text-[10px] text-muted-foreground">urgency</div>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

@@ -16,6 +16,8 @@ import {
 import { operatorActor, requireOperator } from "@helix/core/operator";
 import { sendThreadReply } from "@/lib/reply-send";
 import { sendToLeadsDesk } from "@/lib/leads-handoff";
+import { getAgentProfile, setAgentProfile } from "@/lib/agent-profile";
+import { getSecret } from "@helix/core";
 
 export const runtime = "nodejs";
 
@@ -55,6 +57,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
     draftReply?: string;
     isStarred?: boolean;
     isRead?: boolean;
+    provider?: string;
+    token?: string;
+    links?: string[];
   };
 
   let state = readDeskCookie(req);
@@ -62,7 +67,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   try {
     if (payload.action === "approve" || payload.action === "send") {
-      const result = await sendThreadReply(id, operatorActor(req));
+      const result = await sendThreadReply(id, operatorActor(req), { human: true });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
       state = upsertDeskPatch(state, id, patchFromThread(result.message));
       return jsonWithDeskCookie({ message: result.message, sentId: result.sentId, sentVia: result.sentVia }, state);
@@ -153,6 +158,95 @@ export async function PATCH(req: Request, ctx: Ctx) {
         id,
         { isRead: true },
         { actionType: "read", humanOverride: true }
+      );
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
+    }
+    if (payload.action === "meeting") {
+      const zoom = payload.provider === "zoom";
+      const url = zoom ? "https://zoom.us/start/videomeeting" : "https://meet.google.com/new";
+      const current = await getMessage(id);
+      if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+      const line = zoom ? `Zoom meeting: ${url}` : `Google Meet: ${url}`;
+      const message = await patchMessage(
+        id,
+        { draftReply: `${current.draftReply}\n\n${line}`.trim(), needsReview: true },
+        { actionType: `meeting:${zoom ? "zoom" : "meet"}`, humanOverride: true }
+      );
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
+    }
+    if (payload.action === "crm") {
+      const current = await getMessage(id);
+      if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+      const token = getSecret("HUBSPOT_TOKEN") || String(payload.token || "");
+      if (!token) {
+        return Response.json({ error: "Add a HubSpot token in Integrations or HUBSPOT_TOKEN." }, { status: 400 });
+      }
+      const created = await fetch("https://api.hubapi.com/crm/v3/objects/deals", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          properties: {
+            dealname: `${current.fromName} — ${current.subject}`.slice(0, 180),
+            description: current.snippet || current.body.slice(0, 500),
+          },
+        }),
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!created.ok) {
+        const detail = await created.text();
+        return Response.json({ error: `HubSpot ${created.status}: ${detail.slice(0, 180)}` }, { status: 502 });
+      }
+      const deal = (await created.json()) as { id?: string };
+      const message = await patchMessage(
+        id,
+        { reasoning: `${current.reasoning} · HubSpot deal ${deal.id ?? "created"}` },
+        { actionType: `crm_hubspot:${operatorActor(req)}`, humanOverride: true }
+      );
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message, dealId: deal.id }, state);
+    }
+    if (payload.action === "attach_kb") {
+      const current = await getMessage(id);
+      if (!current) return Response.json({ error: "Not found" }, { status: 404 });
+      const hits = queryInboxKb({ subject: current.subject, body: current.body }, 3);
+      const links = (payload.links ?? [])
+        .filter((url) => typeof url === "string" && /^https:\/\/\S{8,300}$/.test(url))
+        .slice(0, 2);
+      if (!hits.length && !links.length) return Response.json({ error: "No company source matched this thread." }, { status: 404 });
+      const block = hits.map((hit) => `- ${hit.docTitle}: ${hit.quote || hit.excerpt}`).join("\n");
+      const linkBlock = links.length ? `\nOfficial links:\n${links.map((url) => `- ${url}`).join("\n")}` : "";
+      const message = await patchMessage(
+        id,
+        { draftReply: `${current.draftReply}\n\nFrom our files:\n${block}${linkBlock}`.trim(), kbHits: hits, needsReview: true },
+        { actionType: "attach_kb", humanOverride: true }
+      );
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message }, state);
+    }
+    if (payload.action === "save_style") {
+      const current = await getMessage(id);
+      if (!current?.draftReply) return Response.json({ error: "Nothing to learn from yet." }, { status: 400 });
+      const prev = getAgentProfile();
+      setAgentProfile({ prompt: `${prev.prompt}\nMatch this reply style:\n${current.draftReply.slice(0, 600)}`.trim() });
+      const message = await patchMessage(
+        id,
+        {},
+        { actionType: `save_style:${operatorActor(req)}`, humanOverride: true }
+      );
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      return jsonWithDeskCookie({ message, profile: getAgentProfile() }, state);
+    }
+    if (payload.action === "feedback") {
+      const message = await patchMessage(
+        id,
+        { needsReview: true },
+        { actionType: `classification_feedback:${operatorActor(req)}`, humanOverride: true }
       );
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
       state = upsertDeskPatch(state, id, patchFromThread(message));

@@ -8,6 +8,8 @@
     "apps/inbox",
     "apps/commerce",
     "apps/marketing",
+    "apps/real-estate",
+    "apps/social-media",
     "packages/helix-core",
     "packages/helix-help"
   ],
@@ -18,7 +20,9 @@
     "dev:inbox": "npm run dev --workspace=helix-inbox",
     "dev:commerce": "npm run dev --workspace=helix-commerce",
     "dev:marketing": "npm run dev --workspace=helix-marketing",
-    "test": "npm test --workspace=@helix/core"
+    "test": "npm test --workspace=@helix/core",
+    "dev:realestate": "npm run dev --workspace=helix-real-estate",
+    "dev:social": "npm run dev --workspace=helix-social-media"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

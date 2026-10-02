@@ -1,6 +1,7 @@
 import type { DeskActionRegistry } from "@helix/core";
 import type { EmailThread, ThreadCategory, ThreadStatus } from "@/lib/types";
 import { sendThreadReply } from "@/lib/reply-send";
+import { guardrailReason } from "@/lib/agent-profile";
 import { currentDeskMode, getThread, patchMessage, regenerateSmartReply, snoozeThread } from "@/lib/store";
 
 /**
@@ -164,12 +165,17 @@ export const inboxActions: DeskActionRegistry<InboxCtx> = {
     snapshot,
     apply: async (id, _p, ctx) => {
       ctx.touched.add(id);
+      const current = await getThread(id);
+      if (current) {
+        const blocked = guardrailReason({ subject: current.subject, body: current.body, draft: current.draftReply });
+        if (blocked) throw new Error(blocked);
+      }
       if (currentDeskMode() === "demo") {
         // The demo desk has no mailbox: record the send locally and say so, never pretend an email left.
         const m = await patchMessage(id, { status: "sent", needsReview: false, isRead: true, lastReplySentAt: new Date().toISOString() }, { actionType: `send:${ctx.actor}:demo`, humanOverride: true });
         return m !== null;
       }
-      const r = await sendThreadReply(id, ctx.actor);
+      const r = await sendThreadReply(id, ctx.actor, { human: false });
       if (!r.ok) throw new Error(r.error);
       return true;
     },

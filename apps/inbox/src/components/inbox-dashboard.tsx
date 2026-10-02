@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, RefreshCw, Search, Zap } from "lucide-react";
-import { AskAiCard } from "@/components/ask-ai-card";
-import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
@@ -13,6 +11,15 @@ import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/s
 import { EducationalEmpty } from "@/components/educational-empty";
 import { INBOX_HELP, EMPTY_INBOX } from "@helix/help";
 import { summarizeInboxSla } from "@/lib/sla";
+import { rememberFocus } from "@/lib/desk-ui";
+import { toneHint } from "@/lib/tone";
+import { readKnowledgeLinks } from "@/lib/knowledge-links";
+import type { InboxPersona } from "@/lib/agent-profile";
+import { SlaCountdown } from "@/components/sla-countdown";
+import { DraftDiff } from "@/components/draft-diff";
+import { ShowingCard } from "@/components/showing-card";
+import { DashboardPanorama } from "@/components/dashboard-panorama";
+import { ActiveInspector } from "@/components/active-inspector";
 import Link from "next/link";
 
 type FilterTab = "all" | "urgent" | "review" | "routed" | "blocked";
@@ -44,13 +51,42 @@ function filterFromHash(): FilterTab {
 }
 
 export function InboxDashboard() {
-  const [askAiOpen, setAskAiOpen] = useState(false);
-  const [askAiQuestion, setAskAiQuestion] = useState<string | undefined>(undefined);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [history, setHistory] = useState<ThreadMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    rememberFocus(selectedId);
+  }, [selectedId]);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const savedFilter = localStorage.getItem("helix-inbox-filter");
+    const savedQuery = localStorage.getItem("helix-inbox-query");
+    if (savedFilter === "all" || savedFilter === "urgent" || savedFilter === "review" || savedFilter === "routed" || savedFilter === "blocked") {
+      setFilter(savedFilter);
+    }
+    if (savedQuery) setQuery(savedQuery);
+    function onQuery(e: Event) {
+      setQuery((e as CustomEvent<string>).detail ?? "");
+    }
+    function onFocus(e: Event) {
+      const id = (e as CustomEvent<string>).detail;
+      if (id) setSelectedId(id);
+    }
+    window.addEventListener("helix:set-query", onQuery);
+    window.addEventListener("helix:focus-thread", onFocus);
+    return () => {
+      window.removeEventListener("helix:set-query", onQuery);
+      window.removeEventListener("helix:focus-thread", onFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("helix-inbox-filter", filter);
+    localStorage.setItem("helix-inbox-query", query);
+  }, [filter, query]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -65,6 +101,22 @@ export function InboxDashboard() {
     subject: "",
     body: "",
   });
+  const [ingestOpen, setIngestOpen] = useState(false);
+  const [persona, setPersona] = useState<InboxPersona>("executive");
+
+  useEffect(() => {
+    if (sessionStorage.getItem("helix-inbox-ingest-open") === "1") setIngestOpen(true);
+    void fetch("/api/studio")
+      .then((r) => r.json())
+      .then((d: { profile?: { persona?: InboxPersona } }) => {
+        if (d.profile?.persona) setPersona(d.profile.persona);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem("helix-inbox-ingest-open", ingestOpen ? "1" : "0");
+  }, [ingestOpen]);
 
   function flash(msg: string) {
     setToast(msg);
@@ -206,14 +258,15 @@ export function InboxDashboard() {
 
   async function act(
     id: string,
-    action: "approve" | "route" | "block" | "snooze" | "smart_reply" | "star"
+    action: "approve" | "route" | "block" | "snooze" | "smart_reply" | "star" | "meeting" | "attach_kb" | "crm" | "save_style",
+    extra?: Record<string, string | string[]>
   ) {
     setActionBusy(action);
     setError(null);
     const res = await fetch(`/api/messages/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...extra }),
     });
     const data = (await res.json()) as { message?: InboxMessage; error?: string };
     setActionBusy(null);
@@ -234,7 +287,15 @@ export function InboxDashboard() {
                 ? data.message?.isStarred
                   ? "Starred"
                   : "Unstarred"
-                : "Reply regenerated"
+                : action === "meeting"
+                  ? "Meeting link added"
+                  : action === "attach_kb"
+                    ? "Company source attached"
+                    : action === "crm"
+                      ? "HubSpot deal created"
+                      : action === "save_style"
+                        ? "Style saved"
+                        : "Reply regenerated"
     );
     if (action === "snooze") {
       await refresh();
@@ -245,11 +306,7 @@ export function InboxDashboard() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        document.getElementById("inbox-filter")?.focus();
-        return;
-      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
@@ -312,615 +369,59 @@ export function InboxDashboard() {
   }
 
   return (
-    <main className="space-y-6 px-8 py-6">
+    <main className="bg-[#0b0e14] px-4 py-5 text-slate-100 md:px-6">
       {toast ? (
-        <div className="fixed right-6 bottom-6 z-50 rounded-lg border border-[#8B5CF6]/30 bg-surface px-4 py-2 text-xs font-medium text-accent dark:text-[#E9D5FF] shadow-xl backdrop-blur-md">
+        <div className="fixed right-6 bottom-6 z-50 rounded-lg border border-violet-400/30 bg-[#121520] px-4 py-2 text-xs font-medium text-violet-100 shadow-xl">
           {toast}
         </div>
       ) : null}
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="mx-auto mb-4 flex max-w-[1600px] items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Inbox triage</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Rank, draft, and route emails with autonomous multi-agent assistance
-            <span className="ml-2 font-mono text-[10px] text-muted-foreground">· {persistence}</span>
+          <p className="font-mono text-[11px] tracking-wide text-slate-500 uppercase">
+            Autonomous ingestion / Priority stream / <span className="font-semibold text-violet-300">Panoramic triage</span>
           </p>
+          <p className="mt-1 text-xs text-slate-500">Desk data · {persistence}{loading ? " · loading" : ""}</p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void refresh()}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-md transition-all hover:border-[#8B5CF6]/40 hover:bg-surface-muted hover:text-foreground disabled:opacity-50"
-          >
-            <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={loading} onClick={() => void refresh()} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300">
             Refresh
           </button>
-          <button
-            type="button"
-            onClick={() => document.getElementById("ingest-from-name")?.focus()}
-            className="shimmer-button flex items-center gap-1.5 rounded-md bg-gradient-to-r from-[#4E5FF7] via-[#6366F1] to-[#8B5CF6] px-4 py-2 text-xs font-semibold text-white shadow-[0_4px_18px_rgba(124,58,237,0.45)] transition-all hover:from-[#4352EA] hover:to-[#7C3AED] hover:shadow-[0_6px_24px_rgba(139,92,246,0.6)] active:scale-[0.98]"
-          >
-            <Plus className="size-3.5" />
-            New Email
+          <button type="button" onClick={() => setIngestOpen((open) => !open)} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white">
+            New thread
           </button>
         </div>
       </div>
-
+      {error ? <p className="mx-auto mb-3 max-w-[1600px] text-sm text-red-300">{error}</p> : null}
       <DemoBanner message="You are exploring sample email. Connect Gmail and this desk switches to your real mail — the samples disappear." connectHref="/settings" connectLabel="Connect Gmail →" />
-      <AskAiCard threadId={selected?.id} onOpenDrawer={(q) => {
-          setAskAiQuestion(q);
-          setAskAiOpen(true);
-        }} />
-      <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
       <AiToast message={aiToast} />
-
-      {sla.breachCount > 0 || sla.hoursSaved > 0 ? (
-        <Link
-          href="/sla"
-          className={cn(
-            "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs",
-            sla.breachCount > 0
-              ? "border-rose-500/35 bg-rose-500/10 text-rose-200 hover:border-rose-500/55"
-              : "border-violet-500/30 bg-violet-500/10 text-violet-200 hover:border-violet-500/50"
-          )}
+      {ingestOpen ? (
+        <form
+          className="mx-auto mb-4 grid max-w-[1600px] gap-2 rounded-xl border border-white/10 bg-[#121520] p-3 md:grid-cols-2"
+          onSubmit={(event) => void ingest(event)}
         >
-          <span>
-            {sla.breachCount > 0
-              ? `${sla.breachCount} SLA breach${sla.breachCount === 1 ? "" : "es"} · ${sla.hoursSaved}h saved est.`
-              : `${sla.hoursSaved}h saved est. from auto-triage / spam block`}
-            {sla.worstSubject ? ` — worst: ${sla.worstSubject}` : ""}
-          </span>
-          <span className="shrink-0 font-medium">SLA →</span>
-        </Link>
+          <input id="ingest-from-name" value={form.fromName} onChange={(event) => setForm((f) => ({ ...f, fromName: event.target.value }))} placeholder="From name" className="rounded-lg border border-white/10 bg-[#07090e] px-3 py-2 text-sm" />
+          <input value={form.fromEmail} onChange={(event) => setForm((f) => ({ ...f, fromEmail: event.target.value }))} placeholder="Email" className="rounded-lg border border-white/10 bg-[#07090e] px-3 py-2 text-sm" />
+          <input value={form.subject} onChange={(event) => setForm((f) => ({ ...f, subject: event.target.value }))} placeholder="Subject" className="rounded-lg border border-white/10 bg-[#07090e] px-3 py-2 text-sm md:col-span-2" />
+          <textarea value={form.body} onChange={(event) => setForm((f) => ({ ...f, body: event.target.value }))} placeholder="Body" className="min-h-20 rounded-lg border border-white/10 bg-[#07090e] px-3 py-2 text-sm md:col-span-2" />
+          <button type="submit" disabled={busy} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white md:col-span-2">
+            {busy ? "Ingesting…" : "Ingest"}
+          </button>
+        </form>
       ) : null}
-
-      <section data-tour="inbox-metrics" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Open threads */}
-        <div className="metric-card-interactive group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-[rgba(16,10,29,0.65)] dark:shadow-none dark:backdrop-blur-xl">
-          <div className="pointer-events-none absolute top-0 right-0 size-24 rounded-full bg-violet-500/10 blur-xl transition-all group-hover:bg-violet-500/20 dark:bg-[#8B5CF6]/10" />
-          <span className="relative flex items-center gap-1.5 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-[#9CA3AF]">
-            <span className="size-1.5 rounded-full bg-violet-500 dark:bg-[#8B5CF6]" />
-            Open threads
-            <InfoTooltip content={INBOX_HELP.openThreads} side="bottom" label="About open threads" />
-          </span>
-          <div className="relative mt-3 flex items-baseline justify-between">
-            <span className="text-[32px] leading-none font-bold tracking-tight text-slate-900 dark:text-[#F9FAFB]">
-              {stats.total}
-            </span>
-          </div>
+      <DashboardPanorama
+        messages={messages}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onAsk={(text) => window.dispatchEvent(new CustomEvent("helix:ask", { detail: text }))}
+        onDispatch={(id) => void act(id, "approve")}
+        onSnooze={(id) => void act(id, "snooze")}
+        query={query}
+      />
+      {selected ? (
+        <div className="mx-auto mt-4 max-w-[1600px]">
+          <ActiveInspector thread={selected} onUpdate={() => void refresh()} />
         </div>
-
-        {/* Need review */}
-        <div className="metric-card-interactive group relative overflow-hidden rounded-xl border border-amber-200/80 border-l-[3px] border-l-amber-500 bg-white p-5 shadow-sm dark:border-[#F59E0B]/25 dark:border-l-[#F59E0B] dark:bg-[rgba(16,10,29,0.65)] dark:shadow-none dark:backdrop-blur-xl dark:hover:border-[#F59E0B]/40">
-          <div className="pointer-events-none absolute top-0 right-0 size-24 rounded-full bg-amber-400/15 blur-xl dark:bg-[#F59E0B]/08" />
-          <div className="relative flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-amber-700 uppercase dark:text-[#FCD34D]">
-              <span className="size-1.5 animate-pulse rounded-full bg-amber-500 dark:bg-[#F59E0B]" />
-              Need review
-              <InfoTooltip content={INBOX_HELP.needReview} side="bottom" label="About need review" />
-            </span>
-            <span className="shrink-0 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] font-medium text-amber-800 dark:border-[#F59E0B]/20 dark:bg-[#F59E0B]/10 dark:text-[#FBBF24]">
-              Awaiting EA
-            </span>
-          </div>
-          <p className="relative mt-3 text-[32px] leading-none font-bold tracking-tight text-slate-900 dark:text-[#F9FAFB]">
-            {stats.review}
-          </p>
-        </div>
-
-        {/* Urgent */}
-        <div className="metric-card-interactive group relative overflow-hidden rounded-xl border border-red-200/80 border-l-[3px] border-l-red-500 bg-white p-5 shadow-sm dark:border-[#EF4444]/25 dark:border-l-[#EF4444] dark:bg-[rgba(16,10,29,0.65)] dark:shadow-none dark:backdrop-blur-xl dark:hover:border-[#EF4444]/40">
-          <div className="pointer-events-none absolute top-0 right-0 size-24 rounded-full bg-red-400/15 blur-xl dark:bg-[#EF4444]/08" />
-          <div className="relative flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wider text-red-600 uppercase dark:text-[#FCA5A5]">
-              <span className="animate-urgent-ring size-1.5 rounded-full bg-red-500 dark:bg-[#EF4444]" />
-              Urgent
-              <InfoTooltip content={INBOX_HELP.urgent} side="bottom" label="About urgent threads" />
-            </span>
-            <span className="shrink-0 rounded border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[10px] font-medium text-red-700 dark:border-[#EF4444]/25 dark:bg-[#EF4444]/15 dark:text-[#F87171]">
-              &lt; 1h SLA
-            </span>
-          </div>
-          <p className="relative mt-3 text-[32px] leading-none font-bold tracking-tight text-red-700 dark:text-[#FEE2E2]">
-            {stats.urgent}
-          </p>
-        </div>
-
-        {/* Blocked */}
-        <div className="metric-card-interactive relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-[rgba(16,10,29,0.65)] dark:shadow-none dark:backdrop-blur-xl">
-          <span className="relative flex items-center gap-1.5 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-[#9CA3AF]">
-            <span className="size-1.5 rounded-full bg-slate-400 dark:bg-[#6B7280]" />
-            Blocked
-            <InfoTooltip content={INBOX_HELP.blocked} side="bottom" label="About blocked threads" />
-          </span>
-          <div className="relative mt-3 flex items-baseline justify-between">
-            <span className="text-[32px] leading-none font-bold tracking-tight text-slate-900 dark:text-[#F9FAFB]">
-              {stats.blocked}
-            </span>
-            <span className="font-mono text-[11px] text-slate-500 dark:text-[#6B7280]">
-              {stats.blocked} spam
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <section id="queue" data-tour="inbox-queue" className="glass-panel flex flex-col overflow-hidden rounded-xl lg:col-span-8">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border bg-surface-muted/40 px-5 py-4">
-            <div className="flex flex-wrap items-center gap-6">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-                Queue
-                <span className="size-2 rounded-full bg-[#8B5CF6]/60" />
-                <InfoTooltip content={INBOX_HELP.queue} side="bottom" label="About the queue" />
-              </h2>
-              <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1 text-xs font-medium dark:border-white/[0.04] dark:bg-[#05030A]/60">
-                {(
-                  [
-                    ["all", "All"],
-                    ["urgent", "Urgent"],
-                    ["review", "Needs Review"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setFilter(id)}
-                    className={cn(
-                      "rounded-md px-3 py-1 transition-all",
-                      filter === id
-                        ? "bg-white font-semibold text-foreground shadow-sm dark:bg-white/[0.08] dark:shadow-[inset_0_-1px_0_0_rgba(255,255,255,0.12)]"
-                        : "text-muted-foreground hover:bg-white/70 hover:text-foreground dark:hover:bg-white/[0.03] dark:hover:text-[#9CA3AF]"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="relative w-52">
-              <Search className="absolute top-2 left-2.5 size-3.5 text-muted-foreground" />
-              <input
-                id="inbox-filter"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter threads (⌘K)..."
-                className="input-glow w-full rounded-lg border border-border bg-surface-muted py-1.5 pr-3 pl-8 text-xs text-foreground placeholder:text-muted-foreground transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="divide-y divide-white/[0.04]">
-            {selectedIds.size > 0 ? (
-              <div className="flex flex-wrap items-center gap-2 border-b border-border bg-accent/5 px-4 py-2">
-                <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground"
-                  onClick={() => void bulk("approve")}
-                >
-                  Approve / send
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground"
-                  onClick={() => void bulk("route")}
-                >
-                  Route
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="rounded-md border border-red-500/30 px-2 py-1 text-[11px] text-red-600"
-                  onClick={() => void bulk("block")}
-                >
-                  Block
-                </button>
-                <button
-                  type="button"
-                  className="text-[11px] text-muted-foreground"
-                  onClick={() => setSelectedIds(new Set())}
-                >
-                  Clear
-                </button>
-              </div>
-            ) : null}
-            {loading ? (
-              <div className="px-4 py-10 text-center text-xs text-muted-foreground">Loading threads…</div>
-            ) : filtered.length === 0 ? (
-              <EducationalEmpty copy={EMPTY_INBOX.queue} />
-            ) : (
-              filtered.map((m) => {
-              const on = m.id === selectedId;
-              const blocked = m.status === "blocked" || m.category === "spam";
-              const checked = selectedIds.has(m.id);
-              return (
-                <div
-                  key={m.id}
-                  data-ai-id={m.id}
-                  className={cn(
-                    "queue-row flex w-full items-center gap-2 px-4 py-5 text-left transition-all",
-                    on && "border-l-2 border-l-[#8B5CF6] bg-gradient-to-r from-[#8B5CF6]/[0.05] to-transparent",
-                    blocked && "opacity-45 hover:opacity-75",
-                    !m.isRead && "bg-accent/[0.03]"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    aria-label={`Select ${m.subject}`}
-                    className="accent-indigo-500"
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setSelectedIds((prev) => {
-                        const next = new Set(prev);
-                        if (e.target.checked) next.add(m.id);
-                        else next.delete(m.id);
-                        return next;
-                      });
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(m.id)}
-                    className="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-3"
-                  >
-                  <div className="flex min-w-0 flex-1 items-center gap-3.5">
-                    <div className="relative shrink-0">
-                      <div
-                        className={cn(
-                          "flex size-9 items-center justify-center rounded-xl border font-mono text-xs font-semibold",
-                          blocked
-                            ? "border-border bg-surface-muted text-muted-foreground"
-                            : "border-[#8B5CF6]/30 bg-gradient-to-tr from-[#3D4DF5]/20 to-[#8B5CF6]/30 text-accent dark:text-[#DDD6FE] shadow-sm"
-                        )}
-                      >
-                        {initials(m.fromName)}
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3
-                          className={cn(
-                            "truncate text-sm font-semibold text-foreground",
-                            blocked && "font-medium text-muted-foreground line-through decoration-[#6B7280]/50"
-                          )}
-                        >
-                          {m.subject}
-                        </h3>
-                        {m.priority === "urgent" ? (
-                          <span className="shrink-0 rounded-full border border-[#EF4444]/25 bg-[#EF4444]/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:text-[#F87171]">
-                            Urgent
-                          </span>
-                        ) : m.needsReview ? (
-                          <span className="shrink-0 rounded-full border border-[#F59E0B]/25 bg-[#F59E0B]/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-[#FBBF24]">
-                            Review
-                          </span>
-                        ) : blocked ? (
-                          <span className="rounded border border-[#EF4444]/25 bg-[#EF4444]/15 px-1.5 text-[9px] font-mono text-red-600 dark:text-[#EF4444] uppercase">
-                            Blocked
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
-                        <span className="font-medium text-accent dark:text-purple-200">{m.fromName}</span>
-                        <span className="text-muted-foreground/70">·</span>
-                        <span className="rounded border border-[#8B5CF6]/25 bg-[#8B5CF6]/15 px-1.5 py-0.5 font-mono text-[10px] text-accent dark:text-[#C4B5FD]">
-                          {m.kind}
-                        </span>
-                        <span className="text-muted-foreground/70">·</span>
-                        <span className="rounded border border-[#6366F1]/25 bg-[#6366F1]/15 px-1.5 py-0.5 font-mono text-[10px] text-indigo-600 dark:text-[#A5B4FC]">
-                          {m.status}
-                        </span>
-                        <span className="text-muted-foreground/70">·</span>
-                        <span className="text-muted-foreground">{relativeTime(m.createdAt)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className={cn(
-                      "font-mono-numbers shrink-0 px-1.5 py-1 text-xs font-medium tabular-nums",
-                      m.urgencyScore >= 90
-                        ? "text-[rgba(16,185,129,0.85)]"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {String(m.urgencyScore).padStart(2, "0")}
-                  </div>
-                  </button>
-                </div>
-              );
-            })
-            )}
-          </div>
-        </section>
-
-        <div className="space-y-6 lg:col-span-4">
-          <section
-            data-tour="inbox-ingest"
-            className="glass-panel relative overflow-hidden rounded-xl p-5 shadow-xl transition-all hover:border-[#8B5CF6]/40"
-          >
-            <div className="absolute top-0 right-0 left-0 h-[2px] bg-gradient-to-r from-[#3D4DF5] via-[#8B5CF6] to-[#C084FC]" />
-            <div className="mb-1 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-                Ingest thread
-                <span className="size-1.5 animate-ping rounded-full bg-[#8B5CF6]" />
-                <InfoTooltip content={INBOX_HELP.ingest} side="left" label="About ingest" />
-              </h2>
-              <button
-                type="button"
-                className="text-xs font-medium text-accent transition-colors hover:text-accent dark:text-[#C4B5FD]"
-                onClick={() => setForm({ fromName: "", fromEmail: "", subject: "", body: "" })}
-              >
-                Clear
-              </button>
-            </div>
-            <p className="mb-4 text-[13px] text-muted-foreground">
-              Paste an email, or Sync Gmail when a token is saved in Settings.
-            </p>
-            <div className="mb-3">
-              <button
-                type="button"
-                disabled={busy}
-                className="rounded-md border border-border px-3 py-1.5 text-[11px] text-foreground disabled:opacity-50"
-                onClick={() => void syncGmail()}
-              >
-                Sync Gmail
-              </button>
-            </div>
-            <form className="space-y-3" onSubmit={(e) => void ingest(e)}>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold tracking-wider text-accent dark:text-[#C4B5FD] uppercase">
-                    From name
-                  </label>
-                  <input
-                    id="ingest-from-name"
-                    required
-                    value={form.fromName}
-                    onChange={(e) => setForm({ ...form, fromName: e.target.value })}
-                    className="input-glow w-full rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all"
-                    placeholder="e.g. Maya Chen"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold tracking-wider text-accent dark:text-[#C4B5FD] uppercase">
-                    From email
-                  </label>
-                  <input
-                    required
-                    type="email"
-                    value={form.fromEmail}
-                    onChange={(e) => setForm({ ...form, fromEmail: e.target.value })}
-                    className="input-glow w-full rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all"
-                    placeholder="maya@northwindhvac.com"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold tracking-wider text-accent dark:text-[#C4B5FD] uppercase">
-                  Subject
-                </label>
-                <input
-                  required
-                  value={form.subject}
-                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  className="input-glow w-full rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all"
-                  placeholder="Subject line..."
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold tracking-wider text-accent dark:text-[#C4B5FD] uppercase">
-                  Body
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={form.body}
-                  onChange={(e) => setForm({ ...form, body: e.target.value })}
-                  className="input-glow w-full resize-none rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-all"
-                  placeholder="Paste email content..."
-                />
-              </div>
-              {error ? <p className="text-[11px] text-red-600 dark:text-[#FCA5A5]">{error}</p> : null}
-              <button
-                type="submit"
-                disabled={busy}
-                className="shimmer-button flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#4E5FF7] via-[#6366F1] to-[#8B5CF6] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_20px_rgba(124,58,237,0.4)] transition-all hover:from-[#3D4DF5] hover:to-[#7C3AED] hover:shadow-[0_6px_24px_rgba(139,92,246,0.6)] active:scale-[0.99] disabled:opacity-50"
-              >
-                <Zap className="size-4" />
-                {busy ? "Scoring…" : "Triage with AI"}
-              </button>
-            </form>
-          </section>
-
-          {selected ? (
-            <section
-              data-tour="inbox-inspector"
-              tabIndex={-1}
-              className="glass-panel relative overflow-hidden rounded-xl border-[#8B5CF6]/35 p-5 shadow-lg dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] outline-none"
-            >
-              <div className="pointer-events-none absolute -top-12 -right-12 size-32 rounded-full bg-[#8B5CF6]/15 blur-2xl" />
-              <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 animate-pulse rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
-                  <h3 className="text-sm font-semibold text-foreground">Active inspector</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Sheet>
-                    <SheetTrigger
-                      type="button"
-                      className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Why this?
-                    </SheetTrigger>
-                    <SheetContent className="overflow-y-auto">
-                      <SheetTitle className="px-4 pt-4">Why this?</SheetTitle>
-                      <div className="space-y-4 p-4">
-                        <div>
-                          <p className="text-xs uppercase text-muted-foreground">Classification</p>
-                          <p className="text-sm font-semibold">
-                            {categoryLabel(selected.category)} · {selected.sentiment}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {Math.round(selected.aiConfidence)}% confidence
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase text-muted-foreground">Reasoning</p>
-                          <p className="text-sm">{selected.reasoning}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase text-muted-foreground">Knowledge base</p>
-                          {selected.kbHits && selected.kbHits.length > 0 ? (
-                            <ul className="space-y-2">
-                              {selected.kbHits.map((hit) => (
-                                <li
-                                  key={hit.chunkId}
-                                  className="rounded border border-border p-2 text-sm"
-                                >
-                                  <p className="font-semibold">{hit.docTitle}</p>
-                                  <p className="italic">&ldquo;{hit.quote}&rdquo;</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {hit.verified ? "Verified" : "Unverified"} · relevance {hit.score}
-                                  </p>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">
-                              No KB citations for this thread
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                  <div className="flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-gradient-to-r from-[#10B981]/20 to-[#059669]/20 px-2.5 py-1 text-emerald-700 dark:text-[#34D399] shadow-[0_0_12px_-2px_rgba(16,185,129,0.3)]">
-                    <span className="font-mono text-[10px] font-semibold tracking-wider uppercase">Match</span>
-                    <span className="font-mono text-xs font-bold">{selected.urgencyScore}%</span>
-                  </div>
-                </div>
-              </div>
-              <h4 className="mb-1 text-sm leading-snug font-semibold text-foreground">{selected.subject}</h4>
-              <div className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="text-accent dark:text-purple-200">{selected.fromName}</span>
-                <span className="text-muted-foreground">&lt;{selected.fromEmail}&gt;</span>
-                <span className="text-muted-foreground/70">·</span>
-                <span className="text-muted-foreground">{relativeTime(selected.createdAt)}</span>
-              </div>
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-[#34D399]">
-                  {categoryLabel(selected.category)}
-                </span>
-                <span className="flex items-center gap-1 rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent dark:text-[#DDD6FE]">
-                  <span className="size-1.5 rounded-full bg-[#8B5CF6]" />
-                  {selected.sentiment}
-                </span>
-                {selected.priority === "urgent" ? (
-                  <span className="flex items-center gap-1 rounded-full border border-[#DC2626]/25 bg-[rgba(220,38,38,0.1)] px-2.5 py-0.5 text-[11px] font-semibold text-red-600 dark:text-[#F87171]">
-                    High Urgency
-                  </span>
-                ) : null}
-              </div>
-              <div className="mb-2 flex items-center gap-1.5 text-xs text-foreground/80">
-                <span className="text-muted-foreground">Route target:</span>
-                <span className="rounded border border-[#8B5CF6]/30 bg-[#8B5CF6]/15 px-2 py-0.5 font-medium text-accent dark:text-[#C4B5FD]">
-                  {selected.routeTo}
-                </span>
-              </div>
-              <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#8B5CF6]/20 bg-gradient-to-r from-surface-muted to-accent/5 dark:from-[#080412]/80 dark:to-[#140D26]/80 p-3 text-xs text-foreground/80 italic shadow-inner">
-                <span>&ldquo;{selected.reasoning}&rdquo;</span>
-              </div>
-              {selected.draftReply ? (
-                <p className="mb-3 rounded-lg border border-border bg-surface-muted p-3 text-[11px] leading-relaxed text-muted-foreground not-italic">
-                  {selected.draftReply}
-                </p>
-              ) : null}
-              {templates.length > 0 ? (
-                <div className="mb-3">
-                  <label className="mb-1 block text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                    Apply template
-                  </label>
-                  <select
-                    className="input-glow w-full rounded-md border border-border bg-surface-muted px-2 py-1.5 text-xs text-foreground"
-                    defaultValue=""
-                    onChange={(e) => {
-                      const tpl = templates.find((t) => t.id === e.target.value);
-                      if (tpl) void applyTemplate(tpl.body);
-                      e.target.value = "";
-                    }}
-                  >
-                    <option value="">Choose template…</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-              {history.length > 1 ? (
-                <p className="mb-3 font-mono text-[10px] text-muted-foreground">
-                  Thread context · {history.length} messages
-                </p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="btn-tactile h-8 rounded-md bg-gradient-to-r from-[#4E5FF7] to-[#8B5CF6] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
-                  onClick={() => void act(selected.id, "approve")}
-                >
-                  {actionBusy === "approve" ? "…" : "Send reply"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] text-foreground disabled:opacity-50"
-                  onClick={() => void act(selected.id, "route")}
-                >
-                  {actionBusy === "route" ? "…" : "Mark routed"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="btn-tactile h-8 rounded-md border border-accent/40 px-3 text-[11px] text-accent disabled:opacity-50"
-                  onClick={() => void act(selected.id, "smart_reply")}
-                >
-                  {actionBusy === "smart_reply" ? "Drafting…" : "Regen reply"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="btn-tactile h-8 rounded-md border border-amber-500/30 px-3 text-[11px] text-amber-700 dark:text-[#FBBF24] disabled:opacity-50"
-                  onClick={() => void act(selected.id, "snooze")}
-                >
-                  {actionBusy === "snooze" ? "…" : "Snooze"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] text-accent disabled:opacity-50"
-                  onClick={() => void act(selected.id, "star")}
-                >
-                  {selected.isStarred ? "Unstar" : "Star"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionBusy != null}
-                  className="btn-tactile h-8 rounded-md border border-red-500/30 px-3 text-[11px] text-red-600 dark:text-[#FCA5A5] disabled:opacity-50"
-                  onClick={() => void act(selected.id, "block")}
-                >
-                  {actionBusy === "block" ? "…" : "Block"}
-                </button>
-              </div>
-            </section>
-          ) : null}
-        </div>
-      </div>
+      ) : null}
     </main>
   );
 }

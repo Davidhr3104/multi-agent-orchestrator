@@ -7,6 +7,7 @@ import {
   type InboxMessage,
 } from "@/lib/types";
 import { suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
+import { guardrailReason } from "@/lib/agent-profile";
 import { smartReplyWithContext } from "@/lib/smart-reply";
 import { queryInboxKb } from "@/lib/kb-store";
 import { notifySlackLeadIntent } from "@/lib/slack";
@@ -187,6 +188,38 @@ function applyDemoCatalog() {
       | "externalThreadId"
     >
   > = [
+    {
+      fromName: "Camila Soto",
+      fromEmail: "camila.soto@gmail.com",
+      subject: "WhatsApp · Apartamento Polanco",
+      body: "Hola, ¿cuándo puedo ir a ver el apartamento en Polanco? Estoy libre el jueves por la tarde.",
+      category: "meeting",
+      sentiment: "positive",
+      urgencyScore: 90,
+      aiConfidence: 93,
+      routeTo: "Agente · Deveku",
+      draftReply: "",
+      status: "review",
+      reasoning: "Quiere visitar Polanco el jueves por la tarde.",
+      needsReview: true,
+      leadIntent: true,
+    },
+    {
+      fromName: "Andrés Vega",
+      fromEmail: "andres.vega@email.com",
+      subject: "SMS · Casa Coyoacán",
+      body: "Confirmo el viernes a las 11:00 para ver la casa en Coyoacán. Presupuesto 8 millones, necesitamos 3 recámaras.",
+      category: "meeting",
+      sentiment: "positive",
+      urgencyScore: 86,
+      aiConfidence: 95,
+      routeTo: "Agente · Deveku",
+      draftReply: "",
+      status: "review",
+      reasoning: "Confirmó visita el viernes 11:00 en Coyoacán.",
+      needsReview: true,
+      leadIntent: true,
+    },
     {
       fromName: "Maya Chen",
       fromEmail: "maya@northwindhvac.com",
@@ -455,6 +488,8 @@ export async function patchMessage(
       | "draftTone"
       | "handedOffAt"
       | "lastReplySentAt"
+      | "reasoning"
+      | "kbHits"
     >
   >,
   opts?: { humanOverride?: boolean; actionType?: string }
@@ -541,8 +576,11 @@ export async function ingestMessage(input: {
   }
 
   const hay = `${input.subject}\n${input.body}`.toLowerCase();
-  for (const rule of mem.prefs.customRules.filter((r) => r.enabled && r.ifContains.trim())) {
-    if (!hay.includes(rule.ifContains.toLowerCase())) continue;
+  const amounts = [...hay.matchAll(/\$?\d[\d,]*(?:\.\d+)?/g)].map((m) => Number(m[0].replace(/[$,]/g, "")));
+  const maxAmount = amounts.reduce((max, n) => (Number.isFinite(n) ? Math.max(max, n) : max), 0);
+  for (const rule of mem.prefs.customRules.filter((r) => r.enabled && (r.ifContains.trim() || (r.minAmount ?? 0) > 0))) {
+    if (rule.ifContains.trim() && !hay.includes(rule.ifContains.toLowerCase())) continue;
+    if ((rule.minAmount ?? 0) > 0 && maxAmount < (rule.minAmount ?? 0)) continue;
     if (rule.then === "urgent") {
       thread = {
         ...thread,
@@ -577,7 +615,28 @@ export async function ingestMessage(input: {
         status: "review",
         reasoning: `${thread.reasoning} · Rule: force review if contains “${rule.ifContains}”`,
       };
+    } else if (rule.then === "route") {
+      thread = {
+        ...thread,
+        routeTo: rule.routeTo || "Finance",
+        needsReview: true,
+        status: "review",
+        ...(rule.tagUrgent
+          ? { sentiment: "urgent" as const, urgencyScore: Math.max(thread.urgencyScore, 90) }
+          : {}),
+        reasoning: `${thread.reasoning} · Rule: route to ${rule.routeTo || "Finance"} if “${rule.ifContains || "amount"}”`,
+      };
     }
+  }
+
+  const held = guardrailReason({ subject: thread.subject, body: thread.body, draft: thread.draftReply });
+  if (held && thread.status !== "blocked") {
+    thread = {
+      ...thread,
+      needsReview: true,
+      status: "review",
+      reasoning: `${thread.reasoning} · ${held}`,
+    };
   }
 
   if (mem.prefs.vipSenders.some((v) => v.toLowerCase() === input.fromEmail.toLowerCase())) {

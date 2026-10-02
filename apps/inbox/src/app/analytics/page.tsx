@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import type { InboxMessage } from "@/lib/types";
+import { downloadCsv, printReport } from "@/lib/download";
 
 export default function InboxAnalyticsPage() {
   const [messages, setMessages] = useState<InboxMessage[]>([]);
@@ -66,7 +67,51 @@ export default function InboxAnalyticsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
         <p className="text-sm text-muted-foreground">Volume, category mix, and review load for this desk</p>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1.5 text-xs"
+            onClick={() =>
+              downloadCsv(
+                "helix-inbox-analytics.csv",
+                messages.map((m) => ({
+                  subject: m.subject,
+                  from: m.fromEmail,
+                  category: m.category,
+                  status: m.status,
+                  confidence: m.aiConfidence,
+                  urgency: m.urgencyScore,
+                }))
+              )
+            }
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1.5 text-xs"
+            onClick={() =>
+              printReport("Helix for Inbox analytics", [
+                `Threads: ${messages.length}`,
+                `Avg confidence: ${avgConfidence}%`,
+                `HITL rate: ${hitlRate}%`,
+                ...byCategory.map((row) => `${row.name}: ${row.count}`),
+              ])
+            }
+          >
+            Print PDF
+          </button>
+        </div>
       </div>
+
+      <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+        <p className="text-xs font-semibold tracking-wide text-emerald-800 uppercase dark:text-emerald-200">Return on this desk</p>
+        <p className="mt-2 text-sm leading-relaxed text-foreground">
+          Helix processed {messages.length} emails here, about {Math.max(1, Math.round((messages.length * 4) / 60))} hours of triage
+          at 4 minutes each. Urgent threads still open: {messages.filter((m) => m.priority === "urgent" && (m.status === "open" || m.status === "review")).length}.
+          Average model confidence is {avgConfidence}%.
+        </p>
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="glass-panel rounded-xl p-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { EmailThread } from "@/lib/types";
 import { categoryLabel, toInboxMessage } from "@/lib/types";
@@ -46,6 +46,35 @@ export function SlaDesk({
     }
   }
 
+  useEffect(() => {
+    const now = Date.now();
+    let warned = new Set<string>();
+    try {
+      warned = new Set(JSON.parse(sessionStorage.getItem("helix-sla-warned") ?? "[]") as string[]);
+    } catch {
+      warned = new Set();
+    }
+    for (const thread of threads) {
+      const bucket = slaBucketFor(thread, vipSenders);
+      const financial = /invoice|payment|quote|pricing|contract|legal/i.test(`${thread.subject} ${thread.body}`);
+      if (!bucket || (bucket !== "urgent" && bucket !== "vip" && !financial)) continue;
+      if (thread.status !== "open" && thread.status !== "review") continue;
+      const target = bucket === "vip" ? 30 : 60;
+      const remaining = target - threadAgeMin(thread, now);
+      if (remaining <= 0 || remaining > 15 || warned.has(thread.id)) continue;
+      warned.add(thread.id);
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification("SLA warning", { body: `${thread.subject} is ${Math.round(remaining)} min from breach.` });
+      }
+      void fetch("/api/sla/alert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: thread.subject, remainingMin: remaining }),
+      });
+    }
+    sessionStorage.setItem("helix-sla-warned", JSON.stringify([...warned]));
+  }, [threads, vipSenders]);
+
   const ranked = useMemo(() => {
     const now = Date.now();
     const list = threads.filter((t) => {
@@ -78,6 +107,15 @@ export function SlaDesk({
             Time-to-first-human by urgency / VIP. Hours saved estimates ops time from auto-triage and
             spam blocked — the story Inbox sells to EAs and founders.
           </p>
+          <button
+            type="button"
+            className="mt-2 rounded-md border border-border px-2 py-1 text-[11px]"
+            onClick={() => {
+              if (typeof Notification !== "undefined") void Notification.requestPermission();
+            }}
+          >
+            Enable browser SLA alerts
+          </button>
         </div>
         <div className="flex items-center gap-3">
           <button

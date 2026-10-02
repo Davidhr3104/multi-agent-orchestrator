@@ -173,6 +173,12 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground">Paste API keys, then configure inbox preferences</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <a href="/team" className="rounded-md border border-border px-2 py-1">Team & roles</a>
+          <a href="/audit" className="rounded-md border border-border px-2 py-1">Audit log</a>
+          <a href="/studio" className="rounded-md border border-border px-2 py-1">Agent studio</a>
+          <a href="/integrations" className="rounded-md border border-border px-2 py-1">Integrations</a>
+        </div>
       </div>
 
       <div className="max-w-2xl space-y-6">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { InboxMessage } from "@/lib/types";
 import { EducationalEmpty } from "@/components/educational-empty";
+import { RoutingRules } from "@/components/routing-rules";
 import { EMPTY_INBOX } from "@helix/help";
 
 function initials(name: string) {
@@ -38,6 +39,7 @@ export default function RoutedPage() {
         <h1 className="text-2xl font-semibold text-foreground">Routed</h1>
         <p className="text-sm text-muted-foreground">Emails that have been processed and sent</p>
       </div>
+      <RoutingRules />
 
       <div className="glass-panel rounded-xl">
         <div className="divide-y divide-border">

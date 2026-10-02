@@ -1,6 +1,7 @@
 import { getPreferences, listAllThreads } from "@/lib/store";
 import { summarizeWeek } from "@/lib/weekly-report";
 import { isSlackConfigured } from "@/lib/slack";
+import { ExportWeekly } from "@/components/export-report";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,9 @@ export default async function WeeklyReportPage() {
           {fmtDate(report.periodStart)} – {fmtDate(report.periodEnd)}
           {slackOn ? " · posted to Slack every Monday" : " · connect Slack in Settings to auto-post this weekly"}
         </p>
+        <div className="mt-3">
+          <ExportWeekly />
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

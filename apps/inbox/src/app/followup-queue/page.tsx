@@ -8,7 +8,7 @@ import type { InboxMessage } from "@/lib/types";
 
 const EMPTY_FOLLOWUP = {
   title: "No overdue followups",
-  body: "Threads you replied to that get no answer back after 2 US-Eastern business days will land here so you can nudge them.",
+  body: "When a sent thread passes the wait in Agent Studio, Helix leaves a follow-up draft here for approval.",
 };
 
 export default function FollowupQueuePage() {
@@ -31,7 +31,9 @@ export default function FollowupQueuePage() {
   }, []);
 
   useEffect(() => {
-    void fetchThreads();
+    void fetch("/api/followups/prepare", { method: "POST" }).finally(() => {
+      void fetchThreads();
+    });
   }, [fetchThreads]);
 
   if (loading) {
@@ -43,7 +45,7 @@ export default function FollowupQueuePage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-foreground">Followups overdue</h1>
         <p className="text-sm text-muted-foreground">
-          Threads replied to that got no answer back after 2 US-Eastern business days
+          No reply after the wait you set in Agent Studio (default 48 hours). Opening this page drafts the nudge. Nothing sends until you approve it.
         </p>
       </div>
 
@@ -59,6 +61,21 @@ export default function FollowupQueuePage() {
               selectedId={selected?.id ?? null}
               onSelect={setSelected}
             />
+            {selected ? (
+              <button
+                type="button"
+                className="mt-3 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+                onClick={() => {
+                  void fetch(`/api/messages/${selected.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "smart_reply" }),
+                  }).then(() => fetchThreads());
+                }}
+              >
+                Draft follow-up
+              </button>
+            ) : null}
           </div>
           <div>{selected ? <ActiveInspector thread={selected} onUpdate={() => void fetchThreads()} /> : null}</div>
         </div>

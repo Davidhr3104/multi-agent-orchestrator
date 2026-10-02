@@ -352,3 +352,14 @@ body {
 .ai-flash {
   animation: ai-flash 3.2s ease-out 1;
 }
+
+[data-density="dense"] main {
+  padding: 0.75rem 1rem !important;
+}
+[data-density="dense"] .glass-panel {
+  box-shadow: none;
+}
+[data-density="dense"] .queue-row {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}

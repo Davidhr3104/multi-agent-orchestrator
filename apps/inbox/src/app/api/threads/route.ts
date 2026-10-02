@@ -3,6 +3,7 @@ import type { ThreadStatus } from "@/lib/types";
 import { toInboxMessage } from "@/lib/types";
 import { applyThreadPatches, readDeskCookie } from "@/lib/desk-state-cookie";
 import { isOverdue } from "@helix/core/inbox/business-days";
+import { getAgentProfile } from "@/lib/agent-profile";
 
 export const runtime = "nodejs";
 
@@ -36,9 +37,12 @@ export async function GET(req: Request) {
   }
 
   if (overdueParam === "true") {
-    threads = threads.filter(
-      (t) => t.status === "sent" && t.lastReplySentAt && isOverdue(t.lastReplySentAt)
-    );
+    const hours = getAgentProfile().followUpHours;
+    threads = threads.filter((t) => {
+      if (t.status !== "sent" || !t.lastReplySentAt) return false;
+      const elapsed = Date.now() - Date.parse(t.lastReplySentAt);
+      return isOverdue(t.lastReplySentAt) || elapsed >= hours * 3_600_000;
+    });
   }
 
   return Response.json({ threads });

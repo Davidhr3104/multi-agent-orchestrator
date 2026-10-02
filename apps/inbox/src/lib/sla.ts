@@ -169,6 +169,15 @@ export function summarizeInboxSla(
   };
 }
 
+/** Live clock for an open thread. Remaining seconds count down to the bucket target. */
+export function slaClock(thread: EmailThread, now = Date.now(), vipSenders: string[] = []) {
+  const bucket = slaBucketFor(thread, vipSenders);
+  if (!bucket || !isOpenForSla(thread)) return null;
+  const targetMin = TARGETS[bucket];
+  const remainingSec = targetMin * 60 - threadAgeMin(thread, now) * 60;
+  return { targetMin, remainingSec, breached: remainingSec <= 0 };
+}
+
 export function categoryTargetLabel(category: ThreadCategory): string {
   if (category === "spam") return "—";
   if (category === "meeting") return "4h";
