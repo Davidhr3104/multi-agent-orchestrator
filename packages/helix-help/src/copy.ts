@@ -166,7 +166,7 @@ export const HOW_TO_USE_INBOX: HowToUseGuide = {
   steps: [
     {
       title: "1. Open the Dashboard",
-      body: "Scan metrics for open threads, need-review, urgent, and blocked. Use filters or ⌘K to find a thread fast.",
+      body: "Scan metrics for open threads, need-review, urgent, and blocked. Use filters, or ⌘K for snooze, assign, and approve.",
     },
     {
       title: "2. Ask Helix AI",
@@ -192,7 +192,8 @@ export const HOW_TO_USE_INBOX: HowToUseGuide = {
   hitlTip:
     "Anything marked Need review stays in HITL until you approve or block. Prefer review when confidence is low rather than auto-sending.",
   shortcuts: [
-    { keys: "⌘K / Ctrl+K", action: "Focus the queue filter" },
+    { keys: "⌘K / Ctrl+K", action: "Command palette: snooze, assign, approve & send" },
+    { keys: "J / K", action: "Move through the dashboard queue" },
     { keys: "Filters", action: "All · Urgent · Needs Review on the Dashboard" },
     { keys: "Theme toggle", action: "Switch light / dark from the header" },
   ],
