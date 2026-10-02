@@ -33,17 +33,32 @@ export const LEGAL_HREF: Record<LegalNavId, string> = {
 
 type ProductLink = { name: string; href: string; className: string };
 
-const NAV: { id: LegalNavId; label: string; icon: string }[] = [
-  { id: "dashboard", label: "Dashboard", icon: "dash" },
-  { id: "opportunities", label: "Opportunities", icon: "target" },
-  { id: "documents", label: "Documents", icon: "doc" },
-  { id: "deadlines", label: "Deadlines", icon: "cal" },
-  { id: "pricing", label: "Pricing", icon: "coin" },
-  { id: "outcomes", label: "Outcomes", icon: "trophy" },
-  { id: "analytics", label: "Analytics", icon: "chart" },
-  { id: "settings", label: "Settings", icon: "gear" },
-  { id: "audit", label: "Audit Log", icon: "clip" },
-  { id: "help", label: "How to use", icon: "help" },
+const NAV_GROUPS: { label: string; items: { id: LegalNavId; label: string; icon: string }[] }[] = [
+  {
+    label: "Core Operations",
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: "dash" },
+      { id: "opportunities", label: "Opportunities", icon: "target" },
+      { id: "documents", label: "Documents", icon: "doc" },
+      { id: "deadlines", label: "Deadlines", icon: "cal" },
+    ],
+  },
+  {
+    label: "Intelligence & ROI",
+    items: [
+      { id: "outcomes", label: "Outcomes", icon: "trophy" },
+      { id: "analytics", label: "Analytics", icon: "chart" },
+    ],
+  },
+  {
+    label: "Enterprise Controls",
+    items: [
+      { id: "settings", label: "Settings", icon: "gear" },
+      { id: "audit", label: "Audit Log", icon: "clip" },
+      { id: "pricing", label: "Pricing", icon: "coin" },
+      { id: "help", label: "How to use", icon: "help" },
+    ],
+  },
 ];
 
 function NavIcon({ name, className }: { name: string; className?: string }) {
@@ -276,57 +291,65 @@ export function LegalChrome({
               </div>
             )}
           </div>
-          <nav className="space-y-0.5 p-2">
-            {NAV.map((item) => {
-              const on = current === item.id;
-              const badge =
-                item.id === "opportunities"
-                  ? opportunityCount
-                  : item.id === "deadlines"
-                    ? deadlineCount
-                    : 0;
-              return (
-                <Link
-                  key={item.id}
-                  href={LEGAL_HREF[item.id]}
-                  onClick={() => onNav(item.id)}
-                  className={cn(
-                    "flex h-9 w-full items-center justify-between rounded-[4px] px-2.5 transition-colors duration-150",
-                    on
-                      ? "border-l-2 border-[#e2e8f0] bg-[#1F2937] font-semibold text-[#e2e8f0]"
-                      : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F3F4F6]",
-                    collapsed && "justify-center px-0"
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <NavIcon name={item.icon} className={on ? "text-[#e2e8f0]" : "text-[#6B7280]"} />
-                    {collapsed ? null : <span className="text-xs">{item.label}</span>}
-                  </span>
-                  {!collapsed && badge > 0 ? (
-                    item.id === "deadlines" ? (
-                      <span className="font-mono-numbers rounded-[3px] bg-[#7F1D1D] px-1.5 py-0.5 text-[10px] font-medium text-[#FCA5A5]">
-                        {badge}
+          <nav className="space-y-3 p-2">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label} className="space-y-0.5">
+                {collapsed ? null : (
+                  <p className="px-2.5 pb-1 text-[9px] font-semibold tracking-wider text-[#4B5563] uppercase">{group.label}</p>
+                )}
+                {group.items.map((item) => {
+                  const on = current === item.id;
+                  const badge =
+                    item.id === "opportunities"
+                      ? opportunityCount
+                      : item.id === "deadlines"
+                        ? deadlineCount
+                        : 0;
+                  return (
+                    <Link
+                      key={item.id}
+                      href={LEGAL_HREF[item.id]}
+                      onClick={() => onNav(item.id)}
+                      className={cn(
+                        "flex h-9 w-full items-center justify-between rounded-[4px] px-2.5 transition-colors duration-150",
+                        on
+                          ? "border-l-2 border-[#e2e8f0] bg-[#1F2937] font-semibold text-[#e2e8f0]"
+                          : "text-[#9CA3AF] hover:bg-[#1F2937] hover:text-[#F3F4F6]",
+                        collapsed && "justify-center px-0"
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <NavIcon name={item.icon} className={on ? "text-[#e2e8f0]" : "text-[#6B7280]"} />
+                        {collapsed ? null : <span className="text-xs">{item.label}</span>}
                       </span>
-                    ) : (
-                      <span className="font-mono-numbers flex size-[18px] items-center justify-center rounded-full bg-[#1F2937] text-[10px] text-[#F3F4F6]">
-                        {badge}
-                      </span>
-                    )
-                  ) : null}
-                </Link>
-              );
-            })}
+                      {!collapsed && badge > 0 ? (
+                        item.id === "deadlines" ? (
+                          <span className="font-mono-numbers rounded-[3px] bg-[#7F1D1D] px-1.5 py-0.5 text-[10px] font-medium text-[#FCA5A5]">
+                            {badge}
+                          </span>
+                        ) : (
+                          <span className="font-mono-numbers flex size-[18px] items-center justify-center rounded-full bg-[#1F2937] text-[10px] text-[#F3F4F6]">
+                            {badge}
+                          </span>
+                        )
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </div>
         <div className="space-y-2 border-t border-[#1F2937] p-3">
           {collapsed ? null : (
             <>
-              <div className="flex items-center justify-between rounded-[4px] border border-[#1F2937] bg-[#111827] px-2 py-1.5 text-[10px]">
+              <div className="space-y-1 rounded-[4px] border border-[#1F2937] bg-[#111827] px-2 py-1.5 text-[10px] text-[#6B7280]">
                 <div className="flex items-center gap-1.5">
                   <span className="pulse-dot-green size-1.5 shrink-0 rounded-full bg-[#10B981]" />
-                  <span className="text-[#6B7280]">Vault Encrypted</span>
+                  <span>TLS 1.3 in transit</span>
                 </div>
-                <span className="font-mono-numbers text-[#6B7280]">TLS 1.3</span>
+                <p>Matter text is not used to train public models.</p>
+                <p>SOC 2 Type II and ISO 27001 are not attested on this build.</p>
               </div>
               <OperatorProductSwitch />
             </>
@@ -403,7 +426,7 @@ export function LegalChrome({
                   <line x1="21" x2="16.65" y1="21" y2="16.65" />
                 </svg>
               </span>
-              Search RFPs, dockets...
+              Ask Helix…
               <kbd className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                 <span className="font-mono-numbers rounded-[3px] bg-[#1F2937] px-1 py-0.5 text-[10px] text-[#9CA3AF]">⌘K</span>
               </kbd>

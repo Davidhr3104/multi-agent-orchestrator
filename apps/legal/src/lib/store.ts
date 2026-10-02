@@ -6,6 +6,7 @@ import {
   type StoredRfp,
 } from "@helix/core";
 import type { AuditEvent } from "@/lib/audit-types";
+import { modelForMethod, traceSuffix } from "@/lib/audit-trace";
 import type { ConflictReport } from "@/lib/conflict-types";
 import { heuristicConflictReport, runConflictCheck } from "@/lib/conflicts";
 import { checkNoBidRules, loadNoBidRules } from "@/lib/no-bid-rules";
@@ -463,7 +464,19 @@ export async function checkAndStoreConflict(rfp: StoredRfp): Promise<ConflictRep
   const report = await runConflictCheck(rfp);
   desk().conflicts.set(rfp.id, report);
   await supabaseUpsertJson("conflicts", rfp.id, report);
-  await pushAudit("ethics", "coi", `${rfp.title}: ${report.verdict} (${report.score}) via ${report.engine}`);
+  await pushAudit(
+    "ethics",
+    "coi",
+    [
+      `${rfp.title}: ${report.verdict} (${report.score}) via ${report.engine}`,
+      traceSuffix({
+        model: modelForMethod(rfp.method),
+        prompt: report.engine === "claude" ? "coi-claude-v1" : "coi-heuristic-v1",
+        match: `${rfp.matchScore} → coi ${report.score}`,
+        approval: "pending partner",
+      }),
+    ].join("\n")
+  );
   return report;
 }
 

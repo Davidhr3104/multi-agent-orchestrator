@@ -14,6 +14,10 @@ export default function PricingPage() {
   const [quotes, setQuotes] = useState<Record<string, PricingQuote>>({});
   const [book, setBook] = useState<PricingBook | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [attorneys, setAttorneys] = useState(8);
+  const [rfpsMonth, setRfpsMonth] = useState(12);
+  const [manualMin, setManualMin] = useState(90);
+  const [rate, setRate] = useState(450);
 
   useEffect(() => {
     void fetch("/api/rfps")
@@ -38,6 +42,38 @@ export default function PricingPage() {
           Bid floor / target / ceiling from historical matters and the practice rate card.
         </p>
       </div>
+
+      <section className="rounded-2xl border border-white/10 bg-[#111827] p-5">
+        <h2 className="text-lg font-semibold text-white">Review-hours simulator</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Compares a manual first pass with Helix&apos;s 12-minute extract. It does not include partner strategy time.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-xs text-slate-400">
+            Attorneys on the desk · {attorneys}
+            <input className="mt-2 w-full" type="range" min={1} max={40} value={attorneys} onChange={(e) => setAttorneys(Number(e.target.value))} />
+          </label>
+          <label className="text-xs text-slate-400">
+            RFPs / month · {rfpsMonth}
+            <input className="mt-2 w-full" type="range" min={1} max={80} value={rfpsMonth} onChange={(e) => setRfpsMonth(Number(e.target.value))} />
+          </label>
+          <label className="text-xs text-slate-400">
+            Manual minutes / RFP · {manualMin}
+            <input className="mt-2 w-full" type="range" min={20} max={240} value={manualMin} onChange={(e) => setManualMin(Number(e.target.value))} />
+          </label>
+          <label className="text-xs text-slate-400">
+            Billable rate · {formatUsdNumber(rate)}/hr
+            <input className="mt-2 w-full" type="range" min={150} max={1200} step={25} value={rate} onChange={(e) => setRate(Number(e.target.value))} />
+          </label>
+        </div>
+        <p className="mt-4 font-mono-numbers text-2xl font-semibold text-white">
+          {formatUsdNumber(Math.max(0, Math.round((((manualMin - 12) * rfpsMonth) / 60) * rate)))} / month
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          {Math.max(0, Math.round(((manualMin - 12) * rfpsMonth) / 60))} billable hours recovered across {attorneys}{" "}
+          attorney{attorneys === 1 ? "" : "s"}, at the rate above. Partner strategy time is not included.
+        </p>
+      </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
         {(book?.rules ?? []).map((rule) => (

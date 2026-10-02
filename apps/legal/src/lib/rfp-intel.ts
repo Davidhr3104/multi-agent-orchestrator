@@ -56,6 +56,31 @@ function parseDate(s: string): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
+/** Whole local calendar days until a date. Date-only values (2026-10-02) count as that civil day, not UTC midnight, so "today" is not past due. */
+export function calendarDayOffset(raw: string, now: number): number | null {
+  const iso = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let year: number;
+  let month: number;
+  let day: number;
+  if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else {
+    const t = Date.parse(raw);
+    if (Number.isNaN(t)) return null;
+    const dt = new Date(t);
+    year = dt.getFullYear();
+    month = dt.getMonth() + 1;
+    day = dt.getDate();
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const today = new Date(now);
+  const due = Date.UTC(year, month - 1, day);
+  const start = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((due - start) / 86_400_000);
+}
+
 export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
   const hits: DeadlineHit[] = [];
   const seen = new Set<string>();
@@ -68,20 +93,18 @@ export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
       const key = `${label}:${date}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const ts = parseDate(date);
       hits.push({
         label,
         date,
-        days: ts == null ? null : (ts - now) / 86_400_000,
+        days: calendarDayOffset(date, now),
       });
     }
   }
   if (hits.length === 0 && rfp.deadline && !/unspecified|tbd/i.test(rfp.deadline)) {
-    const ts = parseDate(rfp.deadline);
     hits.push({
       label: "Submission",
       date: rfp.deadline,
-      days: ts == null ? null : (ts - now) / 86_400_000,
+      days: calendarDayOffset(rfp.deadline, now),
     });
   }
   return hits.sort((a, b) => (a.days ?? 999) - (b.days ?? 999));
@@ -90,6 +113,7 @@ export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
 export function countdownLabel(days: number | null): string {
   if (days == null) return "Date TBD";
   if (days < 0) return "Past due";
+  if (days === 0) return "Due today";
   if (days < 1) return `${Math.max(1, Math.round(days * 24))}h left`;
   const n = Math.ceil(days);
   return n === 1 ? "1 day left" : `${n} days left`;

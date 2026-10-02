@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { CorpusDocument, StoredRfp } from "@helix/core";
-import { downloadProposalDoc, similarRfp } from "@/lib/rfp-intel";
+import { DocumentSplit } from "@/components/document-split";
+import { complianceGaps, downloadProposalDoc, nearestDeadline, similarRfp } from "@/lib/rfp-intel";
 import { cn } from "@/lib/utils";
 
 function downloadSource(rfp: StoredRfp) {
@@ -25,6 +27,9 @@ export default function DocumentsPage() {
   const [practiceArea, setPracticeArea] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [pinnedQuote, setPinnedQuote] = useState("");
+  const searchParams = useSearchParams();
+  const cite = searchParams.get("q");
 
   async function load() {
     const [rfpRes, corpRes] = await Promise.all([
@@ -38,7 +43,17 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     void load();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("rfp");
+    const cite = params.get("cite");
+    if (id) setOpenId(id);
+    if (cite) setPinnedQuote(cite);
   }, []);
+
+  useEffect(() => {
+    const id = searchParams.get("rfp");
+    if (id) setOpenId(id);
+  }, [searchParams]);
 
   const open = useMemo(() => rfps.find((r) => r.id === openId) ?? rfps[0] ?? null, [rfps, openId]);
   const corpusLive = rfps.filter((r) => r.corpusStatus === "live").length;
@@ -255,13 +270,47 @@ export default function DocumentsPage() {
                     downloadProposalDoc(open, open.clientProfile, peer);
                   }}
                 >
-                  Download proposal pack
+                  Generate Proposal First Draft
                 </button>
+                <Link
+                  href={`/word?rfp=${encodeURIComponent(open.id)}`}
+                  className="btn-tactile rounded-[4px] border border-[#374151] px-2.5 py-1 text-[11px] text-[#E5E7EB]"
+                >
+                  Open Word task pane
+                </Link>
               </div>
-              <pre className="max-h-72 overflow-auto rounded-[4px] border border-[#1F2937] bg-[#0B0F19] p-3 text-[10px] leading-relaxed whitespace-pre-wrap text-[#9CA3AF]">
-                {open.body.slice(0, 4000)}
-                {open.body.length > 4000 ? "…" : ""}
-              </pre>
+              <p className="text-[10px] text-[#6B7280]">Word-ready draft from the RFP and the firm profile. Edit it in Word. It is not a filed proposal.</p>
+              <DocumentSplit
+                title={open.title}
+                body={open.body}
+                initialQuote={pinnedQuote || cite}
+                fields={[
+                  {
+                    id: "amount",
+                    label: "Budget",
+                    value: open.amount || "Not stated",
+                    confidence: Math.round(open.confidence * 100),
+                    quote: open.amount,
+                    tone: "money",
+                  },
+                  {
+                    id: "due",
+                    label: "Deadline",
+                    value: nearestDeadline(open, Date.now())?.date ?? open.deadline,
+                    confidence: 74,
+                    quote: nearestDeadline(open, Date.now())?.date ?? open.deadline,
+                    tone: "rule",
+                  },
+                  {
+                    id: "gaps",
+                    label: "Compliance gaps",
+                    value: complianceGaps(open).map((g) => g.label).join(", ") || "None flagged",
+                    confidence: complianceGaps(open).length ? 68 : 80,
+                    quote: open.body.match(/indemnif[^.\n]{0,80}|liquidated damages[^.\n]{0,60}|penalt[^.\n]{0,40}|iso\s*27001|soc\s*2/i)?.[0] ?? "",
+                    tone: complianceGaps(open).some((g) => g.severity === "red") ? "penalty" : "rule",
+                  },
+                ]}
+              />
             </div>
           ) : (
             <p className="py-12 text-center text-[12px] text-[#6B7280]">Select an RFP from the vault.</p>

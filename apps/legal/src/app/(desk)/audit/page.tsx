@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AuditEvent } from "@/lib/audit-types";
+import { splitAuditDetail } from "@/lib/audit-trace";
 import { cn } from "@/lib/utils";
 
 const STAGE: Record<string, { label: string; className: string; order: number }> = {
@@ -12,6 +13,7 @@ const STAGE: Record<string, { label: string; className: string; order: number }>
   review: { label: "Review", className: "bg-[#7F1D1D] text-[#FCA5A5]", order: 4 },
   compliance: { label: "Compliance", className: "bg-[#4C1D95] text-[#C4B5FD]", order: 5 },
   proposal: { label: "Proposal", className: "bg-[#064E3B] text-[#6EE7B7]", order: 5.5 },
+  partner: { label: "Partner", className: "bg-[#1E3A8A] text-[#93C5FD]", order: 4.5 },
   settings: { label: "Settings", className: "bg-[#1F2937] text-[#9CA3AF]", order: 6 },
   comms: { label: "Comms", className: "bg-[#164E63] text-[#67E8F9]", order: 7 },
 };
@@ -37,13 +39,44 @@ export default function AuditPage() {
 
   const visible = filter === "all" ? events : events.filter((e) => e.action === filter);
 
+  async function exportJson() {
+    const body = { exportedAt: new Date().toISOString(), events: visible };
+    const canonical = JSON.stringify(body);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const blob = new Blob([JSON.stringify({ ...body, sha256 }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "helix-legal-audit.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   return (
     <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5">
-      <div className="animate-entrance stagger-1">
-        <h1 className="text-[18px] font-semibold text-[#F3F4F6]">Audit Log</h1>
-        <p className="mt-1 text-[12px] text-[#6B7280]">
-          Timeline: ingest → COI → bid → review / compliance. Vault encrypted in transit (TLS 1.3).
-        </p>
+      <div className="animate-entrance stagger-1 flex flex-wrap items-end justify-between gap-3 print:block">
+        <div>
+          <h1 className="text-[18px] font-semibold text-[#F3F4F6]">Audit Log</h1>
+          <p className="mt-1 max-w-2xl text-[12px] text-[#6B7280]">
+            Who decided, which model and prompt, and whether a partner signed. JSON export includes a SHA-256 of the event list. That digest is not a qualified electronic signature. Events without a trace line were recorded before this desk stored the model and prompt.
+          </p>
+        </div>
+        <div className="flex gap-2 print:hidden">
+          <button
+            type="button"
+            className="rounded-[4px] border border-[#374151] px-3 py-1.5 text-[11px] text-[#F3F4F6]"
+            onClick={() => void exportJson()}
+          >
+            Export JSON
+          </button>
+          <button
+            type="button"
+            className="rounded-[4px] border border-[#374151] px-3 py-1.5 text-[11px] text-[#F3F4F6]"
+            onClick={() => window.print()}
+          >
+            Export PDF
+          </button>
+        </div>
       </div>
 
       <div className="animate-entrance stagger-2 flex flex-wrap gap-2">
@@ -71,6 +104,7 @@ export default function AuditPage() {
           <ol className="relative ml-2 space-y-0 border-l border-[#1F2937] pl-5">
             {visible.map((ev, i) => {
               const stage = stageOf(ev.action);
+              const parsed = splitAuditDetail(ev.detail);
               return (
                 <li key={ev.id} className="relative pb-5 last:pb-0">
                   <span
@@ -88,7 +122,12 @@ export default function AuditPage() {
                     </span>
                     <span className="text-[11px] text-[#F59E0B]">{ev.actor}</span>
                   </div>
-                  <p className="mt-1 text-[12px] text-[#F3F4F6]">{ev.detail}</p>
+                  <p className="mt-1 text-[12px] text-[#F3F4F6]">{parsed.summary}</p>
+                  {parsed.trace ? (
+                    <p className="mt-1 font-mono-numbers text-[10px] text-[#93C5FD]">{parsed.trace}</p>
+                  ) : (
+                    <p className="mt-1 text-[10px] text-[#4B5563]">Model, prompt, and approval were not stored on this event.</p>
+                  )}
                 </li>
               );
             })}

@@ -337,10 +337,10 @@ export function AskAiDrawer({
   const locked = busy || runningDemo;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
+    <Sheet open={open} onOpenChange={onOpenChange} modal>
       <SheetContent
         side="right"
-        showOverlay={false}
+        showOverlay
         style={THEME.vars}
         className={`flex h-full w-full min-h-0 flex-col overflow-hidden border-l ${border} bg-[var(--ai-bg)] sm:max-w-md`}
       >
@@ -417,6 +417,15 @@ export function AskAiDrawer({
               >
                 {t.attachments?.length ? <p className="mb-1 text-[10px] text-[var(--ai-accent)]">📎 attached image</p> : null}
                 {t.content}
+                {t.role === "assistant" && t.executed?.targets?.length ? (
+                  <p className="mt-2 text-[11px]">
+                    {t.executed.targets.map((target) => (
+                      <a key={target.id} href={`/documents?rfp=${encodeURIComponent(target.id)}`} className="mr-2 underline">
+                        Open source · {target.label}
+                      </a>
+                    ))}
+                  </p>
+                ) : null}
               </div>
 
               {t.executed ? (

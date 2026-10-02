@@ -1,4 +1,5 @@
 import type { PartnerVerdict, StoredRfp } from "@helix/core";
+import { modelForMethod, traceSuffix } from "@/lib/audit-trace";
 import { patchRfp, recordAudit } from "@/lib/store";
 
 export const PARTNER_VERDICTS: PartnerVerdict[] = ["GO", "CONDITIONAL", "NO-GO"];
@@ -27,6 +28,19 @@ export async function recordPartnerDecision(id: string, input: PartnerDecisionIn
     },
   });
   if (!rfp) return null;
-  await recordAudit(actor, "partner", `${rfp.title}: ${input.verdict}${input.coiCleared ? " · COI cleared" : ""}`);
+  const before = rfp.matchScore;
+  await recordAudit(
+    actor,
+    "partner",
+    [
+      `${rfp.title}: ${input.verdict}${input.coiCleared ? " · COI cleared" : ""}`,
+      traceSuffix({
+        model: modelForMethod(rfp.method),
+        prompt: "partner-verdict-v1",
+        match: `${before}`,
+        approval: `${input.verdict} by ${actor}`,
+      }),
+    ].join("\n")
+  );
   return rfp;
 }

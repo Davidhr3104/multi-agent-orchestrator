@@ -15,10 +15,44 @@ import {
 import { cn } from "@/lib/utils";
 
 type Row = DeadlineHit & { rfp: StoredRfp };
+type Bucket = "all" | "today" | "week" | "past";
+type StageId = "analysis" | "coi" | "approved" | "submitted";
+
+const STAGES: { id: StageId; label: string }[] = [
+  { id: "analysis", label: "En análisis" },
+  { id: "coi", label: "En revisión COI" },
+  { id: "approved", label: "Aprobado" },
+  { id: "submitted", label: "Enviado" },
+];
+
+const STAGE_KEY = "helix-legal-pursuit-stage";
+
+function loadStages(): Record<string, StageId> {
+  try {
+    const raw = window.localStorage.getItem(STAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, StageId>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function inferStage(rfp: StoredRfp): StageId {
+  if (rfp.partnerDecision?.outcome === "won") return "submitted";
+  if (rfp.partnerDecision) return "approved";
+  if (rfp.needsReview) return "coi";
+  return "analysis";
+}
 
 export default function DeadlinesPage() {
   const [rfps, setRfps] = useState<StoredRfp[]>([]);
   const [now, setNow] = useState(() => Date.now());
+  const [bucket, setBucket] = useState<Bucket>("all");
+  const [stages, setStages] = useState<Record<string, StageId>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setStages(loadStages());
+  }, []);
 
   useEffect(() => {
     void fetch("/api/rfps")
@@ -37,9 +71,33 @@ export default function DeadlinesPage() {
       .sort((a, b) => (a.days ?? 999) - (b.days ?? 999));
   }, [rfps, now]);
 
-  const critical = rows.filter((r) => r.days != null && r.days >= 0 && r.days < 1).length;
-  const week = rows.filter((r) => r.days != null && r.days >= 0 && r.days <= 7).length;
+  const critical = rows.filter((r) => r.days === 0).length;
+  const week = rows.filter((r) => r.days != null && r.days >= 1 && r.days <= 7).length;
   const past = rows.filter((r) => r.days != null && r.days < 0).length;
+  const visibleRows = rows.filter((r) => {
+    if (bucket === "today") return r.days === 0;
+    if (bucket === "week") return r.days != null && r.days >= 1 && r.days <= 7;
+    if (bucket === "past") return r.days != null && r.days < 0;
+    return true;
+  });
+
+  function stageOf(rfp: StoredRfp): StageId {
+    return stages[rfp.id] ?? inferStage(rfp);
+  }
+
+  function moveStage(id: string, stage: StageId) {
+    setStages((prev) => {
+      const next = { ...prev, [id]: stage };
+      window.localStorage.setItem(STAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function askPartner(rfp: StoredRfp, stage: string) {
+    const url = `${window.location.origin}/deadlines`;
+    const body = `Please approve or reject "${rfp.title}" at the ${stage} step.\n\n${url}\n\nSlack is not connected on this desk. This opens your mail app; Helix does not send the message.`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(`Helix deadline — ${rfp.title}`)}&body=${encodeURIComponent(body)}`;
+  }
 
   return (
     <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5">
@@ -63,16 +121,72 @@ export default function DeadlinesPage() {
       <section className="animate-entrance stagger-2 grid gap-4 sm:grid-cols-3">
         {(
           [
-            ["UNDER 24H", critical, "text-[#FCA5A5]"],
-            ["NEXT 7 DAYS", week, "text-[#FCD34D]"],
-            ["PAST DUE", past, "text-[#9CA3AF]"],
+            ["UNDER 24H", critical, "text-[#FCA5A5]", "today"],
+            ["NEXT 7 DAYS", week, "text-[#FCD34D]", "week"],
+            ["PAST DUE", past, "text-[#9CA3AF]", "past"],
           ] as const
-        ).map(([label, value, color]) => (
-          <div key={label} className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
+        ).map(([label, value, color, id]) => (
+          <button
+            key={label}
+            type="button"
+            className={cn(
+              "rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 text-left shadow-subtle",
+              bucket === id && "ring-1 ring-[#E5E7EB]"
+            )}
+            onClick={() => setBucket((current) => (current === id ? "all" : id))}
+          >
             <p className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">{label}</p>
             <p className={cn("font-mono-numbers mt-2 text-[28px] leading-none font-bold", color)}>{value}</p>
-          </div>
+          </button>
         ))}
+      </section>
+
+      <section className="animate-entrance stagger-3 rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
+        <h2 className="text-[13px] font-semibold text-[#F3F4F6]">Pursuit timeline</h2>
+        <p className="mt-1 text-[11px] text-[#6B7280]">
+          Drag a pursuit between stages. Ask partner opens your mail app. Slack is not connected.
+        </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          {STAGES.map((stage) => (
+            <div
+              key={stage.id}
+              className="min-h-28 rounded-[4px] border border-dashed border-[#374151] bg-[#0B0F19] p-2"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData("text/plain") || dragId;
+                if (id) moveStage(id, stage.id);
+                setDragId(null);
+              }}
+            >
+              <p className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">{stage.label}</p>
+              <ul className="mt-2 space-y-2">
+                {rfps
+                  .filter((rfp) => stageOf(rfp) === stage.id)
+                  .map((rfp) => (
+                    <li
+                      key={rfp.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", rfp.id);
+                        setDragId(rfp.id);
+                      }}
+                      className="cursor-grab rounded-[4px] border border-[#1F2937] bg-[#111827] p-2"
+                    >
+                      <p className="truncate text-[11px] text-[#F3F4F6]">{rfp.title}</p>
+                      <button
+                        type="button"
+                        className="mt-1 text-[10px] text-[#93C5FD] underline"
+                        onClick={() => askPartner(rfp, stage.label)}
+                      >
+                        Ask partner
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="animate-entrance stagger-3 overflow-x-auto rounded-[6px] border border-[#1F2937] bg-[#111827] shadow-subtle">
@@ -88,7 +202,7 @@ export default function DeadlinesPage() {
             </tr>
           </thead>
           <tbody className="text-[12px]">
-            {rows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center">
                   <p className="text-[12px] text-[#9CA3AF]">No dated deadlines parsed on this desk.</p>
@@ -102,7 +216,7 @@ export default function DeadlinesPage() {
                 </td>
               </tr>
             ) : (
-              rows.map((row) => {
+              visibleRows.map((row) => {
                 const urgent = row.days != null && row.days >= 0 && row.days < 1;
                 const overdue = row.days != null && row.days < 0;
                 return (

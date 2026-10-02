@@ -14,11 +14,18 @@ import { cn } from "@/lib/utils";
 import { KEYS_LEGAL } from "@helix/core/secret-fields";
 import { DeskOpsForm } from "@helix/help/desk-form";
 import { ApiKeysForm } from "@helix/help/keys-form";
+import { DEFAULT_WEIGHTS, loadDeskWeights, saveDeskWeights, type DeskWeights } from "@/lib/desk-strategy";
 
 export default function SettingsPage() {
   const [structured, setStructured] = useState<StructuredProfile>(DEFAULT_STRUCTURED);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [weights, setWeights] = useState<DeskWeights>(DEFAULT_WEIGHTS);
+  const [weightsSaved, setWeightsSaved] = useState(false);
+
+  useEffect(() => {
+    setWeights(loadDeskWeights());
+  }, []);
 
   useEffect(() => {
     void fetch("/api/settings/profile")
@@ -54,11 +61,54 @@ export default function SettingsPage() {
           Paste API keys, then keep the client profile that feeds match scoring, Go/No-Go, and proposal drafts.
         </p>
       </div>
+      <section className="glass-card space-y-2 rounded-2xl p-6 text-sm text-slate-300">
+        <h2 className="text-sm font-semibold text-white">Data handling</h2>
+        <p>Traffic to this desk uses TLS 1.3. Helix does not send your RFPs to train public models.</p>
+        <p>SOC 2 Type II and ISO 27001 are not attested on this build. Do not tell a client the firm holds those certifications because of Helix.</p>
+      </section>
       <section className="glass-card rounded-2xl p-6">
         <ApiKeysForm initialFields={KEYS_LEGAL} />
       </section>
       <section className="glass-card rounded-2xl p-6">
         <DeskOpsForm />
+      </section>
+      <section className="glass-card space-y-4 rounded-2xl p-6">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Desk strategy weights</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Relative weights for jurisdiction, financial margin, and effort. Stored on this browser.
+          </p>
+        </div>
+        {(
+          [
+            ["jurisdiction", "Jurisdiction"],
+            ["margin", "Financial margin"],
+            ["effort", "Effort hours"],
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="block text-xs text-slate-300">
+            {label} · {weights[key]}%
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={weights[key]}
+              className="mt-2 w-full"
+              onChange={(e) => setWeights((prev) => ({ ...prev, [key]: Number(e.target.value) }))}
+            />
+          </label>
+        ))}
+        <button
+          type="button"
+          className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white"
+          onClick={() => {
+            saveDeskWeights(weights);
+            setWeightsSaved(true);
+            window.setTimeout(() => setWeightsSaved(false), 1600);
+          }}
+        >
+          {weightsSaved ? "Saved" : "Save weights"}
+        </button>
       </section>
       <form className="glass-card space-y-5 rounded-2xl p-6" onSubmit={(e) => void save(e)}>
         <div>

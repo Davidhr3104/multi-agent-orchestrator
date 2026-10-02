@@ -6,6 +6,8 @@ import { DeskShell } from "@/components/desk-shell";
 
 export function MaybeDeskShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname.startsWith("/operator")) return <>{children}</>;
+  if (pathname.startsWith("/operator") || pathname.startsWith("/authorize") || pathname.startsWith("/word")) {
+    return <>{children}</>;
+  }
   return <DeskShell>{children}</DeskShell>;
 }

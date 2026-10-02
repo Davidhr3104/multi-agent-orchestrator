@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PartnerVerdict, PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
 import { AskAiCard } from "@/components/ask-ai-card";
-import { AskAiDrawer } from "@/components/ask-ai-drawer";
+import { CoiMatrixModal, coiStatusFromVerdict, type CoiDeskStatus } from "@/components/coi-matrix-modal";
+import { DocumentSplit, type SplitField } from "@/components/document-split";
 import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   DEFAULT_STRUCTURED,
-  JURISDICTIONS,
-  PRACTICE_OPTIONS,
   parseProfile,
   serializeProfile,
   type StructuredProfile,
@@ -55,6 +54,7 @@ import {
 } from "@/lib/sparkline";
 import { cn } from "@/lib/utils";
 import type { ConflictReport } from "@/lib/conflict-types";
+import { modelForMethod, traceSuffix } from "@/lib/audit-trace";
 import { ConflictPanel } from "@/components/conflict-panel";
 import { PricingPanel } from "@/components/pricing-panel";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
@@ -66,7 +66,7 @@ import {
   Download,
 } from "lucide-react";
 
-type Filter = "all" | "hot" | "warm" | "cold" | "review" | "BEAR" | "SPI" | "other";
+type Filter = "all" | "hot" | "warm" | "cold" | "review" | "due" | "BEAR" | "SPI" | "other";
 
 type SheetTab =
   | "overview"
@@ -80,10 +80,16 @@ type SheetTab =
   | "conflicts"
   | "pricing";
 
-function coiChipClass(verdict: ConflictReport["verdict"]) {
-  if (verdict === "NO-GO") return "bg-[#7F1D1D] text-[#FCA5A5]";
-  if (verdict === "CONDITIONAL") return "border border-[#F59E0B] text-[#F59E0B]";
+function coiChipClass(status: CoiDeskStatus) {
+  if (status === "BLOCKED") return "bg-[#7F1D1D] text-[#FCA5A5]";
+  if (status === "REVIEW") return "bg-[#422006] text-[#FCD34D]";
   return "bg-[#064E3B] text-[#6EE7B7]";
+}
+
+function coiLabel(status: CoiDeskStatus) {
+  if (status === "BLOCKED") return "COI BLOCKED";
+  if (status === "REVIEW") return "COI REVIEW";
+  return "COI CLEAR";
 }
 
 function tierClass(tier: StoredRfp["tier"]) {
@@ -92,10 +98,22 @@ function tierClass(tier: StoredRfp["tier"]) {
   return "bg-rose-500/15 text-rose-300 ring-rose-500/30";
 }
 
-function daysUntil(deadline: string, now: number) {
-  const t = Date.parse(deadline);
-  if (Number.isNaN(t)) return null;
-  return (t - now) / 86_400_000;
+function previewFields(text: string, form: { title: string; issuer: string }): SplitField[] {
+  const amount = text.match(/\$[\d,]+(?:\.\d+)?/)?.[0] ?? "Not stated";
+  const due = text.match(/\b(?:due|deadline|submit(?:ted)? by)\b[^.\n]{0,48}/i)?.[0] ?? "Not stated";
+  const penalty = text.match(/indemnif[^.\n]{0,60}|liquidated damages[^.\n]{0,40}/i)?.[0] ?? "";
+  return [
+    { id: "amount", label: "Budget", value: amount, confidence: amount === "Not stated" ? 35 : 78, quote: amount === "Not stated" ? "" : amount },
+    { id: "due", label: "Deadline", value: due, confidence: due === "Not stated" ? 30 : 72, quote: due === "Not stated" ? "" : due },
+    { id: "issuer", label: "Issuer", value: form.issuer || "Confirm on ingest", confidence: form.issuer ? 80 : 40, quote: form.issuer },
+    {
+      id: "gap",
+      label: "Compliance gap",
+      value: penalty || "No penalty clause in the first pass",
+      confidence: penalty ? 70 : 55,
+      quote: penalty,
+    },
+  ];
 }
 
 function MiniBar({ value, className }: { value: number; className?: string; wide?: boolean }) {
@@ -126,8 +144,9 @@ function matchTextClass(tier: StoredRfp["tier"]) {
 }
 
 export function LegalDashboard() {
-  const [askAiOpen, setAskAiOpen] = useState(false);
-  const [askAiQuestion, setAskAiQuestion] = useState<string | undefined>(undefined);
+  const [coiRfp, setCoiRfp] = useState<StoredRfp | null>(null);
+  const [coiToken, setCoiToken] = useState<string | null>(null);
+  const [coiOverrides, setCoiOverrides] = useState<Record<string, CoiDeskStatus>>({});
   const [rfps, setRfps] = useState<StoredRfp[]>([]);
   const [nowMs, setNowMs] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -140,7 +159,6 @@ export function LegalDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", issuer: "", body: "" });
   const [structured, setStructured] = useState<StructuredProfile>(DEFAULT_STRUCTURED);
-  const [profileSaved, setProfileSaved] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<{ name: string; text: string } | null>(null);
@@ -216,6 +234,16 @@ export function LegalDashboard() {
     window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }, [mounted]);
 
+  useEffect(() => {
+    const id = searchParams.get("coi");
+    const token = searchParams.get("token");
+    if (!id || !token) return;
+    const rfp = rfps.find((r) => r.id === id);
+    if (!rfp) return;
+    setCoiToken(token);
+    setCoiRfp(rfp);
+  }, [searchParams, rfps]);
+
   const now = nowMs ?? Date.now();
 
   const metrics = useMemo(() => {
@@ -223,10 +251,10 @@ export function LegalDashboard() {
       rfps.length === 0 ? 0 : Math.round(rfps.reduce((s, r) => s + r.matchScore, 0) / rfps.length);
     const hotShare =
       rfps.length === 0 ? 0 : Math.round((rfps.filter((r) => r.tier === "hot").length / rfps.length) * 100);
-    const close = rfps.filter((r) => {
-      const d = daysUntil(r.deadline, now);
-      return d != null && d >= 0 && d <= 14;
-    }).length;
+    const dueDays = rfps.map((r) => nearestDeadline(r, now)?.days ?? null);
+    const pastDue = dueDays.filter((d) => d != null && d < 0).length;
+    const soon = dueDays.filter((d) => d != null && d >= 0 && d <= 14).length;
+    const close = pastDue + soon;
     const review = rfps.filter((r) => r.needsReview).length;
     const hot = rfps.filter((r) => r.tier === "hot").length;
     const warm = rfps.filter((r) => r.tier === "warm").length;
@@ -238,6 +266,8 @@ export function LegalDashboard() {
       avgMatch,
       hotShare,
       close,
+      pastDue,
+      soon,
       review,
       hot,
       warm,
@@ -252,6 +282,10 @@ export function LegalDashboard() {
     const q = query.trim().toLowerCase();
     return rfps.filter((rfp) => {
       if (filter === "review" && !rfp.needsReview) return false;
+      if (filter === "due") {
+        const days = nearestDeadline(rfp, now)?.days;
+        if (days == null || days > 14) return false;
+      }
       if (filter === "hot" || filter === "warm" || filter === "cold") {
         if (rfp.tier !== filter) return false;
       }
@@ -261,7 +295,7 @@ export function LegalDashboard() {
       if (!q) return true;
       return [rfp.title, rfp.issuer, rfp.method, rfp.amount, rfp.deadline].join(" ").toLowerCase().includes(q);
     });
-  }, [rfps, filter, query]);
+  }, [rfps, filter, query, now]);
 
   const winLoss = useMemo(() => {
     const byMethod = ["BEAR", "SPI", "other"] as const;
@@ -326,24 +360,6 @@ export function LegalDashboard() {
   async function ingest(e: FormEvent) {
     e.preventDefault();
     await runIngest(form);
-  }
-
-  async function saveProfile(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const res = await fetch("/api/settings/profile", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_profile: serializeProfile(structured) }),
-    });
-    const data = (await res.json()) as { clientProfile?: string; error?: string };
-    if (!res.ok) {
-      setError(data.error || "Could not save profile");
-      return;
-    }
-    if (data.clientProfile) setStructured(parseProfile(data.clientProfile));
-    setProfileSaved(true);
-    window.setTimeout(() => setProfileSaved(false), 2000);
   }
 
   async function ingestFile(file: File) {
@@ -460,7 +476,15 @@ export function LegalDashboard() {
       body: JSON.stringify({
         actor: "ops",
         action: "proposal",
-        detail: `Proposal pack downloaded for ${rfp.title}`,
+        detail: [
+          `Proposal first draft downloaded for ${rfp.title}`,
+          traceSuffix({
+            model: modelForMethod(rfp.method),
+            prompt: "proposal-draft-v1",
+            match: String(rfp.matchScore),
+            approval: "draft only — not filed",
+          }),
+        ].join("\n"),
       }),
     }).catch(() => undefined);
   }
@@ -475,6 +499,7 @@ export function LegalDashboard() {
     { id: "warm", label: "Warm" },
     { id: "cold", label: "Cold" },
     { id: "review", label: "Needs review" },
+    { id: "due", label: "Due / past due" },
     { id: "BEAR", label: "BEAR" },
     { id: "SPI", label: "SPI" },
     { id: "other", label: "Other method" },
@@ -604,9 +629,14 @@ export function LegalDashboard() {
             </div>
           </div>
 
-          <div
+          <button
+            type="button"
             id="legal-deadlines"
-            className="group animate-entrance stagger-3 relative overflow-hidden rounded-xl p-4 transition-all duration-300"
+            className="group animate-entrance stagger-3 relative overflow-hidden rounded-xl p-4 text-left transition-all duration-300"
+            onClick={() => {
+              setFilter("due");
+              document.getElementById("legal-opportunities")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
             style={{
               background:
                 "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
@@ -634,7 +664,10 @@ export function LegalDashboard() {
               >
                 {metrics.close}
               </span>
-              <span className="text-[11px] text-slate-300">RFP{metrics.close === 1 ? "" : "s"} expiring soon</span>
+              <span className="text-[11px] text-slate-300">
+                {metrics.pastDue} past due · {metrics.soon} in 14d
+                {filter === "due" ? " · filtering the table" : ""}
+              </span>
             </div>
             <div
               className="relative z-10 flex items-center gap-1.5 rounded font-mono-numbers text-[10px]"
@@ -644,7 +677,7 @@ export function LegalDashboard() {
               <span className="text-slate-400">Next:</span>
               <span className="font-medium text-white">{metrics.nextDue?.date ?? "—"}</span>
             </div>
-          </div>
+          </button>
 
           <div
             className="animate-entrance stagger-4 relative flex flex-col justify-between overflow-hidden rounded-xl p-4 transition-all duration-300"
@@ -699,11 +732,21 @@ export function LegalDashboard() {
         </section>
 
         <DemoBanner message="You are exploring sample RFPs. Start with your own data and the samples disappear." ownDataLabel="Use my own data" />
-        <AskAiCard rfpId={selected?.id} onOpenDrawer={(q) => {
-            setAskAiQuestion(q);
-            setAskAiOpen(true);
-          }} />
-        <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
+        <AskAiCard
+          rfpId={selected?.id}
+          onOpenDrawer={(q) => {
+            window.dispatchEvent(new CustomEvent("helix-legal-ask", { detail: q ?? "" }));
+          }}
+        />
+        {coiRfp ? (
+          <CoiMatrixModal
+            rfp={coiRfp}
+            report={conflicts[coiRfp.id]}
+            magicToken={coiToken}
+            onClose={() => setCoiRfp(null)}
+            onDecide={(status) => setCoiOverrides((prev) => ({ ...prev, [coiRfp.id]: status }))}
+          />
+        ) : null}
         <AiToast message={toast} />
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
@@ -735,7 +778,7 @@ export function LegalDashboard() {
                       {rfps.length} total
                     </span>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-slate-400">Match bars, formatted amounts, hover actions.</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">One fact per column. COI opens the conflict matrix.</p>
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-auto">
                   <button
@@ -810,24 +853,21 @@ export function LegalDashboard() {
                       className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase"
                       style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.1)", background: "rgba(9, 11, 16, 0.6)" }}
                     >
-                      <th className="px-3 py-2">Title</th>
-                      <th className="px-2 py-2">Issuer</th>
-                      <th className="px-2 py-2">Method</th>
-                      <th className="px-2 py-2">Amount</th>
-                      <th className="px-2 py-2">Match</th>
-                      <th className="px-2 py-2">Conf.</th>
+                      <th className="px-3 py-2">Licitación / Emisor</th>
+                      <th className="px-2 py-2">Método</th>
+                      <th className="px-2 py-2">Estimado vs puja</th>
+                      <th className="px-2 py-2">Match & confidence</th>
+                      <th className="px-2 py-2">Estado COI</th>
                       <th className="py-2 pr-3 pl-2 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="text-xs">
                     {visible.map((rfp) => {
-                      const gaps = complianceGaps(rfp);
                       const due = nearestDeadline(rfp, now);
-                      const hotDue = due?.days != null && due.days >= 0 && due.days < 1;
-                      const incumbents = battleCard(rfp).names;
-                      const assign = assignTeam(rfp);
+                      const past = due?.days != null && due.days < 0;
                       const coi = conflicts[rfp.id];
                       const quote = pricing[rfp.id];
+                      const coiStatus = coiOverrides[rfp.id] ?? coiStatusFromVerdict(coi?.verdict);
                       const accentBar =
                         rfp.tier === "hot"
                           ? "bg-[#10B981]"
@@ -849,102 +889,47 @@ export function LegalDashboard() {
                                 accentBar
                               )}
                             />
-                            <div
-                              className="max-w-[280px] truncate text-[12px] font-semibold text-slate-100"
-                              title={rfp.title}
-                            >
+                            <div className="max-w-[280px] truncate text-[12px] font-semibold text-slate-100" title={rfp.title}>
                               {rfp.title}
                             </div>
-                            <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto text-[9px] whitespace-nowrap">
-                              <span
-                                className={cn(
-                                  "rounded-[3px] px-1.5 py-0.5 font-medium",
-                                  hotDue
-                                    ? "animate-pulse bg-[#7F1D1D] text-[#FCA5A5]"
-                                    : "bg-[#422006] text-[#FCD34D]"
-                                )}
-                              >
-                                {countdownLabel(due?.days ?? null)}
-                              </span>
-                              {gaps.length ? (
-                                <span className="rounded-[3px] bg-[#7F1D1D] px-1.5 py-0.5 font-medium text-[#FCA5A5]">
-                                  ⚠ {gaps.length} compliance gap{gaps.length === 1 ? "" : "s"}
-                                </span>
-                              ) : null}
-                              {incumbents[0] ? (
-                                <span className="rounded-[3px] bg-[#164E63] px-1.5 py-0.5 font-medium text-[#67E8F9]">
-                                  Incumbent: {incumbents[0]}
-                                </span>
-                              ) : null}
-                              {coi ? (
-                                <button
-                                  type="button"
-                                  className={cn(
-                                    "rounded-[3px] px-1.5 py-[2px] font-medium leading-none",
-                                    coiChipClass(coi.verdict)
-                                  )}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openRfp(rfp, "conflicts");
-                                  }}
-                                >
-                                  COI {coi.verdict}
-                                </button>
-                              ) : null}
-                              {quote ? (
-                                <button
-                                  type="button"
-                                  className="font-mono-numbers rounded-[3px] px-1.5 py-[2px] leading-none text-slate-300"
-                                  style={{ border: "1px solid rgba(226, 232, 240, 0.16)", background: "rgba(226, 232, 240, 0.06)" }}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openRfp(rfp, "pricing");
-                                  }}
-                                >
-                                  Bid {formatUsdNumber(quote.target)}
-                                </button>
-                              ) : null}
-                              <span
-                                className="rounded-[3px] px-1.5 py-[2px] leading-none text-slate-400"
-                                style={{ background: "rgba(226, 232, 240, 0.06)" }}
-                              >
-                                {assign.initials} · {assign.role}
-                              </span>
+                            <div className="mt-0.5 truncate text-[11px] text-slate-400">{rfp.issuer || "Unspecified"}</div>
+                            <div className={cn("mt-1 text-[10px]", past ? "font-medium text-[#FCA5A5]" : "text-slate-500")}>
+                              {countdownLabel(due?.days ?? null)}
                             </div>
                           </td>
-                          <td className="min-w-[130px] truncate px-2 py-2 text-[12px] text-slate-400">
-                            {rfp.issuer || "Unspecified"}
-                          </td>
                           <td className="whitespace-nowrap px-2 py-2">
-                            <span
-                              className={cn(
-                                "font-mono-numbers rounded-[3px] px-1.5 py-0.5 text-[9px] font-semibold",
-                                methodClass(rfp.method)
-                              )}
-                            >
+                            <span className={cn("font-mono-numbers rounded-[3px] px-1.5 py-0.5 text-[9px] font-semibold", methodClass(rfp.method))}>
                               {rfp.method}
                             </span>
+                            <div className="mt-1 text-[10px] text-slate-500">{modelForMethod(rfp.method)}</div>
                           </td>
-                          <td className="font-mono-numbers whitespace-nowrap px-2 py-2 text-[13px] font-semibold text-slate-100">
-                            {formatUsdAmount(rfp.amount)}
+                          <td className="whitespace-nowrap px-2 py-2">
+                            <div className="font-mono-numbers text-[12px] font-semibold text-slate-100">{formatUsdAmount(rfp.amount)}</div>
+                            <div className="mt-0.5 font-mono-numbers text-[10px] text-slate-400">
+                              Bid {quote ? formatUsdNumber(quote.target) : "—"}
+                            </div>
                           </td>
                           <td className="whitespace-nowrap px-2 py-2">
                             <div className="flex items-center gap-1.5">
                               <MiniBar value={rfp.matchScore} className={matchBarClass(rfp.tier)} />
-                              <span className={cn("font-mono-numbers text-[11px]", matchTextClass(rfp.tier))}>
-                                {rfp.matchScore}
-                              </span>
+                              <span className={cn("font-mono-numbers text-[11px]", matchTextClass(rfp.tier))}>{rfp.matchScore}</span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <MiniBar value={rfp.confidence * 100} className="bg-[#F59E0B]" />
+                              <span className="font-mono-numbers text-[10px] text-[#F59E0B]">{Math.round(rfp.confidence * 100)}%</span>
                             </div>
                           </td>
-                          <td className="whitespace-nowrap px-2 py-2">
-                            <div className="flex items-center gap-1.5">
-                              <MiniBar value={rfp.confidence * 100} className="bg-[#F59E0B]" />
-                              <span className="font-mono-numbers text-[11px] text-[#F59E0B]">
-                                {Math.round(rfp.confidence * 100)}%
-                              </span>
-                            </div>
+                          <td className="whitespace-nowrap px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className={cn("rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold", coiChipClass(coiStatus))}
+                              onClick={() => {
+                                setCoiToken(null);
+                                setCoiRfp(rfp);
+                              }}
+                            >
+                              {coiLabel(coiStatus)}
+                            </button>
                           </td>
                           <td
                             className="whitespace-nowrap py-2 pr-3 pl-2 text-right"
@@ -1152,14 +1137,7 @@ export function LegalDashboard() {
                   </div>
                 ) : null}
                 {pdfPreview ? (
-                  <div className="rounded-[6px] p-2.5" style={{ border: "1px solid rgba(226, 232, 240, 0.14)", background: "rgba(9, 11, 16, 0.6)" }}>
-                    <p className="mb-1 text-[10px] tracking-wide text-slate-300 uppercase">
-                      Preview · {pdfPreview.name}
-                    </p>
-                    <p className="max-h-28 overflow-y-auto text-[11px] leading-relaxed whitespace-pre-wrap text-slate-400">
-                      {pdfPreview.text}
-                    </p>
-                  </div>
+                  <DocumentSplit title={pdfPreview.name} body={pdfPreview.text} fields={previewFields(pdfPreview.text, form)} />
                 ) : null}
                 {running ? (
                   <div>
@@ -1234,130 +1212,28 @@ export function LegalDashboard() {
                   "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
               }}
             >
-              <form onSubmit={(e) => void saveProfile(e)}>
+              <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[13px] font-semibold text-slate-100">Client profile</h3>
-                  <a className="text-[11px] text-slate-300 hover:text-white hover:underline" href="#legal-settings">
-                    Desk
+                  <h3 className="text-[13px] font-semibold text-slate-100">Desk strategy</h3>
+                  <a className="text-[11px] text-slate-300 hover:text-white hover:underline" href="/settings">
+                    Open settings
                   </a>
                 </div>
                 <p className="mt-0.5 mb-2.5 text-[11px] text-slate-400">
-                  Custom scoring weights & qualification rules
+                  Profile and scoring weights live in Settings. Modeled win rate on this desk: {modeledWin}%.
                 </p>
-                <div className="mb-3 flex flex-wrap gap-1">
-                  {PRACTICE_OPTIONS.map((area) => {
-                    const on = structured.practiceAreas.includes(area);
-                    return (
-                      <button
-                        key={area}
-                        type="button"
-                        className={cn(
-                          "rounded-[3px] px-2 py-0.5 text-[10px] transition-colors duration-150",
-                          on ? "font-semibold text-white" : "text-slate-400 hover:text-slate-100"
-                        )}
-                        style={
-                          on
-                            ? { border: "1px solid rgba(255,255,255,0.35)", background: "rgba(226, 232, 240, 0.14)" }
-                            : { border: "1px solid rgba(226, 232, 240, 0.14)", background: "rgba(226, 232, 240, 0.04)" }
-                        }
-                        onClick={() =>
-                          setStructured((p) => ({
-                            ...p,
-                            practiceAreas: on
-                              ? p.practiceAreas.filter((a) => a !== area)
-                              : [...p.practiceAreas, area],
-                          }))
-                        }
-                      >
-                        {area}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div
-                  className="mb-3 grid grid-cols-3 gap-2 py-2 text-center"
-                  style={{ borderTop: "1px solid rgba(226, 232, 240, 0.1)", borderBottom: "1px solid rgba(226, 232, 240, 0.1)" }}
+                <p className="text-[12px] text-slate-200">
+                  {structured.jurisdiction} · {formatUsdAmount(String(structured.budgetMin))}–
+                  {formatUsdAmount(String(structured.budgetMax))}
+                </p>
+                <a
+                  href="/settings"
+                  className="mt-3 inline-flex rounded-[6px] px-2.5 py-1 text-[11px] font-semibold text-slate-100"
+                  style={{ border: "1px solid rgba(226, 232, 240, 0.3)", background: "rgba(226, 232, 240, 0.08)" }}
                 >
-                  <div>
-                    <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">BUDGET</span>
-                    <div className="font-mono-numbers mt-0.5 text-[11px] font-semibold text-slate-100">
-                      {formatUsdAmount(String(structured.budgetMin))}–{formatUsdAmount(String(structured.budgetMax))}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">
-                      JURISDICTION
-                    </span>
-                    <div className="mt-0.5 flex items-center justify-center gap-1 text-[11px] font-medium text-slate-100">
-                      <select
-                        className="max-w-full truncate bg-transparent text-center outline-none"
-                        value={structured.jurisdiction}
-                        onChange={(e) => setStructured((p) => ({ ...p, jurisdiction: e.target.value }))}
-                      >
-                        {JURISDICTIONS.map((j) => (
-                          <option key={j} value={j} className="bg-[#111827]">
-                            {j}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">WIN RATE</span>
-                    <div className="font-mono-numbers mt-0.5 text-[11px] font-semibold text-[#6EE7B7]">
-                      {modeledWin}%
-                    </div>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <input
-                    type="range"
-                    min={10000}
-                    max={400000}
-                    step={5000}
-                    value={structured.budgetMax}
-                    className="w-full"
-                    onChange={(e) =>
-                      setStructured((p) => ({
-                        ...p,
-                        budgetMax: Number(e.target.value),
-                        budgetMin: Math.min(p.budgetMin, Number(e.target.value) - 5000),
-                      }))
-                    }
-                  />
-                </div>
-                <div className="mb-3">
-                  <textarea
-                    className="w-full resize-none rounded-[6px] border-0 px-2.5 py-1.5 text-xs leading-normal text-slate-100 focus:outline-none focus:ring-1 focus:ring-white/40"
-                    style={{ background: "rgba(9, 11, 16, 0.6)", border: "1px solid rgba(226, 232, 240, 0.14)" }}
-                    rows={2}
-                    placeholder="Key practice notes, exclusions..."
-                    value={structured.exclusions.join(", ")}
-                    onChange={(e) =>
-                      setStructured((p) => ({
-                        ...p,
-                        exclusions: e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      }))
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[#6EE7B7]">
-                    <span className="pulse-dot-green size-[6px] rounded-full bg-[#10B981]" />
-                    <span>{profileSaved ? "Saved" : "Synced"}</span>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn-tactile rounded-[6px] px-2.5 py-1 text-[11px] font-semibold text-slate-100 transition-all hover:brightness-110"
-                    style={{ border: "1px solid rgba(226, 232, 240, 0.3)", background: "rgba(226, 232, 240, 0.08)" }}
-                  >
-                    Save changes
-                  </button>
-                </div>
-              </form>
+                  Adjust desk strategy
+                </a>
+              </div>
             </section>
 
             <div
@@ -1550,8 +1426,8 @@ function RfpSheet({
                 Fit {go.verdict} {go.score}
               </Badge>
               {conflict ? (
-                <Badge variant="outline" className={coiChipClass(conflict.verdict)}>
-                  COI {conflict.verdict} {conflict.score}
+                <Badge variant="outline" className={coiChipClass(coiStatusFromVerdict(conflict.verdict))}>
+                  {coiLabel(coiStatusFromVerdict(conflict.verdict))} {conflict.score}
                 </Badge>
               ) : null}
               <Badge variant="outline">{prob}% win probability</Badge>
