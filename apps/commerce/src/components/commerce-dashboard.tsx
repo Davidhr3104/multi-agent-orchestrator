@@ -141,14 +141,16 @@ export function CommerceDashboard() {
       </div>
 
       <DemoBanner message="You are exploring a sample store. Connect Shopify and this desk switches to your real orders — the samples disappear." connectHref="/settings" connectLabel="Connect Shopify →" />
-      <AskAiCard orderId={selected?.id} onOpenDrawer={(q) => {
-          setAskAiQuestion(q);
-          setAskAiOpen(true);
-        }} />
+      <div data-tour="commerce-ask">
+        <AskAiCard orderId={selected?.id} onOpenDrawer={(q) => {
+            setAskAiQuestion(q);
+            setAskAiOpen(true);
+          }} />
+      </div>
       <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
       <AiToast message={toast} />
 
-      <section className="animate-enter delay-2 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <section data-tour="commerce-metrics" className="animate-enter delay-2 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={<ShoppingCart className="size-4" />}
           label="Total Orders"
@@ -205,10 +207,10 @@ export function CommerceDashboard() {
       ) : null}
 
       <div className="grid grid-cols-1 items-start gap-6 pt-2 lg:grid-cols-12">
-        <div className="animate-enter delay-3 space-y-4 lg:col-span-8">
+        <div data-tour="commerce-orders" className="animate-enter delay-3 space-y-4 lg:col-span-8">
           <LiveOrdersTable orders={orders} selectedId={selectedId} onSelect={(o) => setSelectedId(o.id)} />
         </div>
-        <div className="animate-enter delay-4 space-y-4 lg:col-span-4">
+        <div data-tour="commerce-inspector" className="animate-enter delay-4 space-y-4 lg:col-span-4">
           {selected ? (
             <OrderInspector
               order={selected}
@@ -224,7 +226,7 @@ export function CommerceDashboard() {
       </div>
 
       <div className="animate-enter delay-5 grid grid-cols-1 gap-6 pt-2 lg:grid-cols-12">
-        <div className="lg:col-span-6">
+        <div data-tour="commerce-restock" className="lg:col-span-6">
           <ReorderQueue
             products={products}
             reorders={reorders}

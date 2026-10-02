@@ -12,12 +12,17 @@ export default function HelpPage() {
           <h1 className="mt-1 text-2xl font-medium">{guide.title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{guide.overview}</p>
         </div>
-        <Link
-          href="/inbox"
-          className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem]"
-        >
-          Inbox
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link href="/?tour=1" className="inline-flex h-7 items-center rounded-lg bg-primary px-2.5 text-[0.8rem] font-semibold text-primary-foreground">
+            Take the tour
+          </Link>
+          <Link
+            href="/inbox"
+            className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem]"
+          >
+            Inbox
+          </Link>
+        </div>
       </div>
       <ol className="flex flex-col gap-3">
         {guide.steps.map((step) => (

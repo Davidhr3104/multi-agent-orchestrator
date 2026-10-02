@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { TourHost } from "@/components/tour-host";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Helix for Leads",
+  icons: { icon: "/helix-leads-icon.png" },
   description:
     "Classify inbound contacts, score fit, human review, send to CRM when GHL keys exist.",
 };
@@ -37,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <TooltipProvider>
           <AppShell>{children}</AppShell>
         </TooltipProvider>
+        <TourHost />
       </body>
     </html>
   );

@@ -207,12 +207,14 @@ export function TriageOverview() {
         </div>
       ) : null}
 
-      <AskAiCard
-        onOpenDrawer={(initialQuestion) => {
-          setAskAiInitialQuestion(initialQuestion);
-          setAskAiDrawerOpen(true);
-        }}
-      />
+      <div data-tour="leads-ask">
+        <AskAiCard
+          onOpenDrawer={(initialQuestion) => {
+            setAskAiInitialQuestion(initialQuestion);
+            setAskAiDrawerOpen(true);
+          }}
+        />
+      </div>
       <AskAiDrawer
         open={askAiDrawerOpen}
         onOpenChange={setAskAiDrawerOpen}
@@ -223,6 +225,7 @@ export function TriageOverview() {
         <p className="text-sm text-outline">Loading triage…</p>
       ) : (
         <>
+          <div data-tour="leads-attention">
           {kpis.hitlPending > 0 ? (
             <AttentionQueue
               leads={leads.filter((l) => l.pipelineStage !== "lost")}
@@ -241,13 +244,16 @@ export function TriageOverview() {
               </p>
             </div>
           )}
-          <KpiStrip {...kpis} />
+          </div>
+          <div data-tour="leads-kpis">
+            <KpiStrip {...kpis} />
+          </div>
           <StreamChart leads={leads} />
           <div className="grid gap-4 lg:grid-cols-5">
-            <div className="lg:col-span-3">
+            <div data-tour="leads-priority" className="lg:col-span-3">
               <PriorityTable leads={leads} flashIds={flashIds} />
             </div>
-            <div className="lg:col-span-2">
+            <div data-tour="leads-feed" className="lg:col-span-2">
               <WebhookFeed leads={leads} logs={logs} />
             </div>
           </div>

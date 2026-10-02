@@ -22,6 +22,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Helix for Inbox — EA Triage Command Center",
+  icons: { icon: "/helix-inbox-icon.png" },
   description: "Rank, draft, and route emails with autonomous multi-agent assistance.",
 };
 

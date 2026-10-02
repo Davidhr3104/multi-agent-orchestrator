@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { HOW_TO_USE_MARKETING } from "@helix/help";
 import { EngineShell } from "@/components/engine-shell";
 
@@ -6,9 +7,14 @@ export default function HelpPage() {
   return (
     <EngineShell active="help">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8 lg:px-8">
-        <div>
-          <h1 className="text-2xl font-medium text-white">{guide.title}</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">{guide.overview}</p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-medium text-white">{guide.title}</h1>
+            <p className="mt-2 text-sm text-[#9CA3AF]">{guide.overview}</p>
+          </div>
+          <Link href="/?tour=1" className="inline-flex h-9 items-center rounded-lg bg-[#f97316] px-4 text-sm font-semibold text-[#0b1220] transition hover:brightness-110">
+            Take the tour
+          </Link>
         </div>
         <ol className="flex flex-col gap-3">
           {guide.steps.map((step) => (

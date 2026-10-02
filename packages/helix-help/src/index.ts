@@ -12,6 +12,10 @@ export {
   TOUR_INBOX,
   TOUR_LEGAL,
   TOUR_LEADS,
+  TOUR_COMMERCE,
+  TOUR_MARKETING,
+  TOUR_SOCIAL,
+  TOUR_REAL_ESTATE,
   EMPTY_INBOX,
   EMPTY_LEGAL,
   EMPTY_LEADS,
@@ -24,5 +28,6 @@ export {
   type HowToUseStep,
   type HowToUseShortcut,
   type TourStepDef,
+  type TourProduct,
   type EmptyStateCopy,
 } from "./copy";

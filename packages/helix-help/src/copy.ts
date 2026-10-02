@@ -284,7 +284,11 @@ export type TourStepDef = {
   element: string;
   title: string;
   description: string;
+  /** Where the popover sits relative to the element; defaults to below. */
+  side?: "top" | "right" | "bottom" | "left";
 };
+
+export type TourProduct = "inbox" | "legal" | "leads" | "commerce" | "marketing" | "social" | "real-estate";
 
 export type EmptyStateCopy = {
   title: string;
@@ -335,19 +339,155 @@ export const TOUR_LEGAL: TourStepDef[] = [
 
 export const TOUR_LEADS: TourStepDef[] = [
   {
-    element: "[data-tour='leads-metrics']",
-    title: "Lead health",
-    description: "Quality, review queue, and inbox health show where to spend time.",
+    element: "[data-tour='leads-ask']",
+    title: "Ask Helix AI",
+    description: "Ask why a lead scored the way it did or what changed in the pipeline. Answers come from your desk's leads and logs.",
   },
   {
-    element: "[data-tour='leads-table']",
-    title: "Lead list",
-    description: "Score, classify, and open any lead for breakdown and HITL actions.",
+    element: "[data-tour='leads-attention']",
+    title: "Needs your review",
+    description: "Leads the engine isn't sure about wait here. Approve to push to your CRM (only when GoHighLevel is connected) or mark as spam.",
   },
   {
-    element: "[data-tour='leads-ingest']",
-    title: "Score inbound",
-    description: "Paste lead text to run the multi-agent pipeline with enrich and CRM-ready output.",
+    element: "[data-tour='leads-kpis']",
+    title: "Pipeline health",
+    description: "Volume, quality and the review queue, counted from the leads on this desk.",
+  },
+  {
+    element: "[data-tour='leads-priority']",
+    title: "Priority list",
+    description: "Best-scored leads first. Open any lead for its 0–100 score breakdown.",
+  },
+  {
+    element: "[data-tour='leads-feed']",
+    title: "Webhook feed",
+    description: "Every inbound lead and sync event as it happens. Try Simulate Webhook at the top to see one arrive.",
+  },
+];
+
+export const TOUR_COMMERCE: TourStepDef[] = [
+  {
+    element: "[data-tour='commerce-metrics']",
+    title: "Store pulse",
+    description: "Orders, revenue, low-stock items and dollars at risk — counted from your orders (a sample store until Shopify is connected).",
+  },
+  {
+    element: "[data-tour='commerce-ask']",
+    title: "Ask Helix AI",
+    description: "Ask why an order scored the way it did. Answers are grounded in that order's fraud reasoning.",
+  },
+  {
+    element: "[data-tour='commerce-orders']",
+    title: "Live orders",
+    description: "Every order gets a fraud score. Filter by High risk, Review or Clean, then click a row to inspect it.",
+  },
+  {
+    element: "[data-tour='commerce-inspector']",
+    title: "Order inspector",
+    description: "See the customer, items, address and fraud reasons, then decide: Approve or Refund & Cancel. The decision is yours.",
+    side: "left",
+  },
+  {
+    element: "[data-tour='commerce-restock']",
+    title: "Restock queue",
+    description: "Products projected to run out within 14 days. Quick Restock PO records a purchase order on the desk for you to follow up.",
+    side: "top",
+  },
+];
+
+export const TOUR_MARKETING: TourStepDef[] = [
+  {
+    element: "[data-tour='marketing-ask']",
+    title: "Ask Helix AI",
+    description: "Ask what spend on spam means, how waste is calculated or when to pause a campaign.",
+  },
+  {
+    element: "[data-tour='marketing-kpis']",
+    title: "Spend at a glance",
+    description: "Spend, lead quality and waste for the selected window — from the spend you imported and your scored leads.",
+  },
+  {
+    element: "[data-tour='marketing-chart']",
+    title: "Spend vs lead quality",
+    description: "Each bubble is a campaign: what it spent against the average Helix score of its leads. Bubble size is form volume.",
+  },
+  {
+    element: "[data-tour='marketing-campaigns']",
+    title: "Campaigns",
+    description: "Helix recommends pause, scale or keep with the evidence. A person confirms every pause or scale.",
+    side: "top",
+  },
+  {
+    element: "[data-tour='marketing-ingest']",
+    title: "Import spend",
+    description: "Drop a CSV — it always works. Meta sync needs keys in Settings; Google and TikTok stay local.",
+    side: "left",
+  },
+];
+
+export const TOUR_SOCIAL: TourStepDef[] = [
+  {
+    element: "[data-tour='social-ask']",
+    title: "Ask Helix AI",
+    description: "Ask what's waiting for review, why a post isn't ready or what goes out this week. Helix can send posts back or move them — approving always waits for you.",
+  },
+  {
+    element: "[data-tour='social-balance']",
+    title: "Pillar balance",
+    description: "How the planned calendar splits across your content pillars. A quiet pillar is called out under its bar.",
+  },
+  {
+    element: "[data-tour='social-kpis']",
+    title: "Key numbers",
+    description: "What's waiting for review, ready to approve, approved and planned this week. Nothing is published from here.",
+  },
+  {
+    element: "[data-tour='social-queue']",
+    title: "Approval queue",
+    description: "Every draft waits for a person. Approving marks it ready — posting to the networks isn't connected.",
+    side: "top",
+  },
+  {
+    element: "[data-tour='social-week']",
+    title: "Next 7 days",
+    description: "Everything planned this week, whatever its status. Open the calendar to move or edit posts.",
+    side: "top",
+  },
+];
+
+export const TOUR_REAL_ESTATE: TourStepDef[] = [
+  {
+    element: "[data-tour='re-nav']",
+    title: "Your desk",
+    description: "Properties, buyers, showings, outreach and sellers. Red badges count what's waiting for you. Collapse the sidebar to icons from the top.",
+    side: "right",
+  },
+  {
+    element: "[data-tour='re-ask']",
+    title: "Ask Helix AI",
+    description: "Ask about buyers, listings and matches. Helix proposes actions — you approve each one, and most can be undone.",
+  },
+  {
+    element: "[data-tour='re-kpis']",
+    title: "Key numbers",
+    description: "Active listings, open buyers, hot buyers and average score, counted from this desk.",
+  },
+  {
+    element: "[data-tour='re-today']",
+    title: "Today & outreach",
+    description: "Showings left today and drafts waiting for your approval. Nothing is sent to buyers from Helix.",
+  },
+  {
+    element: "[data-tour='re-hot']",
+    title: "Hottest buyers",
+    description: "Filter by stage and budget. The dot on each avatar shows how recently you were in touch.",
+    side: "top",
+  },
+  {
+    element: "[data-tour='re-market']",
+    title: "Market snapshot",
+    description: "Sample market figures for each zone next to the numbers from your own listings.",
+    side: "left",
   },
 ];
 
@@ -407,7 +547,7 @@ export const SHORTCUTS_LEADS: HowToUseShortcut[] = [
   { keys: "/", action: "Focus lead filters on the Dashboard" },
 ];
 
-export function tourDoneKey(product: "inbox" | "legal" | "leads") {
+export function tourDoneKey(product: TourProduct) {
   return `helix-${product}-tour-v1-done`;
 }
 

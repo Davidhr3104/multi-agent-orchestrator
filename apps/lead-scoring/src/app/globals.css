@@ -333,3 +333,65 @@ textarea::-webkit-scrollbar-thumb {
   animation: kpi-bump 0.9s ease-out 1;
   transform-origin: left center;
 }
+
+/* Product tour (driver.js) */
+.helix-driver-popover {
+  --tour-accent: #06b6d4;
+  background: rgba(15, 23, 42, 0.97) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid color-mix(in srgb, var(--tour-accent) 40%, transparent) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+  padding: 18px 18px 14px !important;
+  max-width: 340px !important;
+  font-family: inherit !important;
+}
+.helix-driver-popover .driver-popover-title {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #f8fafc !important;
+  line-height: 1.3 !important;
+}
+.helix-driver-popover .driver-popover-description {
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+  color: #cbd5e1 !important;
+  margin-top: 6px !important;
+}
+.helix-driver-popover .driver-popover-progress-text {
+  color: #94a3b8 !important;
+  font-size: 12px !important;
+}
+.helix-driver-popover .driver-popover-footer button {
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  text-shadow: none !important;
+  border-radius: 8px !important;
+  padding: 6px 12px !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  background: rgba(51, 65, 85, 0.6) !important;
+  color: #e2e8f0 !important;
+}
+.helix-driver-popover .driver-popover-footer .driver-popover-next-btn {
+  background: var(--tour-accent) !important;
+  border-color: var(--tour-accent) !important;
+  color: #0b1220 !important;
+}
+.helix-driver-popover .driver-popover-footer button:focus-visible {
+  outline: 2px solid var(--tour-accent) !important;
+  outline-offset: 2px !important;
+}
+.helix-driver-popover .driver-popover-close-btn {
+  color: #94a3b8 !important;
+}
+.helix-driver-popover .driver-popover-close-btn:hover {
+  color: #f8fafc !important;
+}
+.helix-driver-popover .driver-popover-arrow {
+  border-color: rgba(15, 23, 42, 0.97) !important;
+}
+.helix-driver-popover .driver-popover-arrow-side-left { border-top-color: transparent !important; border-bottom-color: transparent !important; border-right-color: transparent !important; }
+.helix-driver-popover .driver-popover-arrow-side-right { border-top-color: transparent !important; border-bottom-color: transparent !important; border-left-color: transparent !important; }
+.helix-driver-popover .driver-popover-arrow-side-top { border-left-color: transparent !important; border-right-color: transparent !important; border-bottom-color: transparent !important; }
+.helix-driver-popover .driver-popover-arrow-side-bottom { border-left-color: transparent !important; border-right-color: transparent !important; border-top-color: transparent !important; }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { TourHost } from "@/components/tour-host";
 import "./globals.css";
 
 const inter = Inter({
@@ -15,6 +16,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Helix for Marketing · Performance Engine",
+  icons: { icon: "/logo-icon.png" },
   description:
     "Join ad spend to Helix lead scores. Pause or scale campaigns with evidence and a human in the loop. Meta/Google stay stubs.",
 };
@@ -37,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className="flex min-h-full flex-col overflow-x-hidden bg-background font-sans text-on-surface"
       >
         <TooltipProvider>{children}</TooltipProvider>
+        <TourHost />
       </body>
     </html>
   );

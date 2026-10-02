@@ -405,10 +405,12 @@ export function MarketingDashboard() {
         </div>
 
         <DemoBanner message="You are exploring sample campaigns. Connect Meta Ads and this desk switches to your real spend — the samples disappear." connectHref="/settings" connectLabel="Connect Meta →" />
-        <AskAiCard onOpenDrawer={(q) => {
-            setAskAiQuestion(q);
-            setAskAiOpen(true);
-          }} />
+        <div data-tour="marketing-ask">
+          <AskAiCard onOpenDrawer={(q) => {
+              setAskAiQuestion(q);
+              setAskAiOpen(true);
+            }} />
+        </div>
         <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
         <AiToast message={aiToast} />
 
@@ -438,7 +440,7 @@ export function MarketingDashboard() {
           </a>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div data-tour="marketing-kpis" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             icon={<Wallet className="size-4 text-outline" />}
             label="Total Spend"
@@ -529,7 +531,7 @@ export function MarketingDashboard() {
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-10">
           <div className="flex flex-col gap-5 lg:col-span-7">
-            <section className="rounded-xl border border-[var(--border-hairline)] bg-surface-container-low p-5 shadow-lg backdrop-blur-sm">
+            <section data-tour="marketing-chart" className="rounded-xl border border-[var(--border-hairline)] bg-surface-container-low p-5 shadow-lg backdrop-blur-sm">
               <div className="mb-3 flex flex-col items-start justify-between gap-2 border-b border-[var(--border-hairline)] pb-3 sm:flex-row sm:items-center">
                 <div>
                   <div className="flex items-center gap-2">
@@ -574,7 +576,7 @@ export function MarketingDashboard() {
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-surface-container-low shadow-lg backdrop-blur-sm">
+            <section data-tour="marketing-campaigns" className="overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-surface-container-low shadow-lg backdrop-blur-sm">
               <div className="flex flex-col items-start justify-between gap-3 border-b border-[var(--border-hairline)] p-4 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-on-surface">Campaigns</h3>
@@ -681,7 +683,7 @@ export function MarketingDashboard() {
             </section>
           </div>
 
-          <aside className="flex flex-col overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-surface-container-low shadow-lg backdrop-blur-sm lg:col-span-3">
+          <aside data-tour="marketing-ingest" className="flex flex-col overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-surface-container-low shadow-lg backdrop-blur-sm lg:col-span-3">
             <div className="border-b border-[var(--border-hairline)] p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

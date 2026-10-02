@@ -3,6 +3,7 @@ import { Inter, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/app-shell";
 import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
+import { TourHost } from "@/components/tour-host";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,6 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Helix for Commerce",
+  icons: { icon: "/logo-icon.png" },
   description: "Enterprise commerce operations and fraud intelligence.",
 };
 
@@ -36,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <AppShell>{children}</AppShell>
           </TooltipProvider>
         </ThemeProvider>
+        <TourHost />
       </body>
     </html>
   );
