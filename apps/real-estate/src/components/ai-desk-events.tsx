@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { OPERATOR_REQUIRED, OperatorText } from "@/components/operator-text";
 
 /**
  * Makes a dashboard react when Helix AI changes data: refetches, flashes the touched rows, and
@@ -93,7 +95,17 @@ export function AiToast({ message, undo }: { message: string | null; undo?: unkn
           </svg>
         )}
       </span>
-      <span className="min-w-0 flex-1 leading-snug">{message}</span>
+      <span className="min-w-0 flex-1 leading-snug">
+        {message}
+        {message.includes(OPERATOR_REQUIRED) ? (
+          <>
+            {" "}
+            <Link href="/operator" className="font-semibold underline underline-offset-2 hover:brightness-125">
+              Unlock
+            </Link>
+          </>
+        ) : null}
+      </span>
       {undo?.length ? (
         <button
           type="button"
@@ -166,7 +178,7 @@ export function DemoBanner({
     <div className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/60 px-4 py-2.5 text-xs text-foreground ring-1 ring-border/60">
       <span className="rounded-full bg-foreground px-2 py-0.5 text-[10px] font-bold tracking-wider text-background uppercase">Demo data</span>
       <p className="min-w-0 flex-1 text-muted-foreground">{message}</p>
-      {error ? <span className="text-rose-400">{error}</span> : null}
+      {error ? <span className="text-rose-400"><OperatorText text={error} /></span> : null}
       <button type="button" disabled={busy} onClick={() => void post("demo")} className="rounded-md border border-border px-2.5 py-1 font-semibold hover:bg-accent disabled:opacity-50">
         Reset demo
       </button>

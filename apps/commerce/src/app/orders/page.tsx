@@ -18,8 +18,10 @@ export default function OrdersPage() {
       const res = await fetch("/api/orders");
       const data = (await res.json()) as { orders: StoredOrder[] };
       setOrders(data.orders);
-      // Preselect the order that most needs a human so the inspector is never an empty slab.
-      const first = data.orders.find((o) => o.requiresReview) ?? data.orders[0];
+      // A ?order=<id> link (e.g. from a product's recent orders) wins; otherwise preselect the order
+      // that most needs a human so the inspector is never an empty slab.
+      const linked = new URLSearchParams(window.location.search).get("order");
+      const first = data.orders.find((o) => o.id === linked) ?? data.orders.find((o) => o.requiresReview) ?? data.orders[0];
       if (first) setSelectedId(first.id);
     })();
   }, []);

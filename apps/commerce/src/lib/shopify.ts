@@ -157,6 +157,7 @@ function mockProducts(): ProductInput[] {
       shopifyProductId: "gid://shopify/Product/1",
       title: "Organic Cotton Tee",
       sku: "TEE-001",
+      imageUrl: "/products/tee-001.jpg",
       currentInventory: 240,
       reorderPoint: 40,
       price: 32.25,
@@ -166,6 +167,7 @@ function mockProducts(): ProductInput[] {
       shopifyProductId: "gid://shopify/Product/2",
       title: "Leather Weekend Bag",
       sku: "BAG-014",
+      imageUrl: "/products/bag-014.jpg",
       currentInventory: 18,
       reorderPoint: 10,
       price: 189.0,
@@ -175,6 +177,7 @@ function mockProducts(): ProductInput[] {
       shopifyProductId: "gid://shopify/Product/3",
       title: "Studio Monitor Speakers (Pair)",
       sku: "AUD-220",
+      imageUrl: "/products/aud-220.jpg",
       currentInventory: 6,
       reorderPoint: 8,
       price: 2450.0,
@@ -184,6 +187,7 @@ function mockProducts(): ProductInput[] {
       shopifyProductId: "gid://shopify/Product/4",
       title: "Ceramic Mug Set",
       sku: "MUG-003",
+      imageUrl: "/products/mug-003.jpg",
       currentInventory: 85,
       reorderPoint: 25,
       price: 42.0,
@@ -193,6 +197,7 @@ function mockProducts(): ProductInput[] {
       shopifyProductId: "gid://shopify/Product/5",
       title: "4K Drone Kit",
       sku: "DRN-500",
+      imageUrl: "/products/drn-500.jpg",
       currentInventory: 2,
       reorderPoint: 5,
       price: 3120.0,
@@ -202,6 +207,7 @@ function mockProducts(): ProductInput[] {
       shopifyProductId: "gid://shopify/Product/6",
       title: "Wool Blanket Throw",
       sku: "BLK-090",
+      imageUrl: "/products/blk-090.jpg",
       currentInventory: 0,
       reorderPoint: 15,
       price: 78.0,
@@ -384,8 +390,10 @@ class LiveShopifyClient implements ShopifyWriteClient {
       const product = asRecord(raw) ?? {};
       const variants = Array.isArray(product.variants) ? product.variants : [];
       const variant = asRecord(variants[0]) ?? {};
+      const imageSrc = asRecord(product.image)?.src;
       return {
         shopifyProductId: `gid://shopify/Product/${product.id}`,
+        ...(typeof imageSrc === "string" && imageSrc ? { imageUrl: imageSrc } : {}),
         title: String(product.title || "Product"),
         sku: String(variant.sku || product.id || ""),
         currentInventory: Number(variant.inventory_quantity || 0),

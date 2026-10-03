@@ -1,14 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { StoredProduct } from "@helix/core";
+import type { ReorderRequest, StoredOrder, StoredProduct } from "@helix/core";
 import { formatCurrency } from "@/lib/format";
-import { KpiCard, CoverArt } from "@helix/ui";
+import { KpiCard } from "@helix/ui";
+import { AiToast } from "@/components/ai-desk-events";
+import { AskAiDrawer } from "@/components/ask-ai-drawer";
+import { ProductThumbnail } from "@/components/inventory-catalog";
+import { ProductDetailDrawer } from "@/components/product-detail-drawer";
 import { StockBar } from "@/components/stock-bar";
 import { inventoryValue, stockStatus } from "@/lib/commerce-charts";
+import { createDraftReorders, draftResultMessage } from "@/lib/reorder-client";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<StoredProduct[]>([]);
+  const [orders, setOrders] = useState<StoredOrder[]>([]);
+  const [reorders, setReorders] = useState<ReorderRequest[]>([]);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askQuestion, setAskQuestion] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     void (async () => {
@@ -16,12 +29,32 @@ export default function ProductsPage() {
       const data = (await res.json()) as { products: StoredProduct[] };
       setProducts(data.products);
     })();
+    void (async () => {
+      const [o, r] = await Promise.all([fetch("/api/orders"), fetch("/api/reorders")]);
+      setOrders(((await o.json()) as { orders: StoredOrder[] }).orders);
+      setReorders(((await r.json()) as { reorders: ReorderRequest[] }).reorders);
+    })();
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+
+  async function draft(p: StoredProduct) {
+    setBusy(true);
+    setError(null);
+    const result = await createDraftReorders([p]);
+    setBusy(false);
+    if (result.created.length) setReorders((prev) => [...result.created, ...prev]);
+    setNotice(draftResultMessage(result, 1));
+    setError(result.operatorError ?? (result.failures.length ? result.failures.join(" · ") : null));
+  }
+
+  const detail = products.find((p) => p.id === detailId) ?? null;
   const value = products.reduce((n, p) => n + inventoryValue(p), 0);
   const low = products.filter((p) => stockStatus(p) !== "ok").length;
-  const PALETTE: [string, string][] = [["#065f46", "#0f766e"], ["#14532d", "#047857"], ["#134e4a", "#1e3a8a"], ["#064e3b", "#4d7c0f"]];
-
   return (
     <div className="space-y-4">
       <div>
@@ -52,14 +85,7 @@ export default function ProductsPage() {
                 <tr key={p.id} className="transition hover:bg-primary/10">
                   <td className="px-4 py-3 font-medium text-foreground">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 shrink-0" title={p.imageUrl ? undefined : "Generated cover, not a product photo"}>
-                        {p.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.imageUrl} alt="" className="h-10 w-12 rounded-lg object-cover" />
-                        ) : (
-                          <CoverArt colors={PALETTE[[...p.title].reduce((n, c) => n + c.charCodeAt(0), 0) % PALETTE.length]} height={40} label="Generated cover, no product photo" />
-                        )}
-                      </div>
+                      <ProductThumbnail product={p} size={40} onOpen={() => setDetailId(p.id)} />
                       <span>{p.title}</span>
                     </div>
                   </td>
@@ -82,6 +108,27 @@ export default function ProductsPage() {
           ) : null}
         </div>
       </div>
+
+      <AiToast message={notice} />
+      <ProductDetailDrawer
+        product={detail}
+        onOpenChange={(open) => {
+          if (open) return;
+          setDetailId(null);
+          setError(null);
+        }}
+        orders={orders}
+        reorders={reorders}
+        busy={busy}
+        error={error}
+        onCreateDraft={draft}
+        onAskAi={(p) => {
+          setDetailId(null);
+          setAskQuestion(`Tell me about ${p.title} (SKU ${p.sku}): current stock, sales velocity, recent orders, and whether I should reorder.`);
+          setAskOpen(true);
+        }}
+      />
+      <AskAiDrawer open={askOpen} onOpenChange={setAskOpen} initialQuestion={askQuestion} />
     </div>
   );
 }

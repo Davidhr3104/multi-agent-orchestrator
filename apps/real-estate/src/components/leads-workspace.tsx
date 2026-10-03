@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { Columns3, Rows3, Search, Snowflake, X } from "lucide-react";
 import { Avatar, money } from "@/components/bits";
+import { OperatorText } from "@/components/operator-text";
 import { ScoreExplain } from "@/components/score-explain";
 import { INTENT_LABEL, INTENTS, intentFor, type Intent } from "@/lib/intent";
 import { contactRecency } from "@/lib/status";
@@ -320,7 +321,7 @@ export function LeadsWorkspace({ leads, coldIds, initial, now }: { leads: Scored
 
       {error ? (
         <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/5 px-4 py-2 text-xs text-rose-300">
-          {error}
+          <OperatorText text={error} />
         </p>
       ) : null}
 
