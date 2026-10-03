@@ -1,3 +1,4 @@
+import { requireOperator } from "@helix/core/operator";
 import { aiCtx, deskWriteDenied } from "@/lib/ai-desk";
 import { upsertHubspotContact } from "@/lib/hubspot";
 import { getLead, logActivity, putLead } from "@/lib/store";
@@ -6,7 +7,8 @@ export const runtime = "nodejs";
 
 /** Creates or updates this buyer as a HubSpot contact after the agent confirmed it. Body: { confirm: true }. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = deskWriteDenied(req);
+  // Writes to the operator's real CRM: demo visitors without the operator key can't push.
+  const denied = requireOperator(req) ?? deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { confirm?: unknown };

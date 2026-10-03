@@ -118,6 +118,7 @@ function Rich({ text }: { text: string }) {
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const thinkingPauseMs = () => 1200 + Math.random() * 900;
 
 type ExecuteResponse = Partial<Executed> & { error?: string; done?: string[] };
 
@@ -168,6 +169,7 @@ export function AskAiDrawer({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- saved sessions live in localStorage, readable only after mount
       setSessions(loadSessions());
       fetch("/api/settings/desk")
         .then((r) => r.json())
@@ -203,7 +205,7 @@ export function AskAiDrawer({
       }
       const data = (await res.json()) as ServerReply;
       // The demo assistant answers instantly; pause so the typing indicator reads as thinking.
-      if (data.demo) await wait(1200 + Math.random() * 900);
+      if (data.demo) await wait(thinkingPauseMs());
       setEngine(data.engine);
       commit([
         ...next,

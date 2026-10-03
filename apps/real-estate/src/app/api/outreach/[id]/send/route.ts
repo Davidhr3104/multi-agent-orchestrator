@@ -1,3 +1,4 @@
+import { requireOperator } from "@helix/core/operator";
 import { aiCtx, deskWriteDenied } from "@/lib/ai-desk";
 import { sendApprovedDraft } from "@/lib/outreach-send";
 
@@ -5,7 +6,8 @@ export const runtime = "nodejs";
 
 /** Sends one approved draft on one channel after the agent confirmed it. Body: { channel, confirm: true }. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = deskWriteDenied(req);
+  // Real messages on the operator's Resend/Twilio account: demo visitors without the operator key can't send.
+  const denied = requireOperator(req) ?? deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { channel?: unknown; confirm?: unknown };

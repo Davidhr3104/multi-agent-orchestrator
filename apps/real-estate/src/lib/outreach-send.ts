@@ -4,6 +4,9 @@ import type { Delivery } from "./types";
 
 export type SendReply = { status: number; body: Record<string, unknown> };
 
+/** draftId:channel pairs waiting on the provider, so a double click or a retry can't send the same message twice. */
+const inFlight = new Set<string>();
+
 /**
  * Sends one approved draft on one channel. The agent must have approved the draft AND confirmed this specific send
  * (confirm: true); a draft is never sent by the risk policy, the chat or the nightly run. "sent" is reported only
@@ -26,15 +29,27 @@ export async function sendApprovedDraft(input: { draftId: string; channel: unkno
     return { status: 409, body: { sent: false, notConfigured: true, error: `Not sent — ${CHANNEL_LABEL[channel]} isn't connected on this server. Copy the message into your own ${channel === "email" ? "inbox" : "phone"}.` } };
   }
 
-  const result: SendResult =
-    channel === "email" ? await sendEmailResend({ to, subject: draft.subject, text: draft.body }, input.fetchImpl) : await sendTwilio({ to, body: draft.body, channel }, input.fetchImpl);
+  const key = `${draft.id}:${channel}`;
+  if (inFlight.has(key)) return { status: 409, body: { sent: false, error: `This message is already being sent by ${CHANNEL_LABEL[channel]}.` } };
+  inFlight.add(key);
+  let result: SendResult;
+  let at = "";
+  try {
+    result =
+      channel === "email" ? await sendEmailResend({ to, subject: draft.subject, text: draft.body }, input.fetchImpl) : await sendTwilio({ to, body: draft.body, channel }, input.fetchImpl);
+    if (result.ok) {
+      at = new Date().toISOString();
+      const current = await getDraft(draft.id);
+      const delivery: Delivery = { channel, provider: result.provider, providerId: result.providerId, to, at, by: input.actor };
+      await putDraft({ ...(current ?? draft), deliveries: [...((current ?? draft).deliveries ?? []), delivery] });
+    }
+  } finally {
+    inFlight.delete(key);
+  }
   if (!result.ok) {
     await logActivity({ actor: input.actor, action: `send_${channel}`, kind: "run", via: "button", labels: [`${lead.name}: ${draft.subject}`], done: 0, failed: 1 });
     return { status: 502, body: { sent: false, error: `Not sent — ${result.error}` } };
   }
-  const at = new Date().toISOString();
-  const delivery: Delivery = { channel, provider: result.provider, providerId: result.providerId, to, at, by: input.actor };
-  await putDraft({ ...draft, deliveries: [...(draft.deliveries ?? []), delivery] });
   await setLeadLastContact(lead.id, at);
   await logActivity({ actor: input.actor, action: `send_${channel}`, kind: "run", via: "button", labels: [`${lead.name}: ${draft.subject}`], done: 1, failed: 0 });
   return { status: 200, body: { sent: true, channel, provider: result.provider, providerId: result.providerId, to, at } };

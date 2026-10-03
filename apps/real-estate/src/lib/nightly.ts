@@ -32,7 +32,7 @@ export type NightlySummary = {
   sent: 0;
 };
 
-/** Cap on Claude-written drafts per run, so a large import can't run up the bill overnight. */
+/** Cap on Claude calls per run (discarded answers are billed too), so a large import can't run up the bill overnight. */
 export const NIGHTLY_MAX_AI_DRAFTS = 20;
 
 export async function runNightlyMatching(opts: { now?: number; useAi?: boolean; fetchImpl?: typeof fetch } = {}): Promise<NightlySummary> {
@@ -45,6 +45,7 @@ export async function runNightlyMatching(opts: { now?: number; useAi?: boolean; 
   let changed = 0;
   let drafted = 0;
   let aiWritten = 0;
+  let aiCalls = 0;
   const labels: string[] = [];
   for (const p of props) {
     const fp = propertyFingerprint(p);
@@ -54,7 +55,8 @@ export async function runNightlyMatching(opts: { now?: number; useAi?: boolean; 
       const key = `${p.id}|${b.lead.id}`;
       if (alreadyDrafted.has(key)) continue;
       const draft = { ...matchAlertDraft(p, b.lead, b.reasons, now), queuedBy: "nightly" as const, writer: "template" as const };
-      if (opts.useAi && aiWritten < NIGHTLY_MAX_AI_DRAFTS) {
+      if (opts.useAi && aiCalls < NIGHTLY_MAX_AI_DRAFTS) {
+        aiCalls++;
         const ai = await writeMatchAlert(b.lead, p, "friendly", opts.fetchImpl, "nightly_match");
         draft.explanation = ai.explanation;
         if (ai.engine === "claude") {

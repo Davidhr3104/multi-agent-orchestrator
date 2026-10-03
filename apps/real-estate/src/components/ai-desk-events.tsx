@@ -11,7 +11,9 @@ export function useAiDeskEvents(refresh: () => void | Promise<void>) {
   const [toast, setToast] = useState<string | null>(null);
   const [undo, setUndo] = useState<unknown[] | null>(null);
   const refreshRef = useRef(refresh);
-  refreshRef.current = refresh;
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
 
   useEffect(() => {
     let toastTimer: number | undefined;
@@ -137,6 +139,7 @@ export function DemoBanner({
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load() only sets state after the fetch resolves
     void load();
     const onRefresh = () => void load();
     window.addEventListener("helix:desk-refresh", onRefresh);

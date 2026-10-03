@@ -110,7 +110,17 @@ export async function importRecords(input: { properties?: Property[]; leads?: Le
     const prev = d.leads.get(l.id);
     if (prev) updated++;
     else added++;
-    d.leads.set(l.id, { ...l, zones: [...l.zones], notes: prev ? [...prev.notes] : [...l.notes], createdAt: prev?.createdAt ?? l.createdAt, crm: prev?.crm });
+    // An empty stage or last-contact cell in a re-import keeps the progress already made on the desk.
+    d.leads.set(l.id, {
+      ...l,
+      zones: [...l.zones],
+      notes: prev ? [...prev.notes] : [...l.notes],
+      createdAt: prev?.createdAt ?? l.createdAt,
+      stage: prev && l.stage === "new" ? prev.stage : l.stage,
+      lastContactAt: l.lastContactAt ?? prev?.lastContactAt,
+      interestedIn: l.interestedIn ?? prev?.interestedIn,
+      crm: prev?.crm,
+    });
   }
   return { added, updated, clearedDemo };
 }

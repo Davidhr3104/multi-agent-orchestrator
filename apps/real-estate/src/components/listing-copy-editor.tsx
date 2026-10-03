@@ -47,7 +47,7 @@ export function ListingCopyEditor({ propertyId, template, approved, claude }: { 
       setWriter(r.engine);
       setNote(r.note ?? null);
       setCost(r.cost ?? null);
-      setDirty(r.engine === "claude");
+      setDirty(r.engine === "claude" || !!saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {

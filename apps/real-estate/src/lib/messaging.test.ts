@@ -125,7 +125,7 @@ describe("sending an approved draft", () => {
 
   it("sends once when approved and confirmed, records the delivery, and blocks a duplicate", async () => {
     const id = await approvedDraftId();
-    await handleExecuteBody(realEstateActions, { action: "approve_draft", targetIds: [id] }, { actor: "You" });
+    const approval = await handleExecuteBody(realEstateActions, { action: "approve_draft", targetIds: [id] }, { actor: "You" });
     process.env.RESEND_API_KEY = "re_test_key";
     process.env.RESEND_FROM = "agent@agency.test";
     const f = vi.fn(async () => json({ id: "email_42" }));
@@ -138,6 +138,27 @@ describe("sending an approved draft", () => {
     const dup = await sendApprovedDraft({ draftId: id, channel: "email", confirm: true, actor: "You", fetchImpl: f as unknown as typeof fetch });
     expect(dup.status).toBe(409);
     expect(f).toHaveBeenCalledTimes(1);
+
+    const undo = await handleExecuteBody(realEstateActions, { action: "restore", entries: approval.body.undo }, { actor: "You" });
+    expect((undo.body.failed as unknown[]).length).toBe(1);
+    const after = (await listDrafts()).find((x) => x.id === id)!;
+    expect(after).toMatchObject({ status: "approved", deliveries: [expect.objectContaining({ providerId: "email_42" })] });
+  });
+
+  it("sends once when two confirmed requests arrive together", async () => {
+    const id = await approvedDraftId();
+    await handleExecuteBody(realEstateActions, { action: "approve_draft", targetIds: [id] }, { actor: "You" });
+    process.env.RESEND_API_KEY = "re_test_key";
+    process.env.RESEND_FROM = "agent@agency.test";
+    const f = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+      return json({ id: "email_once" });
+    });
+    const send = () => sendApprovedDraft({ draftId: id, channel: "email", confirm: true, actor: "You", fetchImpl: f as unknown as typeof fetch });
+    const [a, b] = await Promise.all([send(), send()]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect((await listDrafts()).find((x) => x.id === id)?.deliveries).toHaveLength(1);
   });
 
   it("records nothing when the provider fails", async () => {

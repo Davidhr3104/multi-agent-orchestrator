@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseCsv } from "./csv";
 import { autoMap, fetchSheetCsv, importBuyers, importProperties, parseMoney, sheetCsvUrl } from "./import";
-import { currentDeskMode, deskStatus, importRecords, listDrafts, listLeads, listProperties, loadDemoCatalog } from "./store";
+import { currentDeskMode, deskStatus, getLead, importRecords, listDrafts, listLeads, listProperties, loadDemoCatalog, setLeadLastContact, setLeadStage } from "./store";
 
 const LISTINGS = [
   "MLS #,Address,Neighborhood,Property Type,List Price,Sq Ft,Beds,Baths,Features,Status,Remarks",
@@ -129,5 +129,18 @@ describe("importing switches the desk out of demo", () => {
 
     const again = await importRecords({ properties: records });
     expect(again).toEqual({ added: 0, updated: 2, clearedDemo: false });
+  });
+
+  it("re-importing buyers without stage or last contact keeps the progress made on the desk", async () => {
+    const csv = "Name,Email,Stage,Last contact\nAna Ruiz,ana@realmail.com,,";
+    await importRecords({ leads: importBuyers(csv).records });
+    const id = (await listLeads())[0].id;
+    await setLeadStage(id, "visit");
+    await setLeadLastContact(id, "2026-09-01T10:00:00.000Z");
+    const out = await importRecords({ leads: importBuyers(csv).records });
+    expect(out).toMatchObject({ added: 0, updated: 1 });
+    expect(await getLead(id)).toMatchObject({ stage: "visit", lastContactAt: "2026-09-01T10:00:00.000Z" });
+    await importRecords({ leads: importBuyers("Name,Email,Stage\nAna Ruiz,ana@realmail.com,offer").records });
+    expect((await getLead(id))?.stage).toBe("offer");
   });
 });

@@ -112,7 +112,9 @@ async function restoreDraft(id: string, data: unknown) {
   const d = (data as { draft?: unknown } | null)?.draft;
   if (!isDraft(d)) throw new Error("Invalid undo data");
   if (d.id !== id) throw new Error("Undo data does not match this draft");
-  if (!(await getDraft(id))) return false;
+  const current = await getDraft(id);
+  if (!current) return false;
+  if (current.deliveries?.length) throw new Error("This draft was already sent, so the approval can't be undone.");
   await putDraft(d);
   return true;
 }
