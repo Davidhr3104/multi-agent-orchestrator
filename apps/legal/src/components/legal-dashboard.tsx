@@ -57,6 +57,9 @@ import type { ConflictReport } from "@/lib/conflict-types";
 import { modelForMethod, traceSuffix } from "@/lib/audit-trace";
 import { ConflictPanel } from "@/components/conflict-panel";
 import { PricingPanel } from "@/components/pricing-panel";
+import { RfpAiInsights } from "@/components/rfp-ai-insights";
+import { SamGovPanel } from "@/components/sam-gov-panel";
+import { isSamRfp } from "@/lib/legal-rfp";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import type { PricingQuote } from "@/lib/pricing-types";
 import { type LegalNavId } from "@/components/legal-chrome";
@@ -732,6 +735,7 @@ export function LegalDashboard() {
         </section>
 
         <DemoBanner message="You are exploring sample RFPs. Start with your own data and the samples disappear." ownDataLabel="Use my own data" />
+        <SamGovPanel rfps={rfps} onImported={refresh} />
         <AskAiCard
           rfpId={selected?.id}
           onOpenDrawer={(q) => {
@@ -893,6 +897,14 @@ export function LegalDashboard() {
                               {rfp.title}
                             </div>
                             <div className="mt-0.5 truncate text-[11px] text-slate-400">{rfp.issuer || "Unspecified"}</div>
+                            {isSamRfp(rfp) ? (
+                              <div className="mt-1 flex gap-1">
+                                <span className="rounded-[3px] bg-[#1E3A8A] px-1 py-px text-[9px] font-semibold text-[#93C5FD]">SAM.gov</span>
+                                {!rfp.partnerDecision ? (
+                                  <span className="rounded-[3px] bg-[#422006] px-1 py-px text-[9px] font-semibold text-[#FCD34D]">Proposed</span>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div className={cn("mt-1 text-[10px]", past ? "font-medium text-[#FCA5A5]" : "text-slate-500")}>
                               {countdownLabel(due?.days ?? null)}
                             </div>
@@ -1321,6 +1333,11 @@ export function LegalDashboard() {
               onReview={(payload) => void clearReview(selected.id, payload)}
               onCorpus={() => void askCorpus(selected.id)}
               onProposal={() => downloadProposal(selected)}
+              onUpdated={(next) => {
+                setRfps((prev) => prev.map((r) => (r.id === next.id ? next : r)));
+                setSelected(next);
+                void refresh();
+              }}
             />
           ) : null}
         </SheetContent>
@@ -1341,6 +1358,7 @@ function RfpSheet({
   onReview,
   onCorpus,
   onProposal,
+  onUpdated,
 }: {
   selected: StoredRfp;
   all: StoredRfp[];
@@ -1353,6 +1371,7 @@ function RfpSheet({
   onReview: (payload: { verdict: PartnerVerdict; coiCleared: boolean; bidAmount: string; notes: string }) => void;
   onCorpus: () => void;
   onProposal: () => void;
+  onUpdated: (next: StoredRfp) => void;
 }) {
   const deadlines = extractDeadlines(selected, now);
   const gaps = complianceGaps(selected);
@@ -1434,6 +1453,7 @@ function RfpSheet({
               <Badge variant="secondary">{countdownLabel(deadlines[0]?.days ?? null)}</Badge>
               <Badge variant="outline">{assign.attorney} · {assign.role}</Badge>
             </div>
+            <RfpAiInsights rfp={selected} onUpdated={onUpdated} />
             <p className="text-sm leading-relaxed">{selected.reasoning}</p>
             <p className="text-xs text-muted-foreground">
               {assign.reason} · {assign.workload}h / {assign.capacity}h this week
@@ -1475,6 +1495,13 @@ function RfpSheet({
                     <span className="text-muted-foreground">{Math.round(field.confidence * 100)}%</span>
                   </div>
                   <p className="text-sm">{field.value}</p>
+                  {field.quote ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      “{field.quote}” · {field.verified ? `cited, chars ${field.spanStart}–${field.spanEnd}` : "unverified"}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-muted-foreground">No quote in the source · needs human check</p>
+                  )}
                 </li>
               ))}
             </ul>

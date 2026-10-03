@@ -2,5 +2,11 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=helix-legal",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [
+    {
+      "path": "/api/cron/sam-sync",
+      "schedule": "0 12 * * *"
+    }
+  ]
 }

@@ -299,6 +299,62 @@ export async function supabaseUpsertProfile(profile: string): Promise<boolean> {
   return true;
 }
 
+const RFP_META_PREFIX = "rfp-meta:";
+
+/** JSON blobs kept in legal.desk_meta (id text, body text), so no schema change is needed. */
+export async function supabaseGetMetaJson<T>(id: string): Promise<T | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await kv(db, "desk_meta").select("*").eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  try {
+    return JSON.parse(String((data as Record<string, unknown>).body ?? "")) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function supabaseUpsertMetaJson(id: string, payload: unknown): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  const { error } = await kv(db, "desk_meta").upsert({ id, body: JSON.stringify(payload) });
+  if (error) {
+    console.warn(`[helix-legal] meta ${id} upsert skipped:`, error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function supabaseUpsertRfpMeta(rfpId: string, meta: unknown): Promise<boolean> {
+  return supabaseUpsertMetaJson(`${RFP_META_PREFIX}${rfpId}`, meta);
+}
+
+export async function supabaseGetRfpMeta<T>(rfpId: string): Promise<T | null> {
+  return supabaseGetMetaJson<T>(`${RFP_META_PREFIX}${rfpId}`);
+}
+
+export async function supabaseLoadRfpMetaMap<T>(): Promise<Record<string, T> | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const { data, error } = await kv(db, "desk_meta").select("*").order("id", { ascending: true });
+  if (error) {
+    console.warn("[helix-legal] rfp meta list skipped:", error.message);
+    return null;
+  }
+  const out: Record<string, T> = {};
+  for (const raw of data ?? []) {
+    const row = raw as Record<string, unknown>;
+    const id = String(row.id ?? "");
+    if (!id.startsWith(RFP_META_PREFIX)) continue;
+    try {
+      out[id.slice(RFP_META_PREFIX.length)] = JSON.parse(String(row.body ?? "")) as T;
+    } catch {
+      // A corrupt blob only loses that RFP's extra metadata.
+    }
+  }
+  return out;
+}
+
 export async function supabaseUpsertJson(
   table: "conflicts" | "quotes",
   rfpId: string,

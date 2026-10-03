@@ -27,7 +27,12 @@ import {
   supabaseUpsertProfile,
   supabaseUpsertJson,
   supabaseLoadJsonMap,
+  supabaseGetRfpMeta,
+  supabaseLoadRfpMetaMap,
+  supabaseUpsertRfpMeta,
 } from "@/lib/supabase-desk";
+import type { AiUsageEntry } from "@/lib/ai-cost";
+import { pickRfpMeta, type LegalRfp, type LegalRfpMeta } from "@/lib/legal-rfp";
 
 export type { AuditEvent } from "@/lib/audit-types";
 
@@ -288,7 +293,8 @@ async function hydrateFromRemote(): Promise<void> {
 
   if (remoteRfps.length > 0) {
     d.memory.clear();
-    for (const rfp of remoteRfps) d.memory.set(rfp.id, rfp);
+    const metaMap = (await supabaseLoadRfpMetaMap<LegalRfpMeta>()) ?? {};
+    for (const rfp of remoteRfps) d.memory.set(rfp.id, { ...rfp, ...(metaMap[rfp.id] ?? {}) });
   } else {
     seedMemory();
     if (d.memory.size > 0) await supabaseUpsertRfps([...d.memory.values()]);
@@ -336,7 +342,23 @@ export async function saveRfp(rfp: StoredRfp): Promise<StoredRfp> {
   seedMemory();
   desk().memory.set(rfp.id, rfp);
   await supabaseUpsertRfp(rfp);
+  const meta = pickRfpMeta(rfp as LegalRfp);
+  if (meta) await supabaseUpsertRfpMeta(rfp.id, meta);
   return rfp;
+}
+
+/** Source, AI extraction, Go/No-Go proposal and AI cost live beside the core RFP record. */
+export async function updateRfpMeta(id: string, patch: LegalRfpMeta): Promise<LegalRfp | null> {
+  const current = (await getRfp(id)) as LegalRfp | null;
+  if (!current) return null;
+  return (await saveRfp({ ...current, ...patch } as LegalRfp)) as LegalRfp;
+}
+
+export async function appendAiUsage(id: string, entries: AiUsageEntry[]): Promise<LegalRfp | null> {
+  const current = (await getRfp(id)) as LegalRfp | null;
+  if (!current) return null;
+  if (entries.length === 0) return current;
+  return updateRfpMeta(id, { aiUsage: [...(current.aiUsage ?? []), ...entries] });
 }
 
 export async function getRfp(id: string): Promise<StoredRfp | null> {
@@ -348,8 +370,9 @@ export async function getRfp(id: string): Promise<StoredRfp | null> {
   if (d.memory.has(id)) return d.memory.get(id) ?? null;
   const remote = await supabaseGetRfp(id);
   if (remote) {
-    d.memory.set(remote.id, remote);
-    return remote;
+    const merged: LegalRfp = { ...remote, ...((await supabaseGetRfpMeta<LegalRfpMeta>(id)) ?? {}) };
+    d.memory.set(merged.id, merged);
+    return merged;
   }
   return null;
 }
@@ -464,6 +487,7 @@ export async function checkAndStoreConflict(rfp: StoredRfp): Promise<ConflictRep
   const report = await runConflictCheck(rfp);
   desk().conflicts.set(rfp.id, report);
   await supabaseUpsertJson("conflicts", rfp.id, report);
+  if (report.usage) await appendAiUsage(rfp.id, [report.usage]);
   await pushAudit(
     "ethics",
     "coi",

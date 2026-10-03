@@ -1,3 +1,5 @@
+import type { AiUsageEntry } from "@/lib/ai-cost";
+
 export type FirmClientStatus = "Active" | "Inactive";
 export type FirmMatterStatus = "Active" | "Closed";
 
@@ -52,4 +54,6 @@ export type ConflictReport = {
   claudeFailed: boolean;
   hits: ConflictHit[];
   checkedAt: string;
+  /** Tokens and estimated cost of the Claude call behind this report, when one was made. */
+  usage?: AiUsageEntry;
 };

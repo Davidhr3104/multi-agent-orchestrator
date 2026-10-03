@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { CorpusDocument, StoredRfp } from "@helix/core";
@@ -17,7 +17,7 @@ function downloadSource(rfp: StoredRfp) {
   URL.revokeObjectURL(a.href);
 }
 
-export default function DocumentsPage() {
+function DocumentsPageInner() {
   const [rfps, setRfps] = useState<StoredRfp[]>([]);
   const [docs, setDocs] = useState<CorpusDocument[]>([]);
   const [chunkCount, setChunkCount] = useState(0);
@@ -318,5 +318,14 @@ export default function DocumentsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+/** useSearchParams() needs a Suspense boundary so the page can still be prerendered. */
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DocumentsPageInner />
+    </Suspense>
   );
 }

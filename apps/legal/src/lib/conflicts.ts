@@ -1,5 +1,6 @@
-import { completeWithClaude, isClaudeConfigured, parseJsonObject } from "@helix/core";
+import { parseJsonObject } from "@helix/core";
 import type { StoredRfp } from "@helix/core";
+import { callClaudeMetered } from "@/lib/claude-metered";
 import type {
   CoiVerdict,
   ConflictAgainst,
@@ -151,34 +152,32 @@ export async function runConflictCheck(rfp: StoredRfp): Promise<ConflictReport> 
   let why = base.why;
   let mergedHits = hits;
 
-  if (!isClaudeConfigured()) {
+  const res = await callClaudeMetered({
+    purpose: "coi",
+    maxTokens: 700,
+    rfpId: rfp.id,
+    prompt: [
+      `You are ethics counsel for a US law firm. Return JSON only.`,
+      `Schema: {"verdict":"GO"|"CONDITIONAL"|"NO-GO","score":0-100,"why":"string","hits":[{"party":"","matchedName":"","relation":"issuer"|"opposing_party"|"related_entity"|"incumbent","against":"current_client"|"former_client"|"active_matter_adverse"|"closed_matter","severity":"red"|"amber","detail":""}]}`,
+      `RFP issuer: ${rfp.issuer}`,
+      `RFP title: ${rfp.title}`,
+      `RFP body: ${rfp.body.slice(0, 2500)}`,
+      `Firm clients: ${JSON.stringify(knowledge.clients)}`,
+      `Firm matters: ${JSON.stringify(knowledge.matters)}`,
+      `Heuristic hits already found: ${JSON.stringify(hits)}`,
+      `If unsure, stay CONDITIONAL. Never invent clients that are not in the firm lists.`,
+    ].join("\n"),
+  });
+  const parsed = res.ok ? parseJsonObject<ClaudePayload>(res.text) : null;
+  if (!parsed) {
     claudeFailed = true;
   } else {
-    const raw = await completeWithClaude(
-      [
-        `You are ethics counsel for a US law firm. Return JSON only.`,
-        `Schema: {"verdict":"GO"|"CONDITIONAL"|"NO-GO","score":0-100,"why":"string","hits":[{"party":"","matchedName":"","relation":"issuer"|"opposing_party"|"related_entity"|"incumbent","against":"current_client"|"former_client"|"active_matter_adverse"|"closed_matter","severity":"red"|"amber","detail":""}]}`,
-        `RFP issuer: ${rfp.issuer}`,
-        `RFP title: ${rfp.title}`,
-        `RFP body: ${rfp.body.slice(0, 2500)}`,
-        `Firm clients: ${JSON.stringify(knowledge.clients)}`,
-        `Firm matters: ${JSON.stringify(knowledge.matters)}`,
-        `Heuristic hits already found: ${JSON.stringify(hits)}`,
-        `If unsure, stay CONDITIONAL. Never invent clients that are not in the firm lists.`,
-      ].join("\n"),
-      700
-    );
-    const parsed = raw ? parseJsonObject<ClaudePayload>(raw) : null;
-    if (!raw || !parsed) {
-      claudeFailed = true;
-    } else {
-      engine = "claude";
-      if (parsed.verdict) verdict = parsed.verdict;
-      if (typeof parsed.score === "number") score = Math.max(0, Math.min(100, Math.round(parsed.score)));
-      if (parsed.why) why = parsed.why;
-      if (Array.isArray(parsed.hits) && parsed.hits.length) {
-        mergedHits = [...hits, ...parsed.hits.filter((h) => h && h.matchedName && h.detail)];
-      }
+    engine = "claude";
+    if (parsed.verdict) verdict = parsed.verdict;
+    if (typeof parsed.score === "number") score = Math.max(0, Math.min(100, Math.round(parsed.score)));
+    if (parsed.why) why = parsed.why;
+    if (Array.isArray(parsed.hits) && parsed.hits.length) {
+      mergedHits = [...hits, ...parsed.hits.filter((h) => h && h.matchedName && h.detail)];
     }
   }
 
@@ -192,5 +191,6 @@ export async function runConflictCheck(rfp: StoredRfp): Promise<ConflictReport> 
     claudeFailed,
     hits: mergedHits,
     checkedAt: new Date().toISOString(),
+    usage: res.usage,
   };
 }

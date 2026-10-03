@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { StoredRfp } from "@helix/core";
 import { complianceGaps } from "@/lib/rfp-intel";
@@ -21,7 +21,7 @@ const REDLINES: { test: RegExp; suggestion: string }[] = [
   { test: /iso\s*27001|soc\s*2/i, suggestion: "Do not claim a certification the firm does not hold. Offer the controls that are in place." },
 ];
 
-export default function WordTaskPane() {
+function WordTaskPane() {
   const params = useSearchParams();
   const [rfps, setRfps] = useState<StoredRfp[]>([]);
   const [id, setId] = useState(params.get("rfp") ?? "");
@@ -123,5 +123,14 @@ export default function WordTaskPane() {
       </section>
       {note ? <p className="text-[11px] text-[#FCD34D]">{note}</p> : null}
     </main>
+  );
+}
+
+/** useSearchParams() needs a Suspense boundary so the page can still be prerendered. */
+export default function WordPage() {
+  return (
+    <Suspense fallback={null}>
+      <WordTaskPane />
+    </Suspense>
   );
 }
