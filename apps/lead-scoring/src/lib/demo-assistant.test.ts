@@ -103,6 +103,19 @@ describe("buildDemoReply", () => {
     expect(r.answer).toContain("“12000”");
   });
 
+  it("resolves a first or last name only (not the top lead)", () => {
+    expect(buildDemoReply("why did Priya score 68?", all, NOW).answer).toContain("Priya Nair scored 68");
+    expect(buildDemoReply("why did nair score 68?", all, NOW).answer).toContain("Priya Nair");
+  });
+
+  it("asks which lead when a partial name is ambiguous", () => {
+    const other = lead({ id: "p2", name: "Priya Shah", score: 50 });
+    const r = buildDemoReply("why did Priya score 68?", [...all, other], NOW);
+    expect(r.answer).toMatch(/which lead/i);
+    expect(r.answer).toContain("Priya Shah");
+    expect(r.answer).not.toContain("Jordan Hale");
+  });
+
   it("explains the top active lead when no name is given", () => {
     const r = buildDemoReply("Why is my best lead scored so high?", all, NOW);
     expect(r.answer).toContain("Jordan Hale");

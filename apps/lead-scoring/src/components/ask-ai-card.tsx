@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 type AskAiMessage = { role: "user" | "assistant"; content: string };
 type AskAiEngine = "claude" | "fallback";
@@ -17,6 +17,14 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<AskAiEngine | null>(null);
+  const [claudeConfigured, setClaudeConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((s: { claude?: boolean }) => setClaudeConfigured(Boolean(s.claude)))
+      .catch(() => setClaudeConfigured(null));
+  }, []);
 
   async function ask(text: string) {
     const trimmed = text.trim();
@@ -60,9 +68,11 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
     void ask(question);
   }
 
-  const statusLabel = engine === "fallback" ? "Limited Mode" : "Online & Ready";
-  const statusTone = engine === "fallback" ? "text-error" : "text-tertiary";
-  const dotTone = engine === "fallback" ? "bg-error" : "bg-tertiary";
+  // Real state: no Claude key means the rules-based demo assistant answers, not a live model.
+  const limited = engine === "fallback" || (engine === null && claudeConfigured === false);
+  const statusLabel = limited ? "Demo assistant · rules-based" : claudeConfigured === null && engine === null ? "Checking…" : "Online & Ready";
+  const statusTone = limited ? "text-primary" : claudeConfigured === null && engine === null ? "text-outline" : "text-tertiary";
+  const dotTone = limited ? "bg-primary" : claudeConfigured === null && engine === null ? "bg-outline" : "bg-tertiary";
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-outline-variant/25 bg-surface-container p-5">
@@ -100,7 +110,7 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-outline-variant/40 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-on-surface-variant uppercase">
-              Helix Copilot v4.2
+              Helix Copilot
             </span>
             <span className={`flex items-center gap-1 text-[11px] font-semibold ${statusTone}`}>
               <span className={`inline-block size-1.5 rounded-full ${dotTone}`} />

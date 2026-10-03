@@ -49,6 +49,62 @@ function ScorePill({ lead }: { lead: StoredLead }) {
   );
 }
 
+function SignalChips({ lead, className }: { lead: StoredLead; className?: string }) {
+  const chips = signalChips(lead);
+  const shown = chips.slice(0, 2);
+  const rest = chips.slice(2);
+  return (
+    <div className={cn("flex flex-wrap gap-1", className)}>
+      {shown.map((chip) => (
+        <span key={chip} className="max-w-[140px] truncate rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] text-on-surface-variant">
+          {chip}
+        </span>
+      ))}
+      {rest.length > 0 ? (
+        <span
+          className="rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+          title={rest.join(" · ")}
+        >
+          +{rest.length}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+const TIER_SEGMENTS = [
+  { key: "hot", label: "Hot", bar: "bg-tertiary" },
+  { key: "warm", label: "Warm", bar: "bg-secondary" },
+  { key: "review", label: "Review", bar: "bg-error" },
+  { key: "cold", label: "Cold", bar: "bg-outline" },
+  { key: "spam", label: "Spam", bar: "bg-outline-variant" },
+] as const;
+
+/** Tier mix of the whole roster as a stacked bar + legend (counts from the same leads as the table). */
+function TierDistribution({ leads }: { leads: StoredLead[] }) {
+  const tally = { hot: 0, warm: 0, review: 0, cold: 0, spam: 0 } as Record<(typeof TIER_SEGMENTS)[number]["key"], number>;
+  for (const l of leads) tally[tierTone(l)] += 1;
+  const total = leads.length;
+  if (total === 0) return null;
+  return (
+    <div className="w-full sm:w-80" aria-label="Tier distribution">
+      <div className="flex h-2 overflow-hidden rounded-full bg-surface-container-highest" role="img" aria-label={TIER_SEGMENTS.map((t) => `${t.label} ${tally[t.key]}`).join(", ")}>
+        {TIER_SEGMENTS.map((t) =>
+          tally[t.key] > 0 ? <div key={t.key} className={t.bar} style={{ width: `${(tally[t.key] / total) * 100}%` }} /> : null
+        )}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-on-surface-variant">
+        {TIER_SEGMENTS.map((t) => (
+          <span key={t.key} className="inline-flex items-center gap-1">
+            <span className={cn("size-1.5 rounded-full", t.bar)} />
+            {t.label} <span className="font-mono text-on-surface">{tally[t.key]}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LiveInspect({
   lead,
   busy,
@@ -726,9 +782,10 @@ function LeadsRoster() {
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface">Lead Roster</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            {counts.all} contacts · filters reflect real seed counts
+            {counts.all} contacts · counts reflect the current roster
           </p>
         </div>
+        <TierDistribution leads={leads} />
         <div className="relative w-full sm:max-w-xs">
           <span className="material-symbols-outlined pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[18px] text-outline">
             search
@@ -752,7 +809,7 @@ function LeadsRoster() {
               router.replace(`/leads?filter=${f.id}${selectedId ? `&focus=${selectedId}` : ""}`);
             }}
             className={cn(
-              "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+              "inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:min-h-0",
               filter === f.id
                 ? "bg-primary-container text-on-primary-container"
                 : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
@@ -805,15 +862,58 @@ function LeadsRoster() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-7">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-7">
           <div className="overflow-hidden rounded-xl border border-outline-variant/25 bg-surface-container">
             {loading ? (
               <p className="p-8 text-center text-sm text-outline">Loading roster…</p>
             ) : visible.length === 0 ? (
               <p className="p-8 text-center text-sm text-outline">No leads in this filter.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              <ul className="divide-y divide-outline-variant/10 md:hidden">
+                {visible.map((lead) => {
+                  const active = lead.id === selectedId;
+                  return (
+                    <li key={lead.id} className={cn("flex items-start gap-1 pr-3", active && "bg-primary-container/15")}>
+                      <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
+                        <input
+                          type="checkbox"
+                          className="size-5"
+                          checked={checked.has(lead.id)}
+                          onChange={() => toggleCheck(lead.id)}
+                          aria-label={`Select ${lead.name}`}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(lead.id);
+                          router.replace(`/leads?filter=${filter}&focus=${lead.id}`);
+                        }}
+                        className="flex min-h-11 min-w-0 flex-1 items-start gap-3 py-3 text-left"
+                      >
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-highest text-[11px] font-bold text-primary">
+                          {initials(lead.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold text-on-surface">{lead.name}</p>
+                          <p className="truncate text-xs text-on-surface-variant">
+                            {lead.company ? `${lead.company} · ` : ""}
+                            {lead.email}
+                          </p>
+                          <SignalChips lead={lead} className="mt-1.5" />
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <ScorePill lead={lead} />
+                          <span className="font-mono text-[11px] text-outline">{relativeTime(lead.createdAt)}</span>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[640px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-outline-variant/20 text-[10px] font-bold tracking-wider text-outline uppercase">
@@ -874,16 +974,7 @@ function LeadsRoster() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="flex max-w-[220px] flex-wrap gap-1">
-                                {signalChips(lead).map((chip) => (
-                                  <span
-                                    key={chip}
-                                    className="rounded bg-surface-container-highest px-1.5 py-0.5 text-[10px] text-on-surface-variant"
-                                  >
-                                    {chip}
-                                  </span>
-                                ))}
-                              </div>
+                              <SignalChips lead={lead} className="max-w-[220px]" />
                             </td>
                             <td className="px-4 py-3">
                               <ScorePill lead={lead} />
@@ -905,11 +996,12 @@ function LeadsRoster() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         </div>
 
-        <div className="lg:col-span-5">
+        <div className="min-w-0 lg:col-span-5">
           <LiveInspect
             lead={selected}
             busy={busy}

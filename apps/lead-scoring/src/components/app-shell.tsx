@@ -207,9 +207,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
     return (
-      <div className="mb-6">
-        <p className="mb-2 px-4 text-[10px] font-bold tracking-[0.2em] text-outline uppercase">{title}</p>
-        <div className="space-y-1">
+      <div className="mb-4">
+        <p className="mb-1.5 px-4 text-[10px] font-bold tracking-[0.2em] text-outline uppercase">{title}</p>
+        <div className="space-y-0.5">
           {items.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -217,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                   active
                     ? "bg-primary-container text-on-primary-container"
                     : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -276,14 +276,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </div>
 
-      <nav className="thin-scrollbar flex-1 overflow-y-auto px-3 py-4">
+      <nav className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="Main">
         <NavGroup title="Overview" items={overview} />
         <NavGroup title="Configuration" items={configuration} />
         <NavGroup title="System" items={system} />
       </nav>
 
-      <div className="border-t border-outline-variant/20 p-4">
-        <div className="mb-3 rounded-xl bg-surface-container-lowest p-3">
+      <div className="border-t border-outline-variant/20 p-3">
+        <div className="mb-2 rounded-xl bg-surface-container-lowest p-3">
           <div className="flex items-center justify-between text-[10px] font-bold tracking-wider text-outline uppercase">
             <span>Clear of HITL</span>
             <span className="text-tertiary">{slaPct == null ? "—" : `${slaPct}%`}</span>
@@ -298,7 +298,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <button
           type="button"
-          className="mb-3 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-on-surface-variant hover:bg-surface-container-high"
+          className="mb-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-high"
           onClick={() => setProductsOpen((v) => !v)}
         >
           <Icon name="swap_horiz" className="text-[18px]" />
@@ -319,18 +319,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        <a
-          href="/settings"
-          className="flex items-center gap-3 rounded-xl bg-surface-container px-3 py-2.5 transition-colors hover:bg-surface-container-high"
-        >
-          <div className="flex size-9 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary-container">
-            AV
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-on-surface">Alex Vance</p>
-            <p className="truncate text-[11px] text-outline">Ops · Desk settings</p>
-          </div>
-        </a>
+        <SidebarProfile />
       </div>
     </aside>
   );
@@ -347,7 +336,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ) : null}
       {sidebar}
 
-      <div className="flex min-h-full flex-col md:ml-72">
+      <div className="flex min-h-full min-w-0 flex-col md:ml-72">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-outline-variant/20 bg-surface/90 px-4 backdrop-blur-md sm:px-6">
           <button
             type="button"
@@ -420,7 +409,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </header>
 
-        <div className="flex-1">{children}</div>
+        <div className="min-w-0 flex-1 overflow-x-clip">{children}</div>
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
@@ -456,6 +445,7 @@ function OrgSessionBadge() {
       <Link
         href="/login"
         className="hidden shrink-0 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2.5 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-high sm:block"
+        title="Sign in to use this desk across devices"
       >
         Sign in
       </Link>
@@ -468,5 +458,34 @@ function OrgSessionBadge() {
     >
       {state.org?.orgName ?? "No workspace"}
     </span>
+  );
+}
+
+/** Identity shown in the sidebar reflects the real session instead of a hardcoded user. */
+function SidebarProfile() {
+  const [state, setState] = useState<{ signedIn: boolean; user?: { email: string | null }; org?: { orgName: string } | null } | null>(null);
+  useEffect(() => {
+    fetch("/api/org")
+      .then((r) => r.json())
+      .then(setState)
+      .catch(() => setState({ signedIn: false }));
+  }, []);
+  const signedIn = Boolean(state?.signedIn);
+  const email = state?.user?.email ?? null;
+  const name = signedIn ? (email?.split("@")[0] ?? "Operator") : "Guest operator";
+  const sub = signedIn ? (state?.org?.orgName ?? "Desk settings") : "Not signed in · Desk settings";
+  return (
+    <a
+      href="/settings"
+      className="flex items-center gap-3 rounded-xl bg-surface-container px-3 py-2 transition-colors hover:bg-surface-container-high"
+    >
+      <div className="flex size-9 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary-container" aria-hidden>
+        {name.slice(0, 2).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-on-surface">{name}</p>
+        <p className="truncate text-[11px] text-outline">{sub}</p>
+      </div>
+    </a>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StoredLead } from "@helix/core";
 
 type Props = {
@@ -16,7 +16,7 @@ type Point = {
   total: number;
 };
 
-const W = 720;
+const DEFAULT_W = 720;
 const H = 260;
 const PAD = { l: 12, r: 12, t: 28, b: 8 };
 
@@ -74,6 +74,18 @@ function smoothArea(
 export function StreamChart({ leads }: Props) {
   const { series, counts } = useMemo(() => buildSeries(leads), [leads]);
   const [hover, setHover] = useState<number | null>(null);
+  // Draw at the real container width so the chart spans the card (a fixed viewBox letterboxed it to the middle).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(DEFAULT_W);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setW(Math.max(240, Math.round(el.clientWidth)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const max = Math.max(1, ...series.map((d) => d.total));
   const innerW = W - PAD.l - PAD.r;
@@ -126,10 +138,11 @@ export function StreamChart({ leads }: Props) {
         </div>
       </div>
 
-      <div className="relative">
+      <div className="relative" ref={wrapRef}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="h-64 w-full"
+          className="w-full"
+          style={{ height: H }}
           role="img"
           aria-label="Inbound stream chart"
           onMouseLeave={() => setHover(null)}
@@ -222,7 +235,7 @@ export function StreamChart({ leads }: Props) {
               <circle cx={tipX} cy={tipY} r="2.5" fill="#042f2e" />
 
               {(() => {
-                const boxW = 168;
+                const boxW = 196;
                 const boxH = 52;
                 const bx = Math.min(Math.max(tipX - boxW / 2, PAD.l), W - PAD.r - boxW);
                 const by = Math.max(tipY - boxH - 14, 4);
@@ -244,13 +257,13 @@ export function StreamChart({ leads }: Props) {
                       +{Math.round(activePt.qualified)} qualified
                     </text>
                     <text
-                      x={bx + 118}
+                      x={bx + 124}
                       y={by + 36}
                       fill="#94a3b8"
                       fontSize="10"
                       fontFamily="ui-monospace, monospace"
                     >
-                      {Math.round(activePt.total)} tot
+                      {Math.round(activePt.total)} total
                     </text>
                   </g>
                 );
@@ -259,7 +272,7 @@ export function StreamChart({ leads }: Props) {
           ) : null}
         </svg>
 
-        <div className="mt-1 flex justify-between px-1 font-mono text-[10px] text-outline">
+        <div className="mt-1 flex justify-between font-mono text-[10px] text-outline">
           {series.map((d, i) => (
             <span
               key={d.label}

@@ -166,9 +166,17 @@ export function TriageOverview() {
             <h1 className="text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
               Autonomous Triage Overview
             </h1>
-            <span className="rounded-full bg-tertiary-container/50 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-tertiary uppercase">
-              Engine · Production
-            </span>
+            {deskMode ? (
+              <span
+                className={
+                  deskMode === "demo"
+                    ? "rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase"
+                    : "rounded-full bg-tertiary-container/50 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-tertiary uppercase"
+                }
+              >
+                {deskMode === "demo" ? "Engine · Demo workspace" : "Engine · Live desk"}
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
             Real-time telemetry from your desk — probabilistic validation and CRM sync.
@@ -186,24 +194,29 @@ export function TriageOverview() {
       </div>
 
       {deskMode === "demo" ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs">
-          <span className="rounded-full bg-primary-container px-2 py-0.5 text-[10px] font-bold tracking-wider text-on-primary-container uppercase">
+        <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <span className="w-fit rounded-full bg-primary-container px-2 py-0.5 text-[10px] font-bold tracking-wider text-on-primary-container uppercase">
             Demo data
           </span>
           <p className="min-w-0 flex-1 text-on-surface-variant">
             You are exploring a sample workspace. Connect GoHighLevel and this desk switches to your real leads —
             the samples disappear.
           </p>
-          <button
-            type="button"
-            onClick={() => void resetDemo()}
-            className="rounded-md border border-outline-variant/40 px-2.5 py-1 font-semibold text-on-surface-variant hover:bg-surface-container-high"
-          >
-            Reset demo
-          </button>
-          <a href="/settings" className="rounded-md bg-primary-container px-2.5 py-1 font-bold text-on-primary-container hover:brightness-110">
-            Connect →
-          </a>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void resetDemo()}
+              className="inline-flex min-h-10 items-center rounded-md border border-outline-variant/40 px-3 py-1 font-semibold text-on-surface-variant hover:bg-surface-container-high sm:min-h-0 sm:px-2.5"
+            >
+              Reset demo
+            </button>
+            <a
+              href="/settings"
+              className="inline-flex min-h-10 items-center rounded-md bg-primary-container px-3 py-1 font-bold text-on-primary-container hover:brightness-110 sm:min-h-0 sm:px-2.5"
+            >
+              Connect →
+            </a>
+          </div>
         </div>
       ) : null}
 
@@ -250,10 +263,10 @@ export function TriageOverview() {
           </div>
           <StreamChart leads={leads} />
           <div className="grid gap-4 lg:grid-cols-5">
-            <div data-tour="leads-priority" className="lg:col-span-3">
+            <div data-tour="leads-priority" className="min-w-0 lg:col-span-3">
               <PriorityTable leads={leads} flashIds={flashIds} />
             </div>
-            <div data-tour="leads-feed" className="lg:col-span-2">
+            <div data-tour="leads-feed" className="min-w-0 lg:col-span-2">
               <WebhookFeed leads={leads} logs={logs} />
             </div>
           </div>

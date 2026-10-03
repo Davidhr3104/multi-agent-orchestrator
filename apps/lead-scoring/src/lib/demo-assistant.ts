@@ -178,8 +178,29 @@ function nextMove(active: StoredLead[]): DemoReply {
   };
 }
 
+/**
+ * Resolve a lead mentioned in free text. Full name wins; otherwise a first or last name
+ * ("Priya", "nair") counts when it identifies exactly one lead. Ambiguous partials return
+ * `ambiguous` so the caller can ask instead of guessing (or silently falling back to the top lead).
+ */
+export function matchLead(q: string, leads: StoredLead[]): { lead?: StoredLead; ambiguous?: StoredLead[] } {
+  const text = q.toLowerCase();
+  const full = leads.find((l) => text.includes(l.name.toLowerCase()));
+  if (full) return { lead: full };
+  const words = new Set(text.match(/[\p{L}'-]+/gu) ?? []);
+  const partial = leads.filter((l) =>
+    l.name
+      .toLowerCase()
+      .split(/\s+/)
+      .some((tok) => tok.length >= 3 && words.has(tok))
+  );
+  if (partial.length === 1) return { lead: partial[0] };
+  if (partial.length > 1) return { ambiguous: partial };
+  return {};
+}
+
 function findByName(q: string, leads: StoredLead[]) {
-  return leads.find((l) => q.includes(l.name.toLowerCase()));
+  return matchLead(q, leads).lead;
 }
 
 function unknownLead(name: string): DemoReply {
@@ -241,8 +262,9 @@ export function buildDemoReply(question: string, leads: StoredLead[], now: numbe
   const cmd = command(question.trim(), q, active, now);
   if (cmd) return cmd;
 
-  const named = active.find((l) => q.includes(l.name.toLowerCase()));
+  const { lead: named, ambiguous } = matchLead(q, active);
   if (named) return { answer: explain(named) };
+  if (ambiguous) return { answer: `Which lead do you mean: ${names(ambiguous)}? Use the full name so I explain the right one.` };
   if (/highest score|top lead|best lead|strongest lead|why.*(score|scored)/.test(q)) {
     const top = [...active].sort(byScoreDesc)[0];
     if (top) return { answer: explain(top) };

@@ -190,7 +190,7 @@ export default function AutomationsPage() {
     const hitl = leads.filter(matchesHitl).length;
     const spam = leads.filter(matchesSpam).length;
     const nurture = leads.filter((l) => matchesNurture(l, thresholds.nurtureMin, thresholds.nurtureMax)).length;
-    const synced = leads.filter((l) => l.crmStatus === "sent" || l.crmStatus === "mocked").length;
+    const synced = leads.filter((l) => l.crmStatus === "sent").length;
     const dispatched = vip + hitl + spam + nurture;
     return { vip, hitl, spam, nurture, synced, dispatched, total: leads.length };
   }, [leads, thresholds]);
@@ -540,13 +540,13 @@ export default function AutomationsPage() {
             w: "84%",
           },
           {
-            label: "Reliability",
-            value: "100%",
-            sub: "0 routing crashes",
+            label: "Human Review",
+            value: String(stats.hitl),
+            sub: "waiting for approval",
             icon: "verified_user",
             tone: "text-tertiary",
             bar: "bg-tertiary",
-            w: "100%",
+            w: `${Math.min(100, (stats.hitl / Math.max(1, stats.total)) * 100)}%`,
           },
           {
             label: "Routed Matches",

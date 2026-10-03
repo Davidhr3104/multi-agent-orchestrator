@@ -36,7 +36,8 @@ export default function AnalyticsPage() {
       total === 0
         ? 0
         : Math.round(((hot + warm) / total) * 1000) / 10;
-    const synced = leads.filter((l) => l.crmStatus === "sent" || l.crmStatus === "mocked").length;
+    const synced = leads.filter((l) => l.crmStatus === "sent").length;
+    const mocked = leads.filter((l) => l.crmStatus === "mocked").length;
     const avgConf =
       total === 0
         ? 0
@@ -50,6 +51,7 @@ export default function AnalyticsPage() {
       spam,
       autoQ,
       synced,
+      mocked,
       avgConf,
       median: medianScore(leads.map((l) => l.score)),
       hotShare: hotPct(leads),
@@ -85,7 +87,7 @@ export default function AnalyticsPage() {
               Engine Observability
             </span>
             <span className="size-1 rounded-full bg-outline" />
-            <span className="font-mono text-[10px] text-tertiary">Production desk</span>
+            <span className="font-mono text-[10px] text-tertiary">Current roster</span>
           </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
             Pipeline Telemetry &amp; AI Model Performance
@@ -214,7 +216,8 @@ export default function AnalyticsPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-on-surface-variant">
-            {ghl ? "GHL keys present" : "GHL offline · mock/push ready"}
+            {ghl ? "GHL keys present" : "GHL offline · no real pushes"}
+            {stats.mocked > 0 ? ` · ${stats.mocked} simulated (not counted)` : ""}
           </p>
           <p className="mt-1 font-mono text-[10px] text-tertiary">HITL pending: {stats.review}</p>
         </div>
@@ -222,7 +225,7 @@ export default function AnalyticsPage() {
 
       {/* Charts */}
       <div className="grid gap-4 xl:grid-cols-12">
-        <div className="rounded-xl bg-surface-container-low p-5 xl:col-span-8">
+        <div className="flex min-w-0 flex-col rounded-xl bg-surface-container-low p-5 xl:col-span-8">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -246,8 +249,8 @@ export default function AnalyticsPage() {
               </span>
             </div>
           </div>
-          <div className="relative h-56 rounded-lg bg-surface-container-lowest/60 p-4">
-            <svg className="h-full w-full" viewBox="0 0 700 220" preserveAspectRatio="none">
+          <div className="relative flex min-h-56 flex-1 flex-col rounded-lg bg-surface-container-lowest/60 p-4">
+            <svg className="min-h-0 w-full flex-1" viewBox="0 0 700 220" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="tprFillA" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
@@ -303,7 +306,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-surface-container-low p-5 xl:col-span-4">
+        <div className="min-w-0 rounded-xl bg-surface-container-low p-5 xl:col-span-4">
           <h2 className="text-sm font-bold text-on-surface">Lead Volume by Tier</h2>
           <p className="text-xs text-on-surface-variant">Live roster mix</p>
           <div className="mt-4 grid h-52 grid-cols-4 items-end gap-2 rounded-lg bg-surface-container-lowest/60 px-2 pb-2 pt-4">
