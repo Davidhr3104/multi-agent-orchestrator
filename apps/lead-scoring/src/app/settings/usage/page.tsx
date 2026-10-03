@@ -7,16 +7,32 @@ import { KEYS_LEADS } from "@helix/core/secret-fields";
 import { ApiKeysForm } from "@helix/help/keys-form";
 import { relativeTime, ingestLeadStream } from "@/components/leads-engine/lead-ui";
 import { cn } from "@/lib/utils";
+import type { AiCostSummary } from "@/lib/ai-cost";
 
 type Usage = {
   ingestCount: number;
   heuristicCalls: number;
   claudeCalls: number;
   ghlCalls: number;
-  estimatedTokens: number;
+  hubspotCalls: number;
   claudeKey: boolean;
   ghlKey: boolean;
+  hubspotKey: boolean;
+  aiCost: AiCostSummary;
+  models: { triage: string; draft: string };
 };
+
+function usd(n: number): string {
+  if (n === 0) return "$0.00";
+  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+}
+
+function claudeStatus(u: Usage | null): { label: string; live: boolean } {
+  if (!u?.claudeKey) return { label: "Missing", live: false };
+  const last = u.aiCost?.lastCall;
+  if (!last) return { label: "Key set · no call yet", live: false };
+  return last.ok ? { label: "Last call OK", live: true } : { label: "Last call failed", live: false };
+}
 
 type CodeLang = "curl" | "python" | "typescript" | "nodejs";
 
@@ -364,12 +380,12 @@ export default function UsagePage() {
                     <span
                       className={cn(
                         "rounded px-2 py-0.5 font-mono text-[10px]",
-                        u?.claudeKey
+                        claudeStatus(u).live
                           ? "bg-tertiary-container/30 text-tertiary"
                           : "bg-surface-container-high text-on-surface-variant"
                       )}
                     >
-                      {u?.claudeKey ? "Live" : "Missing"}
+                      {claudeStatus(u).label}
                     </span>
                   </div>
                   <button
@@ -391,7 +407,8 @@ export default function UsagePage() {
                   </span>
                 </div>
                 <p className="font-mono text-[10px] text-on-surface-variant">
-                  Scope: Structured JSON scoring · Heuristic fallback when offline
+                  Triage: {u?.models.triage ?? "—"} · Drafts: {u?.models.draft ?? "—"} · Heuristic
+                  fallback when the key is missing or a call fails
                 </p>
               </div>
 
@@ -478,6 +495,23 @@ export default function UsagePage() {
                     </span>
                   </button>
                 </div>
+              </div>
+              <div className="space-y-1">
+                <label className="font-mono text-[10px] tracking-wider text-outline uppercase">
+                  Public form / webhook intake (JSON or HTML form POST)
+                </label>
+                <div className="flex items-center overflow-hidden rounded bg-surface-container-lowest p-1.5">
+                  <span className="mr-2 rounded bg-primary-container px-2 py-0.5 font-mono text-[10px] font-semibold text-on-primary-container">
+                    POST
+                  </span>
+                  <span className="truncate font-mono text-[11px] text-on-surface">
+                    {origin}/api/leads/intake/&lt;token&gt;
+                  </span>
+                </div>
+                <p className="pt-0.5 font-mono text-[10px] text-outline">
+                  Token = your org webhook token, or HELIX_INTAKE_TOKEN on a single-tenant deploy. Leads
+                  are triaged on arrival and stored as real data; nothing is pushed to a CRM.
+                </p>
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
@@ -727,12 +761,72 @@ export default function UsagePage() {
             </Link>
           </div>
 
+          <div className="overflow-hidden rounded-xl bg-surface-container-low shadow-sm">
+            <div className="flex items-center justify-between bg-surface-container p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-8 items-center justify-center rounded bg-primary/10">
+                  <span className="material-symbols-outlined text-[20px] text-primary">payments</span>
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-on-surface">Claude cost (estimated)</h2>
+                  <p className="font-mono text-[10px] text-on-surface-variant">
+                    Tokens as reported by the Anthropic API × list prices in code. Not your invoice.
+                  </p>
+                </div>
+              </div>
+              <span className="rounded bg-surface-container-high px-2 py-0.5 font-mono text-[10px] text-outline">
+                estimate
+              </span>
+            </div>
+            <div className="space-y-3 p-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { label: "Claude calls", v: u ? String(u.aiCost.calls) : "—" },
+                  { label: "Input tokens", v: u ? u.aiCost.inputTokens.toLocaleString() : "—" },
+                  { label: "Output tokens", v: u ? u.aiCost.outputTokens.toLocaleString() : "—" },
+                  { label: "Est. USD", v: u ? usd(u.aiCost.estimatedUsd) : "—" },
+                ].map((c) => (
+                  <div key={c.label} className="rounded-lg bg-surface-container p-3">
+                    <p className="font-mono text-[10px] text-outline">{c.label}</p>
+                    <p className="mt-0.5 text-lg font-semibold text-on-surface">{c.v}</p>
+                  </div>
+                ))}
+              </div>
+              {u && u.aiCost.byModel.length > 0 ? (
+                <ul className="space-y-1 font-mono text-[10px] text-on-surface-variant">
+                  {u.aiCost.byModel.map((m) => (
+                    <li key={m.model} className="flex justify-between rounded bg-surface-container-lowest px-2 py-1">
+                      <span className="text-on-surface">{m.model}</span>
+                      <span>
+                        {m.calls} calls · {m.inputTokens.toLocaleString()} in /{" "}
+                        {m.outputTokens.toLocaleString()} out · ~{usd(m.estimatedUsd)}
+                        {m.priceKnown ? "" : " (price unknown, Sonnet rate assumed)"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="font-mono text-[10px] text-outline">
+                  {u?.claudeKey
+                    ? "No Claude calls recorded yet."
+                    : "No ANTHROPIC_API_KEY: triage runs on the heuristic, which costs nothing."}
+                </p>
+              )}
+              <p className="font-mono text-[10px] text-outline">
+                {u?.aiCost.failedCalls ? `${u.aiCost.failedCalls} failed call(s) · ` : ""}
+                Counted on this server instance since{" "}
+                {u ? new Date(u.aiCost.since).toLocaleString() : "—"}; resets on restart/redeploy. Ask
+                Helix AI chat calls are not included yet.
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               { label: "Ingests", v: u?.ingestCount },
               { label: "Heuristic", v: u?.heuristicCalls },
-              { label: "Claude", v: u?.claudeCalls },
-              { label: "Est. tokens", v: u?.estimatedTokens },
+              { label: "Claude triage", v: u?.claudeCalls },
+              { label: "HubSpot calls", v: u?.hubspotCalls },
             ].map((c) => (
               <div key={c.label} className="rounded-lg bg-surface-container p-3">
                 <p className="font-mono text-[10px] text-outline">{c.label}</p>

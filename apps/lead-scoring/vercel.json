@@ -2,5 +2,11 @@
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm install",
   "buildCommand": "cd ../.. && npm run build --workspace=helix-lead-scoring",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [
+    {
+      "path": "/api/cron/triage",
+      "schedule": "0 13 * * *"
+    }
+  ]
 }

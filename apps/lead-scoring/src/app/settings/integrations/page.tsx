@@ -6,6 +6,7 @@ import { KEYS_LEADS } from "@helix/core/secret-fields";
 import { ApiKeysForm } from "@helix/help/keys-form";
 import { relativeTime } from "@/components/leads-engine/lead-ui";
 import { cn } from "@/lib/utils";
+import type { HelixLead } from "@/lib/lead-ai";
 
 const QUOTA_CAP = 2000;
 
@@ -55,6 +56,7 @@ export default function IntegrationsPage() {
   const [ghl, setGhl] = useState(false);
   const [claude, setClaude] = useState(false);
   const [supabase, setSupabase] = useState(false);
+  const [hubspot, setHubspot] = useState(false);
   const [leads, setLeads] = useState<StoredLead[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -65,16 +67,22 @@ export default function IntegrationsPage() {
       fetch("/api/status").then((r) => r.json()).catch(() => ({})),
       fetch("/api/leads").then((r) => r.json()).catch(() => ({ leads: [] })),
     ]);
-    const s = status as { ghl?: boolean; claude?: boolean; supabase?: boolean };
+    const s = status as { ghl?: boolean; claude?: boolean; supabase?: boolean; hubspot?: boolean };
     setGhl(Boolean(s.ghl));
     setClaude(Boolean(s.claude));
     setSupabase(Boolean(s.supabase));
+    setHubspot(Boolean(s.hubspot));
     setLeads(((leadsRes as { leads?: StoredLead[] }).leads ?? []) as StoredLead[]);
   }, []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const hubspotSynced = useMemo(
+    () => (leads as HelixLead[]).filter((l) => l.crmStatus === "sent" && l.hubspotContactId),
+    [leads]
+  );
 
   const synced = useMemo(
     () =>
@@ -294,13 +302,13 @@ export default function IntegrationsPage() {
             <span className="material-symbols-outlined text-[18px] text-primary">alt_route</span>
             <h2 className="text-sm font-semibold text-on-surface">CRM &amp; Pipeline Destinations</h2>
             <span className="rounded-full bg-surface-container px-2 py-0.5 font-mono text-[10px] text-on-surface-variant">
-              {ghl ? "1 CRM live" : "0 CRM live"}
+              {(ghl ? 1 : 0) + (hubspot ? 1 : 0)} CRM configured
             </span>
           </div>
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
-          {/* HubSpot — not in this desk */}
-          <div className="flex flex-col justify-between gap-5 rounded-xl bg-surface-container-low p-5 opacity-80">
+          {/* HubSpot — CRM v3 contacts upsert by email, human-approved pushes only */}
+          <div className="flex flex-col justify-between gap-5 rounded-xl bg-surface-container-low p-5">
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -309,33 +317,56 @@ export default function IntegrationsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-on-surface">HubSpot CRM</p>
-                    <p className="font-mono text-[10px] text-on-surface-variant">Roadmap — use GHL</p>
+                    <p className="font-mono text-[10px] text-on-surface-variant">
+                      {hubspot ? "HUBSPOT_TOKEN set" : "Token missing"}
+                    </p>
                   </div>
                 </div>
-                <span className="flex h-6 items-center gap-1.5 rounded-full bg-outline/10 px-2 font-mono text-[10px] text-outline uppercase">
-                  <span className="size-1.5 rounded-full bg-outline" /> Offline
+                <span
+                  className={cn(
+                    "flex h-6 items-center gap-1.5 rounded-full px-2 font-mono text-[10px] uppercase",
+                    hubspotSynced.length > 0
+                      ? "bg-tertiary/10 text-tertiary"
+                      : hubspot
+                        ? "bg-secondary/10 text-secondary"
+                        : "bg-outline/10 text-outline"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      hubspotSynced.length > 0 ? "bg-tertiary" : hubspot ? "bg-secondary" : "bg-outline"
+                    )}
+                  />
+                  {hubspotSynced.length > 0 ? "Synced" : hubspot ? "Not verified yet" : "Offline"}
                 </span>
               </div>
               <div className="space-y-1 text-xs text-on-surface-variant">
                 <div className="flex justify-between rounded bg-surface-container-lowest/40 px-2 py-1">
                   <span>Target Entity</span>
-                  <span className="font-mono text-secondary">Deals &amp; Contacts</span>
+                  <span className="font-mono text-secondary">Contacts (upsert by email)</span>
                 </div>
                 <div className="flex justify-between rounded bg-surface-container-lowest/40 px-2 py-1">
-                  <span>Status</span>
-                  <span className="font-mono text-on-surface">Not in this build</span>
+                  <span>Synced to HubSpot</span>
+                  <span className="font-mono text-on-surface">{hubspotSynced.length} leads</span>
+                </div>
+                <div className="flex justify-between rounded bg-surface-container-lowest/40 px-2 py-1">
+                  <span>Push rule</span>
+                  <span className="font-mono text-on-surface">Human approval only</span>
                 </div>
               </div>
+              <p className="text-[11px] text-outline">
+                {hubspot
+                  ? ghl
+                    ? "GoHighLevel is also connected and stays the default; HubSpot is used when GHL is not connected."
+                    : "Approve a lead in Inbox or Leads to push it. \u201cSynced\u201d only appears after HubSpot answers OK."
+                  : "Create a HubSpot private app with the crm.objects.contacts.write scope and set its token as the HUBSPOT_TOKEN environment variable."}
+              </p>
             </div>
-            <button
-              type="button"
-              disabled
-              title="HubSpot connector is not available in Helix for Leads yet"
-              className="flex h-8 cursor-not-allowed items-center justify-center gap-1 rounded-lg bg-surface-container-high text-xs font-medium text-outline"
-            >
-              <span className="material-symbols-outlined text-[16px]">block</span>
-              Coming soon
-            </button>
+            <div className="flex h-8 items-center justify-center gap-1 rounded-lg bg-surface-container-high font-mono text-[10px] text-on-surface-variant">
+              <span className="material-symbols-outlined text-[16px]">terminal</span>
+              Env var: HUBSPOT_TOKEN
+            </div>
           </div>
 
           {/* GHL — real */}

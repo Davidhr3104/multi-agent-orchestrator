@@ -1,6 +1,7 @@
 import { getLead, patchLead } from "@/lib/store";
-import { completeWithClaude, draftOutreachHeuristic, isClaudeConfigured } from "@helix/core";
+import { draftOutreachHeuristic } from "@helix/core";
 import { withOrgScope } from "@/lib/org-auth";
+import { callClaude, DRAFT_MODEL, isAnthropicConfigured } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
 
@@ -15,17 +16,21 @@ export async function POST(
     const heuristic = draftOutreachHeuristic(lead);
     let subject = heuristic.subject;
     let body = heuristic.body;
-    if (isClaudeConfigured()) {
-      const text = await completeWithClaude(
-        `Write a short English sales email for this contact. Return JSON {"subject","body"}. Use only facts given. Lead JSON: ${JSON.stringify({
+    if (isAnthropicConfigured()) {
+      const res = await callClaude({
+        model: DRAFT_MODEL,
+        purpose: "outreach",
+        maxTokens: 900,
+        prompt: `Write a short English sales email for this contact. Return JSON {"subject","body"}. Use only facts given. Lead JSON: ${JSON.stringify({
           name: lead.name,
           company: lead.company || lead.enrichment?.company,
           industry: lead.enrichment?.industry,
           source: lead.source,
           score: lead.score,
           message: lead.message.slice(0, 400),
-        })}`
-      );
+        })}`,
+      });
+      const text = res.ok ? res.text : null;
       if (text) {
         try {
           const parsed = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as {

@@ -13,6 +13,8 @@ import {
 } from "@/components/leads-engine/lead-ui";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { HelixLead } from "@/lib/lead-ai";
+import { AiTriagePanel, aiTriagePanelKey } from "@/components/leads-engine/AiTriagePanel";
 
 const STAGES: PipelineStage[] = ["new", "qualified", "contacted", "won", "lost"];
 
@@ -62,9 +64,10 @@ function LiveInspect({
   onOutreach,
   onMeeting,
   onLookalike,
+  onLeadUpdate,
   onClose,
 }: {
-  lead: StoredLead | null;
+  lead: HelixLead | null;
   busy: boolean;
   draftEmail: { subject: string; body: string } | null;
   slots: { label?: string; start?: string; url?: string }[];
@@ -78,6 +81,7 @@ function LiveInspect({
   onOutreach: () => void;
   onMeeting: () => void;
   onLookalike: () => void;
+  onLeadUpdate: (lead: HelixLead) => void;
   onClose: () => void;
 }) {
   if (!lead) {
@@ -156,6 +160,8 @@ function LiveInspect({
           </h3>
           <p className="text-sm leading-relaxed text-on-surface-variant">{lead.reasoning}</p>
         </div>
+
+        <AiTriagePanel key={aiTriagePanelKey(lead)} lead={lead} onLeadUpdate={onLeadUpdate} />
 
         <div>
           <h3 className="mb-2 text-[11px] font-bold tracking-wider text-outline uppercase">
@@ -426,7 +432,7 @@ function LeadsRoster() {
     setBusy(true);
     try {
       const res = await fetch(`/api/leads/${selected.id}/crm`, { method: "POST" });
-      const data = (await res.json()) as { lead?: StoredLead; error?: string };
+      const data = (await res.json()) as { lead?: StoredLead; error?: string; crm?: "ghl" | "hubspot" };
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
       }
@@ -434,6 +440,7 @@ function LeadsRoster() {
         showToast(data.error || `CRM ${res.status}`);
         return;
       }
+      const pushedTo = data.crm === "hubspot" ? "Synced to HubSpot" : "Pushed to GoHighLevel";
       if (selected.needsReview) {
         const reviewRes = await fetch(`/api/leads/${selected.id}/review`, { method: "POST" });
         const reviewData = (await reviewRes.json()) as { lead?: StoredLead };
@@ -441,7 +448,7 @@ function LeadsRoster() {
           setLeads((prev) => prev.map((l) => (l.id === reviewData.lead!.id ? reviewData.lead! : l)));
         }
       }
-      showToast("Pushed to CRM");
+      showToast(pushedTo);
       window.dispatchEvent(new CustomEvent("helix:leads-refresh"));
     } finally {
       setBusy(false);
@@ -918,6 +925,7 @@ function LeadsRoster() {
             onOutreach={() => void runOutreach()}
             onMeeting={() => void loadMeeting()}
             onLookalike={() => void loadLookalikes()}
+            onLeadUpdate={(next) => setLeads((prev) => prev.map((l) => (l.id === next.id ? next : l)))}
             onClose={() => setSelectedId(null)}
           />
         </div>

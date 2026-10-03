@@ -76,6 +76,15 @@ describe("desk mode without any integration (local / fresh deployment)", () => {
     expect((await store.deskStatus()).mode).toBe("live");
   });
 
+  it("stores a real intake lead outside the demo sandbox and flips the desk to live", async () => {
+    const { store } = await loadStore();
+    expect((await store.deskStatus()).mode).toBe("demo");
+    await store.saveLead(realLead("lead-intake-1", "Form Visitor"), undefined, { real: true });
+    const leads = await store.listLeads();
+    expect(leads.map((l) => l.id)).toEqual(["lead-intake-1"]);
+    expect((await store.deskStatus()).mode).toBe("live");
+  });
+
   it("switches to live, with no demo leads, once the CRM is connected", async () => {
     process.env.GHL_API_KEY = "k";
     process.env.GHL_LOCATION_ID = "loc";

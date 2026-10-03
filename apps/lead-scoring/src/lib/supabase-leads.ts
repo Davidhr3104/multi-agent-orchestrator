@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSecret, onSecretsChanged, type StoredLead } from "@helix/core";
+import type { HelixLead, LeadAiExtras } from "./lead-ai";
 
 type Client = ReturnType<typeof createClient>;
 
@@ -107,8 +108,33 @@ function toRow(lead: StoredLead, orgId: string) {
   };
 }
 
-function fromRow(row: Record<string, unknown>): StoredLead {
+/** Columns added by supabase/phase6-ai.sql. */
+function aiColumns(lead: HelixLead) {
   return {
+    ai_triage: lead.aiTriage ?? null,
+    next_move: lead.nextMove ?? null,
+    crm_proposal: lead.crmProposal ?? null,
+    hubspot_contact_id: lead.hubspotContactId ?? null,
+    hubspot_synced_at: lead.hubspotSyncedAt ?? null,
+    hubspot_error: lead.hubspotError ?? null,
+  };
+}
+
+function aiFromRow(row: Record<string, unknown>): LeadAiExtras {
+  const obj = <T,>(v: unknown) => (v && typeof v === "object" ? (v as T) : undefined);
+  return {
+    aiTriage: obj<LeadAiExtras["aiTriage"]>(row.ai_triage),
+    nextMove: obj<LeadAiExtras["nextMove"]>(row.next_move),
+    crmProposal: obj<LeadAiExtras["crmProposal"]>(row.crm_proposal),
+    hubspotContactId: row.hubspot_contact_id != null ? String(row.hubspot_contact_id) : undefined,
+    hubspotSyncedAt: row.hubspot_synced_at != null ? String(row.hubspot_synced_at) : undefined,
+    hubspotError: row.hubspot_error != null ? String(row.hubspot_error) : undefined,
+  };
+}
+
+function fromRow(row: Record<string, unknown>): HelixLead {
+  return {
+    ...aiFromRow(row),
     id: String(row.id),
     orgId: row.org_id != null ? String(row.org_id) : undefined,
     createdAt: String(row.created_at),
@@ -172,7 +198,7 @@ function fromRow(row: Record<string, unknown>): StoredLead {
  * but this server client uses the service-role key, which bypasses RLS —
  * so this filter is the real tenant boundary for every server-side read.
  */
-export async function supabaseListLeads(orgId: string): Promise<StoredLead[] | null> {
+export async function supabaseListLeads(orgId: string): Promise<HelixLead[] | null> {
   const db = getSupabase();
   if (!db) return null;
   const { data, error } = await leadsTable(db)
@@ -187,15 +213,47 @@ export async function supabaseListLeads(orgId: string): Promise<StoredLead[] | n
 }
 
 /** orgId is stamped on every write — see supabaseListLeads for why this matters server-side. */
-export async function supabaseUpsertLead(lead: StoredLead, orgId: string): Promise<boolean> {
+let aiColumnsMissing = false;
+
+export async function supabaseUpsertLead(lead: HelixLead, orgId: string): Promise<boolean> {
   const db = getSupabase();
   if (!db) return false;
-  const { error } = await leadsTable(db).upsert(toRow(lead, orgId));
+  const base = toRow(lead, orgId);
+  let { error } = await leadsTable(db).upsert(aiColumnsMissing ? base : { ...base, ...aiColumns(lead) });
+  if (error && !aiColumnsMissing && /ai_triage|next_move|crm_proposal|hubspot_/i.test(error.message)) {
+    // phase6-ai.sql not applied yet: keep saving the lead, without the AI columns.
+    aiColumnsMissing = true;
+    console.warn("[helix-leads] AI columns missing; run supabase/phase6-ai.sql to persist triage/HubSpot fields.");
+    ({ error } = await leadsTable(db).upsert(base));
+  }
   if (error) {
     console.warn("[helix-leads] upsert skipped:", error.message);
     return false;
   }
   return true;
+}
+
+/** Every org id, for server jobs (cron) that have no signed-in user. null when Supabase is off or errors. */
+export async function supabaseListOrgIds(): Promise<string[] | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  const table = (
+    db as unknown as {
+      schema: (name: string) => {
+        from: (table: string) => {
+          select: (cols: string) => Promise<{ data: { id: string }[] | null; error: { message: string } | null }>;
+        };
+      };
+    }
+  )
+    .schema("lead_scoring")
+    .from("organizations");
+  const { data, error } = await table.select("id");
+  if (error) {
+    console.warn("[helix-leads] org list skipped:", error.message);
+    return null;
+  }
+  return (data ?? []).map((r) => String(r.id));
 }
 
 export async function supabaseDeleteLeads(ids: string[]): Promise<boolean> {

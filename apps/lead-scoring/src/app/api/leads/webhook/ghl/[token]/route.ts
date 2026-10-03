@@ -33,7 +33,7 @@ export async function POST(
 
   const events: LeadStreamEvent[] = [];
   try {
-    const lead = await finishLeadIngest(parsed, (event) => events.push(event), orgId);
+    const lead = await finishLeadIngest(parsed, (event) => events.push(event), orgId, { real: true });
     return Response.json({ lead, logs: events.filter((e) => e.type === "log").map((e) => e.log) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

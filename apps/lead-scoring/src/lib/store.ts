@@ -7,9 +7,9 @@ import {
   scoreLeadHeuristic,
   type DeskMode,
   type LeadIngestInput,
-  type StoredLead,
 } from "@helix/core";
 import { isSupabaseConfigured, supabaseListLeads, supabaseUpsertLead } from "./supabase-leads";
+import type { HelixLead } from "./lead-ai";
 
 /**
  * Two stores, never mixed:
@@ -18,8 +18,8 @@ import { isSupabaseConfigured, supabaseListLeads, supabaseUpsertLead } from "./s
  * Which one a request sees is decided by resolveView(), from one rule: an integration is
  * connected or real records exist -> live; otherwise demo. See resolveDeskMode() in helix-core.
  */
-const real = new Map<string, StoredLead>();
-const sandbox = new Map<string, StoredLead>();
+const real = new Map<string, HelixLead>();
+const sandbox = new Map<string, HelixLead>();
 let sandboxSeeded = false;
 
 const SAMPLES: LeadIngestInput[] = [
@@ -76,7 +76,7 @@ function applyDemoCatalog() {
   sandbox.clear();
   for (const sample of SAMPLES) {
     const scored = scoreLeadHeuristic(sample);
-    const lead: StoredLead = attachIntelligence(
+    const lead: HelixLead = attachIntelligence(
       {
         ...scored,
         id: `seed-${sample.email.replace(/[^a-z0-9]/gi, "").slice(0, 12)}`,
@@ -120,12 +120,14 @@ function ensureSandbox() {
   applyDemoCatalog();
 }
 
-/** GoHighLevel is this desk's outbound integration: both fields set means the operator connected it. */
+/** A CRM destination is connected: GoHighLevel (key + location) or HubSpot (private app token). */
 export function isCrmConnected(): boolean {
-  return Boolean(getSecret("GHL_API_KEY") && getSecret("GHL_LOCATION_ID"));
+  return Boolean(
+    (getSecret("GHL_API_KEY") && getSecret("GHL_LOCATION_ID")) || getSecret("HUBSPOT_TOKEN")
+  );
 }
 
-type View = { mode: DeskMode; store: Map<string, StoredLead>; remote: StoredLead[] | null };
+type View = { mode: DeskMode; store: Map<string, HelixLead>; remote: HelixLead[] | null };
 
 const VIEW_TTL_MS = 5_000;
 const viewCache = new Map<string, { mode: DeskMode; at: number }>();
@@ -139,7 +141,7 @@ async function resolveView(orgId?: string): Promise<View> {
   ensureSandbox();
   if (!orgId) {
     if (isSupabaseConfigured()) return { mode: "demo", store: sandbox, remote: null };
-    const mode = resolveDeskMode({ connected: isCrmConnected(), realRecords: 0 });
+    const mode = resolveDeskMode({ connected: isCrmConnected(), realRecords: real.size });
     return { mode, store: mode === "demo" ? sandbox : real, remote: null };
   }
 
@@ -170,7 +172,7 @@ async function modeFor(orgId?: string): Promise<DeskMode> {
  * tenant boundary (the server client bypasses RLS via the service-role key, so this explicit
  * filter IS the isolation). Guests (no orgId) only ever see the demo sandbox.
  */
-export async function listLeads(orgId?: string): Promise<StoredLead[]> {
+export async function listLeads(orgId?: string): Promise<HelixLead[]> {
   const view = await resolveView(orgId);
   if (view.mode === "live" && view.remote) {
     for (const lead of view.remote) real.set(lead.id, lead);
@@ -179,7 +181,23 @@ export async function listLeads(orgId?: string): Promise<StoredLead[]> {
   return [...view.store.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function saveLead(lead: StoredLead, orgId?: string): Promise<StoredLead> {
+/**
+ * `opts.real` marks a lead that arrived from a real source (public intake / org webhook): it goes
+ * to the real store even on a desk still showing demo, which then flips the desk to live.
+ */
+export async function saveLead(
+  lead: HelixLead,
+  orgId?: string,
+  opts?: { real?: boolean }
+): Promise<HelixLead> {
+  if (opts?.real && !isDemoRecordId(lead.id)) {
+    real.set(lead.id, lead);
+    if (orgId) {
+      viewCache.delete(orgId);
+      await supabaseUpsertLead(lead, orgId);
+    }
+    return lead;
+  }
   const mode = await modeFor(orgId);
   if (mode === "demo" || isDemoRecordId(lead.id)) {
     // Demo records never reach Supabase, whoever is signed in.
@@ -191,7 +209,7 @@ export async function saveLead(lead: StoredLead, orgId?: string): Promise<Stored
   return lead;
 }
 
-export async function getLead(id: string, orgId?: string): Promise<StoredLead | null> {
+export async function getLead(id: string, orgId?: string): Promise<HelixLead | null> {
   const view = await resolveView(orgId);
   if (view.store.has(id)) return view.store.get(id) ?? null;
   if (view.mode === "live") return view.remote?.find((l) => l.id === id) ?? null;
@@ -200,9 +218,9 @@ export async function getLead(id: string, orgId?: string): Promise<StoredLead | 
 
 export async function patchLead(
   id: string,
-  patch: Partial<Omit<StoredLead, "id">>,
+  patch: Partial<Omit<HelixLead, "id">>,
   orgId?: string
-): Promise<StoredLead | null> {
+): Promise<HelixLead | null> {
   const current = await getLead(id, orgId);
   if (!current) return null;
   const next = { ...current, ...patch };
@@ -220,10 +238,10 @@ export async function deleteLeads(ids: string[], orgId?: string): Promise<number
 
 export async function patchLeads(
   ids: string[],
-  patch: Partial<Pick<StoredLead, "crmStatus" | "needsReview" | "pipelineStage" | "reviewedBy" | "reviewedAt">>,
+  patch: Partial<Pick<HelixLead, "crmStatus" | "needsReview" | "pipelineStage" | "reviewedBy" | "reviewedAt">>,
   orgId?: string
-): Promise<StoredLead[]> {
-  const out: StoredLead[] = [];
+): Promise<HelixLead[]> {
+  const out: HelixLead[] = [];
   for (const id of ids) {
     const next = await patchLead(id, patch, orgId);
     if (next) out.push(next);
