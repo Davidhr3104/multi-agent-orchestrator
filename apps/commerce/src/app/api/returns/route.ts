@@ -1,5 +1,5 @@
 import { createReturnRequest, listReturns } from "@/lib/store";
-import { requireOperator } from "@helix/core/operator";
+import { deskWriteDenied } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
@@ -9,7 +9,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
 
   let body: unknown;

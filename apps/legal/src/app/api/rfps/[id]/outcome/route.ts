@@ -1,5 +1,6 @@
 import { getRfp, patchRfp, recordAudit } from "@/lib/store";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { deskWriteDenied } from "@/lib/ai-desk";
 import type { MatterOutcome } from "@helix/core";
 
 export const runtime = "nodejs";
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 const OUTCOMES: MatterOutcome[] = ["pending", "won", "lost", "withdrawn", "no_bid"];
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
   let body: {

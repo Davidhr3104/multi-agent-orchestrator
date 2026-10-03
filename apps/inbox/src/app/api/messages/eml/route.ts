@@ -1,11 +1,11 @@
 import { parseEml } from "@helix/core/inbox/eml";
 import { appendEmlToThread, findThreadForEml, ingestMessage } from "@/lib/store";
-import { requireOperator } from "@helix/core/operator";
+import { deskWriteDenied, mayUseClaude } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
 
   // M6: a malformed multipart body or an unparseable .eml must return a
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       body: parsed.textBody,
       rfcMessageId: parsed.rfcMessageId,
       sentAt: parsed.date,
+      heuristicOnly: !mayUseClaude(req),
     });
     return Response.json({ threadId: created.id, created: true, message: created });
   } catch (err) {

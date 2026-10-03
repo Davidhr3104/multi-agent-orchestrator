@@ -1,4 +1,5 @@
 import { askAi, askAiWithProposal, isClaudeConfigured, type AskAiMessage } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { applyRiskPolicy } from "@/lib/ai-desk";
 import { buildDemoReply } from "@/lib/demo-assistant";
 import { postLabel } from "@/lib/format";
@@ -47,12 +48,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "history must be a non-empty array" }, { status: 400 });
   }
 
-  // Demo desk without a Claude key: answer from the real posts with the deterministic assistant.
-  if (!isClaudeConfigured() && currentDeskMode() === "demo") {
+  // Demo desk without a Claude key, or no operator unlock: answer from the real posts with the deterministic assistant.
+  const operatorLocked = Boolean(requireOperator(req));
+  if (operatorLocked || (!isClaudeConfigured() && currentDeskMode() === "demo")) {
     const last = body.history[body.history.length - 1];
     if (last.attachments?.length) {
       return Response.json({
-        answer: "I can't read attachments in demo mode. Connect an ANTHROPIC_API_KEY and I'll review images alongside your posts.",
+        answer: operatorLocked
+          ? "I can't read attachments without the operator key. Unlock it on the [operator page](/operator) and I'll review images alongside your posts."
+          : "I can't read attachments in demo mode. Connect an ANTHROPIC_API_KEY and I'll review images alongside your posts.",
         engine: "fallback",
         demo: true,
       });

@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Repeat2, X } from "lucide-react";
+import { KeyRound, Menu, Repeat2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type LegalNavId =
@@ -163,19 +163,32 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
 function OperatorProductSwitch() {
   const [open, setOpen] = useState(false);
   const [operator, setOperator] = useState(false);
+  const [configured, setConfigured] = useState(false);
   const [links, setLinks] = useState<ProductLink[]>([]);
 
   useEffect(() => {
     void fetch("/api/operator")
       .then((r) => r.json())
-      .then((d: { operator?: boolean; products?: ProductLink[] }) => {
+      .then((d: { operator?: boolean; configured?: boolean; products?: ProductLink[] }) => {
         setOperator(Boolean(d.operator));
+        setConfigured(Boolean(d.configured));
         setLinks(Array.isArray(d.products) ? d.products : []);
       })
       .catch(() => setOperator(false));
   }, []);
 
-  if (!operator) return null;
+  if (!operator) {
+    if (!configured) return null;
+    return (
+      <Link
+        href="/operator"
+        className="btn-tactile flex w-full items-center gap-1.5 rounded-[4px] px-2 py-1 text-[10px] text-[#4B5563] hover:text-[#9CA3AF]"
+      >
+        <KeyRound className="size-3.5" />
+        Operator unlock
+      </Link>
+    );
+  }
 
   return (
     <div className="relative">

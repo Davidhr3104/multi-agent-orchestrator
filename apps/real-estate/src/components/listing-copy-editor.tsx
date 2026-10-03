@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, CheckCircle2, Copy, Loader2, Sparkles } from "lucide-react";
+import { OperatorText } from "@/components/operator-text";
 import type { ListingCopy } from "@/lib/listing-copy";
 import type { ApprovedListingCopy } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -112,7 +113,11 @@ export function ListingCopyEditor({ propertyId, template, approved, claude }: { 
           </button>
         </span>
       </div>
-      {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
+      {note ? (
+        <p className="text-[11px] text-muted-foreground">
+          <OperatorText text={note} />
+        </p>
+      ) : null}
       {cost ? (
         <p className="tabular font-mono text-[11px] text-muted-foreground">
           {cost.inputTokens + cost.outputTokens} tokens · ≈ {usd(cost.estUsd)} estimated
@@ -120,7 +125,7 @@ export function ListingCopyEditor({ propertyId, template, approved, claude }: { 
       ) : null}
       {error ? (
         <p role="alert" className="text-xs text-rose-400">
-          {error}
+          <OperatorText text={error} />
         </p>
       ) : null}
       <div className="grid gap-3 xl:grid-cols-3">

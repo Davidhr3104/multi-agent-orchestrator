@@ -7,6 +7,7 @@ import {
   BarChart3,
   Boxes,
   CircleHelp,
+  KeyRound,
   LayoutDashboard,
   Package,
   RotateCcw,
@@ -98,6 +99,18 @@ export function SidebarContent({
       </div>
 
       <div className="border-t border-sidebar-border pt-4">
+        <Link
+          href="/operator"
+          onClick={onNavigate}
+          aria-current={pathname === "/operator" ? "page" : undefined}
+          className={cn(
+            "mb-2 flex min-h-9 items-center gap-3 rounded-lg px-3 py-1.5 text-xs transition hover:bg-white/[0.03] hover:text-white",
+            pathname === "/operator" ? "text-white" : "text-[#9aa3b2]"
+          )}
+        >
+          <KeyRound className="size-3.5" />
+          <span>Operator</span>
+        </Link>
         <div className="flex cursor-pointer items-center justify-between rounded-lg p-2 transition hover:bg-white/[0.03]">
           <div className="flex items-center gap-3">
             <div className="flex size-8 items-center justify-center rounded-full bg-white/[0.06] text-xs font-medium text-white">

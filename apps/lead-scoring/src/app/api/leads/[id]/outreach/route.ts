@@ -1,12 +1,13 @@
 import { getLead, patchLead } from "@/lib/store";
 import { draftOutreachHeuristic } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { withOrgScope } from "@/lib/org-auth";
 import { callClaude, DRAFT_MODEL, isAnthropicConfigured } from "@/lib/anthropic";
 
 export const runtime = "nodejs";
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -16,7 +17,7 @@ export async function POST(
     const heuristic = draftOutreachHeuristic(lead);
     let subject = heuristic.subject;
     let body = heuristic.body;
-    if (isAnthropicConfigured()) {
+    if (isAnthropicConfigured() && !requireOperator(req)) {
       const res = await callClaude({
         model: DRAFT_MODEL,
         purpose: "outreach",

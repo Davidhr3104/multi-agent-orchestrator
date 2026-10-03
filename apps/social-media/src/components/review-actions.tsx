@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Send, Undo2 } from "lucide-react";
+import { OperatorText } from "@/components/operator-text";
 import type { PostStatus } from "@/lib/types";
 
 type Decision = "approve" | "changes" | "submit";
@@ -75,7 +76,7 @@ export function ReviewActions({ postId, status, blocked }: { postId: string; sta
       {blocked && canApprove ? <p className="text-xs text-amber-300">Approve is off until this is fixed: {blocked}</p> : null}
       {error ? (
         <p role="alert" className="text-xs text-rose-400">
-          {error}
+          <OperatorText text={error} />
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground">Approving records your sign-off on this desk; it does not post anything. Publishing is a separate button on each approved post.</p>

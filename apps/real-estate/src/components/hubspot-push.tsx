@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Users } from "lucide-react";
+import { OperatorText } from "@/components/operator-text";
 
 /** Pushes one buyer to HubSpot after a confirmation. Disabled, with the reason, when HUBSPOT_TOKEN isn't set. */
 export function HubspotPush({ leadId, name, email, ready, pushedAt }: { leadId: string; name: string; email: string; ready: boolean; pushedAt?: string }) {
@@ -38,7 +39,7 @@ export function HubspotPush({ leadId, name, email, ready, pushedAt }: { leadId: 
       </button>
       {msg ? (
         <span role={msg.ok ? "status" : "alert"} className={msg.ok ? "text-[11px] text-emerald-300" : "text-[11px] text-rose-300"}>
-          {msg.text}
+          <OperatorText text={msg.text} />
         </span>
       ) : pushedAt ? (
         <span className="text-[11px] text-muted-foreground">In HubSpot since {new Date(pushedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>

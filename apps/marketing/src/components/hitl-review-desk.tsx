@@ -7,6 +7,7 @@ import { useDeskWindow } from "@/lib/use-desk-snapshot";
 import { recommendedSpend } from "@/lib/desk-derive";
 import { DemoChip } from "@helix/ui";
 import { ReviewCharts, useDemoMode } from "@/components/desk-charts";
+import { isOperatorLocked, OperatorLockNote } from "@/components/operator-lock-note";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -186,6 +187,7 @@ export function HitlReviewDesk() {
   const [filter, setFilter] = useState<"all" | "high" | "meta">("all");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const [metaReady, setMetaReady] = useState(false);
   const [sandboxMode, setSandboxMode] = useState(false);
   const [simResult, setSimResult] = useState<{
@@ -284,7 +286,11 @@ export function HitlReviewDesk() {
       error?: string;
       adsWrite?: { attempted: boolean; ok: boolean; detail: string };
     };
-    if (!res.ok) throw new Error(data.error || "Review failed");
+    if (!res.ok) {
+      setLocked(isOperatorLocked(res.status, data.error));
+      throw new Error(data.error || "Review failed");
+    }
+    setLocked(false);
     return data;
   }
 
@@ -421,6 +427,7 @@ export function HitlReviewDesk() {
 
   return (
     <div className="flex w-full flex-col gap-5 pb-20 text-on-surface">
+      {locked ? <OperatorLockNote /> : null}
       {toast ? (
         <div className="fixed right-6 bottom-24 z-50 max-w-sm rounded-lg border border-[var(--border-hairline)] bg-surface-container-high px-4 py-2.5 text-xs shadow-2xl">
           {toast}

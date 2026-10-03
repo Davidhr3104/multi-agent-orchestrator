@@ -1,6 +1,7 @@
 import { encodeSse, parseLeadIngest, type LeadStreamEvent } from "@helix/core";
 import { finishLeadIngest } from "@/lib/finish-ingest";
 import { withOrgScope } from "@/lib/org-auth";
+import { requireOperator } from "@helix/core/operator";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
   const scoped = await withOrgScope(async (orgId) => orgId);
   if (scoped instanceof Response) return scoped;
   const orgId = scoped;
+  const heuristicOnly = Boolean(requireOperator(req));
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
         controller.enqueue(encodeSse(event));
       };
       try {
-        const lead = await finishLeadIngest(parsed, send, orgId);
+        const lead = await finishLeadIngest(parsed, send, orgId, { heuristicOnly });
         send({ type: "result", lead });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

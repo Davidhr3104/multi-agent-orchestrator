@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StoredLead } from "@helix/core";
 import { AskAiCard } from "@/components/ask-ai-card";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
+import { isOperatorLocked, OperatorLockedNotice } from "@/components/operator-locked";
 import { AttentionQueue } from "./AttentionQueue";
 import { KpiStrip } from "./KpiStrip";
 import { PriorityTable } from "./PriorityTable";
@@ -17,6 +18,7 @@ export function TriageOverview() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [operatorLocked, setOperatorLocked] = useState(false);
   const [deskMode, setDeskMode] = useState<"demo" | "live" | null>(null);
   const [flashIds, setFlashIds] = useState<string[]>([]);
   const [simBusy, setSimBusy] = useState(false);
@@ -121,7 +123,9 @@ export function TriageOverview() {
     try {
       const crm = await fetch(`/api/leads/${id}/crm`, { method: "POST" });
       const data = (await crm.json()) as { error?: string };
-      if (!crm.ok) {
+      if (isOperatorLocked(crm.status, data.error)) {
+        setOperatorLocked(true);
+      } else if (!crm.ok) {
         showToast(data.error || "CRM push failed");
       } else {
         await fetch(`/api/leads/${id}/review`, { method: "POST" });
@@ -239,6 +243,13 @@ export function TriageOverview() {
       ) : (
         <>
           <div data-tour="leads-attention">
+          {operatorLocked ? (
+            <OperatorLockedNotice
+              action="Approve & Push to the CRM"
+              onDismiss={() => setOperatorLocked(false)}
+              className="mb-3"
+            />
+          ) : null}
           {kpis.hitlPending > 0 ? (
             <AttentionQueue
               leads={leads.filter((l) => l.pipelineStage !== "lost")}

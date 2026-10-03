@@ -1,5 +1,6 @@
 import { askAi, askAiWithProposal, isClaudeConfigured, type AskAiMessage } from "@helix/core";
-import { aiCtx, applyRiskPolicy, loadDeskState, mayChangeDesk, respondWithDeskCookie } from "@/lib/ai-desk";
+import { requireOperator } from "@helix/core/operator";
+import { aiCtx, applyRiskPolicy, loadDeskState, mayChangeDesk, mayUseClaude, respondWithDeskCookie } from "@/lib/ai-desk";
 import { newAgentCtx, startAgent } from "@/lib/inbox-agent-session";
 import { buildDemoReply } from "@/lib/demo-assistant";
 import { currentDeskMode, getMessage, listAllThreads, listMessages } from "@/lib/store";
@@ -82,8 +83,8 @@ export async function POST(req: Request) {
 
   if (body.mode === "drawer") {
     const ctx = aiCtx(req);
-    // Demo desk without a Claude key: answer from the real threads with the deterministic assistant.
-    if (!isClaudeConfigured() && currentDeskMode() === "demo") {
+    // Demo desk without a Claude key (or without the operator unlock): answer from the real threads with the deterministic assistant.
+    if ((!isClaudeConfigured() || !mayUseClaude(req)) && currentDeskMode() === "demo") {
       const last = body.history[body.history.length - 1];
       if (last.attachments?.length) {
         return Response.json({
@@ -94,6 +95,10 @@ export async function POST(req: Request) {
       }
       const reply = buildDemoReply(last.content, await listAllThreads());
       return respondWithDeskCookie(req, ctx, { ...(await applyRiskPolicy(req, ctx, reply)), engine: "fallback", demo: true });
+    }
+    if (isClaudeConfigured()) {
+      const denied = requireOperator(req);
+      if (denied) return denied;
     }
     // With a Claude key, text requests go to the tool-use agent; image attachments keep the
     // single-call path because the agent transcript is text-only.
@@ -124,6 +129,10 @@ export async function POST(req: Request) {
     return respondWithDeskCookie(req, ctx, await applyRiskPolicy(req, ctx, { ...result, command: Boolean(result.proposal) }));
   }
 
+  if (isClaudeConfigured()) {
+    const denied = requireOperator(req);
+    if (denied) return denied;
+  }
   const result = await askAi({
     systemPrompt: SYSTEM_PROMPT,
     recordContext,

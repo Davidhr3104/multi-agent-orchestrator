@@ -10,6 +10,7 @@ import {
   tierTone,
 } from "@/components/leads-engine/lead-ui";
 import { cn } from "@/lib/utils";
+import { OPERATOR_LOCKED_ERROR, OperatorLockedNotice } from "@/components/operator-locked";
 
 const REPS = [
   { id: "rep-enterprise", name: "Sam Patel" },
@@ -416,7 +417,11 @@ export default function InboxPage() {
         ))}
       </div>
 
-      {error ? <p className="text-sm text-error">{error}</p> : null}
+      {error === OPERATOR_LOCKED_ERROR ? (
+        <OperatorLockedNotice action="This action" onDismiss={() => setError(null)} />
+      ) : error ? (
+        <p className="text-sm text-error">{error}</p>
+      ) : null}
 
       {undoLostId ? (
         <div className="fixed right-4 bottom-[3.75rem] z-50 flex items-center gap-3 rounded-lg border border-error/40 bg-error-container/30 px-4 py-2 text-sm text-error shadow-lg">

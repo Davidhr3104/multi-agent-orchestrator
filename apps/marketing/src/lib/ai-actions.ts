@@ -10,7 +10,7 @@ import { getDecision, getSnapshot, restoreDecision } from "@/lib/store";
  * Spend decisions that reach the ad platform always need a person's sign-off.
  */
 
-export type MarketingCtx = { actor: string };
+export type MarketingCtx = { actor: string; writeAds?: boolean };
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const names = (l: string[]) => l.join(", ");
@@ -46,7 +46,7 @@ async function restore(id: string, data: unknown): Promise<boolean> {
 
 function decider(action: CampaignAction) {
   return async (id: string, p: Record<string, unknown>, ctx: MarketingCtx) =>
-    (await decideCampaign(id, action, typeof p.note === "string" ? p.note : undefined, ctx.actor, true)) !== null;
+    (await decideCampaign(id, action, typeof p.note === "string" ? p.note : undefined, ctx.actor, ctx.writeAds !== false)) !== null;
 }
 
 export const marketingActions: DeskActionRegistry<MarketingCtx> = {

@@ -1,5 +1,6 @@
 import { askAi, askAiWithProposal, isClaudeConfigured, type AskAiMessage } from "@helix/core";
 import type { ScoredField, StoredRfp } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { applyRiskPolicy } from "@/lib/ai-desk";
 import { buildDemoReply } from "@/lib/demo-assistant";
 import { currentDeskMode, getRfp, listRfps } from "@/lib/store";
@@ -90,9 +91,14 @@ export async function POST(req: Request) {
     recordContext = await buildSnapshotContext();
   }
 
+  const operatorDenied = requireOperator(req);
+  const demo = currentDeskMode() === "demo";
+  if (isClaudeConfigured() && operatorDenied && !demo) return operatorDenied;
+  const useDemoAssistant = demo && (!isClaudeConfigured() || Boolean(operatorDenied));
+
   if (body.mode === "drawer") {
-    // Demo desk without a Claude key: answer from the real RFPs with the deterministic assistant.
-    if (!isClaudeConfigured() && currentDeskMode() === "demo") {
+    // Demo desk without Claude (no key, or visitor not unlocked): answer from the real RFPs with the deterministic assistant.
+    if (useDemoAssistant) {
       const last = body.history[body.history.length - 1];
       if (last.attachments?.length) {
         return Response.json({
@@ -112,6 +118,12 @@ export async function POST(req: Request) {
     });
     // Claude only emits a proposal when the operator explicitly asked to act, so treat it as a command.
     return Response.json(await applyRiskPolicy(req, { ...result, command: Boolean(result.proposal) }));
+  }
+
+  if (useDemoAssistant) {
+    const last = body.history[body.history.length - 1];
+    const reply = buildDemoReply(last.content, await listRfps(), Date.now());
+    return Response.json({ answer: reply.answer, engine: "fallback", demo: true });
   }
 
   const result = await askAi({

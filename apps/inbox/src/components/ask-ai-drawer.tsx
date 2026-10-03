@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ErrorText, isOperatorLocked, OPERATOR_HINT } from "@/components/operator-notice";
 
 type Attachment = { type: "image"; data: string; mediaType: string };
 type Engine = "claude" | "fallback";
@@ -297,7 +298,8 @@ export function AskAiDrawer({
       ]);
       if (r.done?.length) announce(r.announce ?? s.label, r.done);
     } catch (err) {
-      commit([...turnsRef.current, { role: "assistant", content: `I couldn't apply that: ${err instanceof Error ? err.message : "unknown error"}.` }]);
+      const message = err instanceof Error ? err.message : "unknown error";
+      commit([...turnsRef.current, { role: "assistant", content: isOperatorLocked(message) ? OPERATOR_HINT : `I couldn't apply that: ${message}.` }]);
     }
   }
 
@@ -523,7 +525,7 @@ export function AskAiDrawer({
                       <p className="text-[11px] text-rose-400">The server cannot sign this confirmation, so it cannot be approved here.</p>
                     )
                   ) : t.agentStatus === "failed" ? (
-                    <p className="text-[11px] font-medium text-rose-400">{t.agentError}</p>
+                    <p className="text-[11px] font-medium text-rose-400"><ErrorText message={t.agentError ?? "Ask Helix failed"} /></p>
                   ) : null}
                 </div>
               ) : null}
@@ -561,7 +563,7 @@ export function AskAiDrawer({
                   ) : t.proposalStatus === "confirmed" ? (
                     <p className="text-[11px] font-medium text-emerald-300">✓ {t.proposalResult}</p>
                   ) : t.proposalStatus === "failed" ? (
-                    <p className="text-[11px] font-medium text-rose-400">{t.proposalResult}</p>
+                    <p className="text-[11px] font-medium text-rose-400"><ErrorText message={t.proposalResult ?? "Execute failed"} /></p>
                   ) : (
                     <p className="text-[11px] text-slate-500">Dismissed.</p>
                   )}
@@ -604,7 +606,7 @@ export function AskAiDrawer({
               ))}
             </div>
           ) : null}
-          {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+          {error ? <p className="text-xs text-rose-400"><ErrorText message={error} /></p> : null}
           <div ref={bottomRef} />
         </div>
 

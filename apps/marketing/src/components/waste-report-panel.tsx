@@ -6,6 +6,7 @@ import type { AiUsageTotals } from "@/lib/ai-usage";
 import type { WasteProposal, WasteReport } from "@/lib/waste-report";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { isOperatorLocked, OperatorLockNote } from "@/components/operator-lock-note";
 
 type Payload = {
   mode?: "demo" | "live";
@@ -57,7 +58,7 @@ function confirmText(p: WasteProposal) {
 export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
   const [data, setData] = useState<Payload | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<{ msg: string; err?: boolean } | null>(null);
+  const [note, setNote] = useState<{ msg: string; err?: boolean; locked?: boolean } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/waste-report");
@@ -77,18 +78,25 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
     };
   }, []);
 
+  async function buildReport(): Promise<{ msg: string; err?: boolean; locked?: boolean } | null> {
+    const res = await fetch("/api/waste-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ window: "7d" }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    await load();
+    if (res.ok) return null;
+    return { msg: body.error || "Could not build the report.", err: true, locked: isOperatorLocked(res.status, body.error) };
+  }
+
   async function generate() {
     setBusy("generate");
     setNote(null);
     try {
-      const res = await fetch("/api/waste-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ window: "7d" }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) setNote({ msg: body.error || "Could not build the report.", err: true });
-      await load();
+      setNote(await buildReport());
+    } catch {
+      setNote({ msg: "Could not build the report.", err: true });
     } finally {
       setBusy(null);
     }
@@ -104,9 +112,15 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
         body: JSON.stringify({ source: "all", window: "7d" }),
       });
       const body = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
-      setNote(res.ok ? { msg: `Imported ${body.imported ?? 0} spend rows from the platform APIs.` } : { msg: body.error || "Sync failed.", err: true });
+      setNote(
+        res.ok
+          ? { msg: `Imported ${body.imported ?? 0} spend rows from the platform APIs.` }
+          : { msg: body.error || "Sync failed.", err: true, locked: isOperatorLocked(res.status, body.error) }
+      );
       await load();
       onChanged?.();
+    } catch {
+      setNote({ msg: "Sync failed.", err: true });
     } finally {
       setBusy(null);
     }
@@ -122,9 +136,13 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
         body: JSON.stringify({ action: p.action, targetIds: [p.campaignId], labels: [p.label], params: { note: `Waste report: ${p.reason}` } }),
       });
       const body = (await res.json().catch(() => ({}))) as { resultText?: string; error?: string };
-      setNote(res.ok ? { msg: body.resultText || "Done." } : { msg: body.error || "Not applied.", err: true });
+      setNote(
+        res.ok
+          ? { msg: body.resultText || "Done." }
+          : { msg: body.error || "Not applied.", err: true, locked: isOperatorLocked(res.status, body.error) }
+      );
       onChanged?.();
-      await generate();
+      if (res.ok) await buildReport().catch(() => null);
     } finally {
       setBusy(null);
     }
@@ -205,7 +223,11 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
         </div>
       ) : null}
 
-      {note ? <p className={cn("text-xs", note.err ? "text-alert-rose" : "text-success-emerald")}>{note.msg}</p> : null}
+      {note?.locked ? (
+        <OperatorLockNote />
+      ) : note ? (
+        <p className={cn("text-xs", note.err ? "text-alert-rose" : "text-success-emerald")}>{note.msg}</p>
+      ) : null}
 
       {!report || !m ? (
         <p className="text-xs text-on-surface-variant">

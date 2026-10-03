@@ -1,6 +1,5 @@
 import { handleExecuteBody } from "@helix/core";
-import { requireOperator } from "@helix/core/operator";
-import { aiCtx, mayChangeDesk } from "@/lib/ai-desk";
+import { aiCtx, deskWriteDenied } from "@/lib/ai-desk";
 import { realEstateActions } from "@/lib/ai-actions";
 import { logActivity } from "@/lib/store";
 
@@ -12,9 +11,8 @@ const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => ty
 // Closed allowlist: only actions registered in realEstateActions can run, and only after the agent
 // confirmed them (a button click, the panel's Confirm, or the risk policy clearing them as safe).
 export async function POST(req: Request) {
-  if (!mayChangeDesk(req)) {
-    return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
-  }
+  const denied = deskWriteDenied(req);
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await req.json();

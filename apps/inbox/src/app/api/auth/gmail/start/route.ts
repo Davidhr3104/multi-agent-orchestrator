@@ -5,7 +5,10 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const denied = requireOperator(req);
-  if (denied) return denied;
+  if (denied) {
+    if (req.headers.get("accept")?.includes("text/html")) return Response.redirect(new URL("/operator", req.url), 302);
+    return denied;
+  }
   if (!isGoogleOAuthConfigured()) {
     return Response.json(
       { error: "GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET required. Paste them in Settings." },

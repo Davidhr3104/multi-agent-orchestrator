@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReorderRequest, StoredProduct } from "@helix/core";
 import { cn } from "@/lib/utils";
+import { ApiErrorLine } from "@/components/operator-notice";
 
 export function ReorderQueue({
   products,
@@ -58,7 +59,7 @@ export function ReorderQueue({
         </span>
       </div>
 
-      {error ? <p className="text-xs text-[#dc2626]">{error}</p> : null}
+      {error ? <ApiErrorLine error={error} className="text-xs" /> : null}
 
       <div className="space-y-3">
         {urgent.map((product) => {

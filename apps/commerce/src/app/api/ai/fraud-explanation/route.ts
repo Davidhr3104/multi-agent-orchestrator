@@ -1,15 +1,13 @@
 import { requireOperator } from "@helix/core/operator";
-import { mayChangeDesk } from "@/lib/ai-desk";
 import { explainOrderFraud } from "@/lib/fraud-explanation";
 import { getOrder } from "@/lib/store";
 
 export const runtime = "nodejs";
 
-// Each call can spend Claude tokens, so a live desk requires the operator unlock.
+// Each call can spend Claude tokens, so it always requires the operator unlock.
 export async function POST(req: Request) {
-  if (!mayChangeDesk(req)) {
-    return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
-  }
+  const denied = requireOperator(req);
+  if (denied) return denied;
   let body: { orderId?: unknown };
   try {
     body = (await req.json()) as { orderId?: unknown };

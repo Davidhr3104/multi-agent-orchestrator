@@ -1,5 +1,5 @@
 import { askAi, askAiWithProposal, isClaudeConfigured, type AskAiMessage } from "@helix/core";
-import { operatorActor } from "@helix/core/operator";
+import { operatorActor, requireOperator } from "@helix/core/operator";
 import { aiActor, runAiAction } from "@/lib/ai-actions";
 import { assessRisk } from "@/lib/ai-risk";
 import { buildDemoReply, type DemoProposal } from "@/lib/demo-assistant";
@@ -142,12 +142,14 @@ export async function POST(req: Request) {
     // Demo desk without a Claude key: answer from the real leads with the deterministic
     // assistant instead of dumping raw context. Clearly labeled demo so the UI never
     // presents it as a live model.
-    if (body.mode === "drawer" && !isClaudeConfigured() && (await deskModeFor(orgId)) === "demo") {
+    const claudeLocked = isClaudeConfigured() && Boolean(requireOperator(req));
+    if (body.mode === "drawer" && (claudeLocked || (!isClaudeConfigured() && (await deskModeFor(orgId)) === "demo"))) {
       const last = body.history[body.history.length - 1];
       if (last.attachments?.length) {
         return Response.json({
-          answer:
-            "I can't read attachments in demo mode. Connect an ANTHROPIC_API_KEY and I'll analyze images alongside your pipeline.",
+          answer: claudeLocked
+            ? "I can't read attachments without operator unlock. Unlock at /operator and I'll analyze images with Claude."
+            : "I can't read attachments in demo mode. Connect an ANTHROPIC_API_KEY and I'll analyze images alongside your pipeline.",
           engine: "fallback",
           demo: true,
         });
@@ -164,6 +166,14 @@ export async function POST(req: Request) {
         proposalInstruction: PROPOSAL_INSTRUCTION,
       });
       return Response.json(result);
+    }
+
+    if (claudeLocked) {
+      return Response.json({
+        answer: recordContext ?? "Claude answers need operator unlock on this deployment. Visit /operator to unlock.",
+        engine: "fallback",
+        operatorRequired: true,
+      });
     }
 
     const result = await askAi({

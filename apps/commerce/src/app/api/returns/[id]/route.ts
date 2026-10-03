@@ -1,6 +1,7 @@
 import { getOrder, listReturns, patchReturnRequest } from "@/lib/store";
 import { getLiveShopifyClient } from "@/lib/shopify";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { deskWriteDenied } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
@@ -9,7 +10,7 @@ function isDemoShopifyId(gid: string): boolean {
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
 

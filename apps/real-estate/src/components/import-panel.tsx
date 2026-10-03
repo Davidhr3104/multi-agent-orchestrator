@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Link2, Loader2, Upload } from "lucide-react";
+import { OperatorText } from "@/components/operator-text";
 import { cn } from "@/lib/utils";
 
 type Kind = "properties" | "buyers";
@@ -154,7 +155,10 @@ export function ImportPanel() {
 
       {error ? (
         <p role="alert" className="flex items-start gap-2 rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-200">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden /> {error}
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>
+            <OperatorText text={error} />
+          </span>
         </p>
       ) : null}
       {done ? (

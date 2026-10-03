@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isOperatorLocked, OperatorLockedNotice } from "@/components/operator-locked";
 import type { HelixLead } from "@/lib/lead-ai";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export function aiTriagePanelKey(lead: HelixLead): string {
 export function AiTriagePanel({ lead, onLeadUpdate }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const [message, setMessage] = useState(lead.nextMove?.message ?? "");
   const [copied, setCopied] = useState(false);
   const triage = lead.aiTriage;
@@ -34,7 +36,8 @@ export function AiTriagePanel({ lead, onLeadUpdate }: Props) {
       });
       const data = (await res.json()) as { lead?: HelixLead; error?: string };
       if (data.lead) onLeadUpdate(data.lead);
-      if (!res.ok) setError(data.error || `Failed (${res.status})`);
+      setLocked(isOperatorLocked(res.status, data.error));
+      if (!res.ok && !isOperatorLocked(res.status, data.error)) setError(data.error || `Failed (${res.status})`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
@@ -182,6 +185,7 @@ export function AiTriagePanel({ lead, onLeadUpdate }: Props) {
             {busy === "draft" ? "Claude is drafting…" : hot ? "Draft next move with Claude" : "Draft next move with Claude (not a hot lead)"}
           </button>
         )}
+        {locked ? <OperatorLockedNotice action="Drafting with Claude" className="mt-2" /> : null}
         {error ? <p className="mt-2 text-[11px] text-error">{error}</p> : null}
       </div>
     </div>

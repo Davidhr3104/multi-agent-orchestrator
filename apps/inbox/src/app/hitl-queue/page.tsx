@@ -10,6 +10,7 @@ import { EMPTY_INBOX } from "@helix/help";
 import { ChartCard, DemoChip, HBarList } from "@helix/ui";
 import { ColumnChart, Grid, PageFrame, SOURCE_DESK, VIOLET, useDeskMode } from "@/components/desk-kit";
 import { urgencyHistogram } from "@/lib/desk-metrics";
+import { ErrorText } from "@/components/operator-notice";
 
 export default function HITLQueuePage() {
   const [threads, setThreads] = useState<InboxMessage[]>([]);
@@ -63,7 +64,8 @@ export default function HITLQueuePage() {
     });
     setBusy(null);
     if (!res.ok) {
-      setNotice("Batch action failed.");
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setNotice(data?.error || "Batch action failed.");
       return;
     }
     setChecked(new Set());
@@ -84,7 +86,7 @@ export default function HITLQueuePage() {
       chips={demo ? <DemoChip /> : null}
       subtitle="Human-in-the-loop review for the decisions the AI was least sure about."
     >
-      {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
+      {notice ? <p className="text-xs text-muted-foreground"><ErrorText message={notice} /></p> : null}
       {threads.length > 0 ? (
         <Grid cols={2}>
           <ChartCard title="How urgent the queue is" subtitle={`${threads.length} thread${threads.length === 1 ? "" : "s"} waiting for a person`} demo={demo} source={SOURCE_DESK}>

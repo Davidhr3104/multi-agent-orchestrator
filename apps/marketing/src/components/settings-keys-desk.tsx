@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import { KEYS_MARKETING } from "@helix/core/secret-fields";
 import { loadJson, saveJson } from "@/lib/desk-prefs";
 import { ConnectorFlow } from "@/components/desk-charts";
+import { isOperatorLocked } from "@/components/operator-lock-note";
 import { cn } from "@/lib/utils";
+
+const LOCKED_FLASH = "Operator unlock required — unlock in Security below or at /operator.";
 
 type KeyField = { name: string; label: string; hint: string; stub?: boolean };
 type KeyRow = KeyField & { configured: boolean; masked: string | null };
@@ -314,7 +317,7 @@ export function SettingsKeysDesk() {
     });
     setSaving(false);
     if (!res.ok) {
-      flash("Could not save keys.");
+      flash(res.status === 401 ? LOCKED_FLASH : "Could not save keys.");
       return;
     }
     const data = (await res.json()) as { keys?: KeyRow[]; persist?: string };
@@ -337,7 +340,7 @@ export function SettingsKeysDesk() {
     });
     setBusy(null);
     if (!res.ok) {
-      flash("Desk update failed.");
+      flash(res.status === 401 ? LOCKED_FLASH : "Desk update failed.");
       return;
     }
     setDesk((await res.json()) as DeskStatus);
@@ -354,6 +357,10 @@ export function SettingsKeysDesk() {
     setBusy(null);
     const data = (await res.json().catch(() => ({}))) as { error?: string; imported?: number };
     const name = source === "google" ? "Google Ads" : "TikTok Ads";
+    if (isOperatorLocked(res.status, data.error)) {
+      flash(LOCKED_FLASH);
+      return;
+    }
     flash(res.ok ? `${name} read OK · ${data.imported ?? 0} spend rows.` : (data.error ?? `${name} read failed.`));
     void loadRuntime();
   }
@@ -366,14 +373,14 @@ export function SettingsKeysDesk() {
       body: JSON.stringify({ window: "7d", source: "meta" }),
     });
     setBusy(null);
-    const data = (await res.json()) as {
+    const data = (await res.json().catch(() => ({}))) as {
       error?: string;
       imported?: number;
       campaigns?: number;
       message?: string;
     };
     if (!res.ok) {
-      flash(data.error ?? "Meta ping failed.");
+      flash(isOperatorLocked(res.status, data.error) ? LOCKED_FLASH : (data.error ?? "Meta ping failed."));
       return;
     }
     flash(
@@ -1134,6 +1141,13 @@ export function SettingsKeysDesk() {
                     HITL writes and Meta sync are allowed on this browser.
                   </p>
                 )}
+                <a
+                  href="/operator"
+                  className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-marketing-amber hover:text-primary-container"
+                >
+                  <span className="material-symbols-outlined text-[14px]">lock</span>
+                  Open operator unlock page →
+                </a>
               </div>
             </section>
           )}

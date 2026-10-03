@@ -1,6 +1,7 @@
 import { getLead, patchLead } from "@/lib/store";
 import { finishLeadIngest } from "@/lib/finish-ingest";
 import { withOrgScope } from "@/lib/org-auth";
+import { requireOperator } from "@helix/core/operator";
 import type { LeadEmit, LeadIngestInput } from "@helix/core";
 
 export const runtime = "nodejs";
@@ -38,7 +39,7 @@ export async function POST(
       };
       const emit: LeadEmit = () => undefined;
       try {
-        const lead = await finishLeadIngest(input, emit, orgId);
+        const lead = await finishLeadIngest(input, emit, orgId, { heuristicOnly: Boolean(requireOperator(req)) });
         // Mark the most recent scoreHistory entry as a manual rescore, not a fresh pipeline run,
         // so the audit view can distinguish operator-triggered rescoring from real ingestion.
         if (lead.scoreHistory && lead.scoreHistory.length > 0) {

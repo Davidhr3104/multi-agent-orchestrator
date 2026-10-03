@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { demoAvailable, getSecret } from "@helix/core";
 import { requireOperator } from "@helix/core/operator";
 import { verifyActionToken, type LeadAction } from "@helix/core/action-token";
+import { deskModeFor } from "./store";
 import { getSupabase } from "./supabase-leads";
 
 export type AuthedUser = { id: string; email: string | null };
@@ -147,13 +148,30 @@ export async function isGuestVisitor(): Promise<boolean> {
 }
 
 /**
- * Operator gate for routes that only ever touch the lead store. Guests pass because they can only
- * reach the in-memory demo sandbox. Do NOT use this on routes with external side effects (CRM push).
+ * Desk-state changes are open while the caller's desk is in demo mode (guests and demo desks only
+ * ever touch the in-memory sandbox) and need the operator key on a live desk.
+ */
+export async function mayChangeDesk(req: Request): Promise<boolean> {
+  if (!requireOperator(req) || (await isGuestVisitor())) return true;
+  try {
+    return (await deskModeFor(await resolveOrgScope())) === "demo";
+  } catch (err) {
+    if (err instanceof OrgScopeError) return false;
+    throw err;
+  }
+}
+
+export async function deskWriteDenied(req: Request): Promise<Response | null> {
+  if (await mayChangeDesk(req)) return null;
+  return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
+}
+
+/**
+ * Operator gate for routes that only ever touch the lead store. Open on a demo desk, gated on a
+ * live one. Do NOT use this on routes with external side effects (CRM push) — use requireOperator.
  */
 export async function requireOperatorOrGuest(req: Request): Promise<Response | null> {
-  const denied = requireOperator(req);
-  if (!denied) return null;
-  return (await isGuestVisitor()) ? null : denied;
+  return deskWriteDenied(req);
 }
 
 export class OrgScopeError extends Error {}

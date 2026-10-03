@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
 import { deskWindow } from "@/lib/desk-prefs";
+import { isOperatorLocked, OperatorLockNote } from "@/components/operator-lock-note";
 
 type Nav =
   | "engine"
@@ -14,6 +15,7 @@ type Nav =
   | "review"
   | "help"
   | "settings"
+  | "operator"
   | "attribution"
   | "scoring"
   | "automations"
@@ -134,6 +136,7 @@ export function EngineShell({
   const [search, setSearch] = useState("");
   const [headerBusy, setHeaderBusy] = useState(false);
   const [headerToast, setHeaderToast] = useState<string | null>(null);
+  const [headerLocked, setHeaderLocked] = useState(false);
   const crumbs = crumbFor(active);
 
   useEffect(() => {
@@ -186,13 +189,18 @@ export function EngineShell({
   async function runDeskSync() {
     setHeaderBusy(true);
     setHeaderToast(null);
+    setHeaderLocked(false);
     try {
       const res = await fetch("/api/ads/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ window: "30d" }),
       });
-      const data = (await res.json()) as { error?: string; imported?: number; message?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; imported?: number; message?: string };
+      if (isOperatorLocked(res.status, data.error)) {
+        setHeaderLocked(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Sync failed");
       setHeaderToast(
         data.imported != null
@@ -278,6 +286,7 @@ export function EngineShell({
 
   const system: NavItem[] = [
     { id: "settings", href: "/settings", label: "Settings & API Keys", icon: "key" },
+    { id: "operator", href: "/operator", label: "Operator Unlock", icon: "lock" },
     { id: "help", href: "/help", label: "How to Use", icon: "menu_book" },
   ];
 
@@ -499,6 +508,7 @@ export function EngineShell({
             {headerToast}
           </div>
         ) : null}
+        {headerLocked ? <OperatorLockNote className="mx-4 mt-2 sm:mx-6" /> : null}
 
         <main className="min-h-[calc(100vh-4rem)] bg-background px-4 py-5 sm:px-6">{children}</main>
       </div>

@@ -16,7 +16,8 @@ type ClaudeReplyJson = {
 
 export async function smartReplyWithContext(
   thread: EmailThread,
-  history: ThreadMessage[]
+  history: ThreadMessage[],
+  opts?: { heuristicOnly?: boolean }
 ): Promise<{ draftReply: string; engine: "claude" | "heuristic"; confidence: number; reasoning?: string }> {
   const fallback = smartReplyHeuristic({
     fromName: thread.fromName,
@@ -35,7 +36,7 @@ export async function smartReplyWithContext(
       : "You are the Executive desk. Filter noise, summarize the ask, and propose a meeting only when one was requested.";
   const hits = queryInboxKb({ subject: thread.subject, body: thread.body }, 3);
   const sources = hits.map((hit) => `${hit.docTitle}: ${hit.quote || hit.excerpt}`).join("\n");
-  if (!key || thread.category === "spam" || thread.category === "fyi") {
+  if (!key || opts?.heuristicOnly || thread.category === "spam" || thread.category === "fyi") {
     return { draftReply: fallback, engine: "heuristic", confidence: thread.aiConfidence || 62 };
   }
 

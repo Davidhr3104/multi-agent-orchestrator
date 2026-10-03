@@ -1,9 +1,12 @@
 import { parseSpendCsv } from "@helix/core";
+import { deskWriteDenied } from "@/lib/ai-desk";
 import { ingestSpend } from "@/lib/store";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const denied = deskWriteDenied(req);
+  if (denied) return denied;
   let csv = "";
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data")) {

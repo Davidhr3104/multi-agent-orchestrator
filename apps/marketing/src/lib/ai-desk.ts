@@ -4,7 +4,7 @@ import { marketingActions, type MarketingCtx } from "@/lib/ai-actions";
 import { currentDeskMode } from "@/lib/store";
 
 export function aiCtx(req: Request): MarketingCtx {
-  return { actor: `Helix AI · approved by ${operatorActor(req)}` };
+  return { actor: `Helix AI · approved by ${operatorActor(req)}`, writeAds: mayWriteAds(req) };
 }
 
 /**
@@ -13,6 +13,16 @@ export function aiCtx(req: Request): MarketingCtx {
  */
 export function mayChangeDesk(req: Request): boolean {
   return currentDeskMode() === "demo" || !requireOperator(req);
+}
+
+export function deskWriteDenied(req: Request): Response | null {
+  if (mayChangeDesk(req)) return null;
+  return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
+}
+
+/** Pause/scale may reach Meta Ads Manager only for an unlocked operator, even on the open demo desk. */
+export function mayWriteAds(req: Request): boolean {
+  return !requireOperator(req);
 }
 
 type Reply = { answer: string; proposal?: ActionProposal; command?: boolean } & Record<string, unknown>;

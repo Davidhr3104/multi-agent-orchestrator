@@ -1,4 +1,5 @@
 import { askAi, askAiWithProposal, isClaudeConfigured, type AskAiMessage } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { applyRiskPolicy } from "@/lib/ai-desk";
 import { buildDemoReply } from "@/lib/demo-assistant";
 import { currentDeskMode, getSnapshot } from "@/lib/store";
@@ -52,10 +53,17 @@ export async function POST(req: Request) {
   }
 
   const recordContext = body.mode === "drawer" ? await buildSnapshotContext() : undefined;
+  const claudeDenied = isClaudeConfigured() ? requireOperator(req) : null;
+  const demo = currentDeskMode() === "demo";
+  if (claudeDenied && !demo) return claudeDenied;
+  if (claudeDenied && body.mode !== "drawer") {
+    const last = body.history[body.history.length - 1];
+    return Response.json({ answer: buildDemoReply(last.content, await getSnapshot("7d")).answer, engine: "fallback", demo: true });
+  }
 
   if (body.mode === "drawer") {
-    // Demo desk without a Claude key: answer from the real numbers with the deterministic assistant.
-    if (!isClaudeConfigured() && currentDeskMode() === "demo") {
+    // Demo desk without Claude (no key, or no operator unlock): answer from the real numbers with the deterministic assistant.
+    if ((!isClaudeConfigured() || claudeDenied) && demo) {
       const last = body.history[body.history.length - 1];
       if (last.attachments?.length) {
         return Response.json({

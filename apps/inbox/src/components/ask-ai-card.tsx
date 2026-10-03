@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { ErrorText } from "@/components/operator-notice";
 
 type AskAiMessage = { role: "user" | "assistant"; content: string };
 type AskAiEngine = "claude" | "fallback";
@@ -135,7 +136,7 @@ export function AskAiCard({
             ))}
           </div>
 
-          {error ? <p className="text-xs text-rose-500">{error}</p> : null}
+          {error ? <p className="text-xs text-rose-500"><ErrorText message={error} /></p> : null}
 
           {history.length > 0 ? (
             <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-border bg-surface p-3">

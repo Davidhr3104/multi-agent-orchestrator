@@ -124,7 +124,8 @@ type ExecuteResponse = Partial<Executed> & { error?: string; done?: string[] };
 
 async function callExecute(body: Record<string, unknown>): Promise<ExecuteResponse> {
   const res = await fetch("/api/ask-ai/execute", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const data = (await res.json()) as ExecuteResponse;
+  const data = (await res.json().catch(() => ({}))) as ExecuteResponse;
+  if (res.status === 401) throw new Error(`${data.error ?? "Operator unlock required."} [Unlock on the operator page](/operator)`);
   if (!res.ok) throw new Error(data.error ?? `Execute failed (${res.status})`);
   return data;
 }
@@ -474,7 +475,9 @@ export function AskAiDrawer({
                   ) : t.proposalStatus === "confirmed" ? (
                     <p className="text-[11px] font-medium text-emerald-300">✓ {t.proposalResult}</p>
                   ) : t.proposalStatus === "failed" ? (
-                    <p className="text-[11px] font-medium text-rose-400">{t.proposalResult}</p>
+                    <p className="text-[11px] font-medium text-rose-400">
+                      <Rich text={t.proposalResult ?? ""} />
+                    </p>
                   ) : (
                     <p className="text-[11px] text-slate-500">Dismissed.</p>
                   )}
@@ -517,7 +520,11 @@ export function AskAiDrawer({
               ))}
             </div>
           ) : null}
-          {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+          {error ? (
+            <p className="text-xs text-rose-400">
+              <Rich text={error} />
+            </p>
+          ) : null}
           <div ref={bottomRef} />
         </div>
 

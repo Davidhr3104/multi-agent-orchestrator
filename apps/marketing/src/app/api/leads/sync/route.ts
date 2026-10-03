@@ -1,3 +1,4 @@
+import { deskWriteDenied } from "@/lib/ai-desk";
 import { attributedFromStored, upsertAttributedLeads } from "@/lib/store";
 import type { StoredLead } from "@helix/core";
 
@@ -7,7 +8,9 @@ function leadsBase(): string {
   return (process.env.HELIX_LEADS_URL?.trim() || "http://127.0.0.1:43148").replace(/\/$/, "");
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const denied = deskWriteDenied(req);
+  if (denied) return denied;
   let res: Response;
   try {
     res = await fetch(`${leadsBase()}/api/leads`, { cache: "no-store", signal: AbortSignal.timeout(12_000) });

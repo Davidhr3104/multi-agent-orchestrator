@@ -18,7 +18,7 @@ const DEFAULT_THRESHOLDS: ScoreThresholds = {
   nurtureMax: 65,
 };
 
-type TriageOpts = { hitl?: number; addendum?: string; thresholds?: ScoreThresholds };
+type TriageOpts = { hitl?: number; addendum?: string; thresholds?: ScoreThresholds; heuristicOnly?: boolean };
 
 /** The lead's own words: the only text a reason may quote. */
 export function leadText(input: LeadIngestInput): string {
@@ -119,6 +119,7 @@ export async function triageLead(input: LeadIngestInput, opts: TriageOpts = {}):
   });
 
   if (!isAnthropicConfigured()) return heuristicOutcome("ANTHROPIC_API_KEY not set");
+  if (opts.heuristicOnly) return heuristicOutcome("Operator unlock required for Claude triage");
 
   const { system, prompt } = triagePrompt(input, opts.addendum);
   const res = await callClaudeJson<ClaudeTriageJson>({
@@ -207,7 +208,11 @@ export async function runTriagePipeline(
   log(
     "recommender",
     "info",
-    isAnthropicConfigured() ? `Calling Claude (${TRIAGE_MODEL}) for triage.` : "No ANTHROPIC_API_KEY; heuristic scoring."
+    !isAnthropicConfigured()
+      ? "No ANTHROPIC_API_KEY; heuristic scoring."
+      : opts.heuristicOnly
+        ? "Operator not unlocked; heuristic scoring."
+        : `Calling Claude (${TRIAGE_MODEL}) for triage.`
   );
 
   const { result, triage } = await triageLead(input, opts);
@@ -215,7 +220,7 @@ export async function runTriagePipeline(
     log("recommender", "success", `Claude triage: ${triage.classification} · ${triage.score}.`, {
       confidence: triage.confidence,
     });
-  } else if (triage.fallbackReason && isAnthropicConfigured()) {
+  } else if (triage.fallbackReason && isAnthropicConfigured() && !opts.heuristicOnly) {
     log("recommender", "warn", `${triage.fallbackReason}; heuristic used.`);
   }
 

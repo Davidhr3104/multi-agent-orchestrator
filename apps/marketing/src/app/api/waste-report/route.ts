@@ -19,11 +19,8 @@ export async function GET() {
 
 /** Builds a fresh report now. Only analyses and proposes; it never pauses or scales. */
 export async function POST(req: Request) {
-  const { mode } = await deskStatus();
-  if (mode === "live") {
-    const denied = requireOperator(req);
-    if (denied) return denied;
-  }
+  const denied = requireOperator(req);
+  if (denied) return denied;
   let windowRaw: string | null = null;
   try {
     windowRaw = ((await req.json()) as { window?: string }).window ?? null;

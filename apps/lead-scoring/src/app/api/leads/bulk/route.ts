@@ -1,6 +1,6 @@
 import { deleteLeads, getLead, patchLead, patchLeads } from "@/lib/store";
 import { sendLeadToGhl } from "@/lib/ghl";
-import { operatorActor } from "@helix/core/operator";
+import { operatorActor, requireOperator } from "@helix/core/operator";
 import { requireOperatorOrGuest } from "@/lib/org-auth";
 import { supabaseDeleteLeads } from "@/lib/supabase-leads";
 import { withOrgScope } from "@/lib/org-auth";
@@ -20,13 +20,18 @@ export async function POST(req: Request) {
   const ids = Array.isArray(row.ids) ? row.ids.map(String).filter(Boolean) : [];
   const action = String(row.action ?? "");
   if (ids.length === 0) return Response.json({ error: "ids required" }, { status: 400 });
+  if (action === "ghl") {
+    const pushDenied = requireOperator(req);
+    if (pushDenied) return pushDenied;
+  }
   const actor = operatorActor(req);
   const at = new Date().toISOString();
 
   return withOrgScope(async (orgId) => {
     if (action === "delete") {
       const removed = await deleteLeads(ids, orgId);
-      await supabaseDeleteLeads(ids);
+      // Without an org the ids aren't tenant-scoped, so only the operator may touch the database.
+      if (orgId || !requireOperator(req)) await supabaseDeleteLeads(ids, orgId);
       return Response.json({ ok: true, removed });
     }
     if (action === "review") {

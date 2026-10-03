@@ -1,6 +1,7 @@
 import { corpusStats, ingestCorpusDoc, listCorpusDocs } from "@/lib/corpus-store";
 import { recordAudit } from "@/lib/store";
-import { requireOperator, operatorActor } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
+import { deskWriteDenied } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   let body: { title?: string; body?: string; practiceArea?: string } = {};
   try {

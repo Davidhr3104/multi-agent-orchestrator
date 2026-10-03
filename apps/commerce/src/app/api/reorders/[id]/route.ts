@@ -1,5 +1,5 @@
 import { patchReorderRequest } from "@/lib/store";
-import { requireOperator } from "@helix/core/operator";
+import { deskWriteDenied } from "@/lib/ai-desk";
 import type { ReorderStatus } from "@helix/core";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 const STATUSES: ReorderStatus[] = ["draft", "ordered", "received", "cancelled"];
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
 

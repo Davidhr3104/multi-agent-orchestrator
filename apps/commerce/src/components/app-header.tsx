@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, HelpCircle, Menu, RefreshCw, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { isOperatorRequired } from "@/components/operator-notice";
 
 const LABELS: Record<string, string> = {
   "/": "Dashboard",
@@ -17,6 +18,7 @@ const LABELS: Record<string, string> = {
   "/analytics": "Analytics",
   "/settings": "Settings",
   "/help": "How to use",
+  "/operator": "Operator",
 };
 
 export function AppHeader({ onOpenMenu }: { onOpenMenu?: () => void }) {
@@ -82,7 +84,16 @@ export function AppHeader({ onOpenMenu }: { onOpenMenu?: () => void }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-3">
-        {syncNote ? (
+        {isOperatorRequired(syncNote) ? (
+          <Link
+            href="/operator"
+            role="alert"
+            title="Operator unlock required — unlock at /operator to use Claude/real sends"
+            className="max-w-32 truncate text-[11px] text-amber-600 underline underline-offset-2 sm:max-w-56 dark:text-amber-300"
+          >
+            Operator unlock required — unlock at /operator
+          </Link>
+        ) : syncNote ? (
           <span role="alert" title={syncNote} className="max-w-32 truncate text-[11px] text-rose-600 sm:max-w-56 dark:text-rose-300">
             {syncNote}
           </span>

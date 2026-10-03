@@ -9,6 +9,7 @@ import { readKnowledgeLinks } from "@/lib/knowledge-links";
 import type { InboxPersona } from "@/lib/agent-profile";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { DraftDiff } from "@/components/draft-diff";
+import { ErrorText } from "@/components/operator-notice";
 import { cn } from "@/lib/utils";
 
 const BAND = {
@@ -158,7 +159,7 @@ export function ActiveInspector({
       />
       {error ? (
         <p className="mb-3 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-2 text-[11px] text-red-600 dark:text-[#FCA5A5]">
-          {error}
+          <ErrorText message={error} />
         </p>
       ) : null}
       {thread.handedOffAt ? (

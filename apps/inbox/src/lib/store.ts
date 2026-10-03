@@ -535,12 +535,14 @@ export async function ingestMessage(input: {
   sentAt?: string;
   /** The operator's own recent sent emails — a style reference for Claude drafts only. */
   toneSamples?: string[];
+  /** Skip Claude (paid) and triage with the local heuristic only. */
+  heuristicOnly?: boolean;
 }): Promise<InboxMessage> {
   const mem = deskMem();
   seedMemory();
   await hydrateFromRemote();
   const heuristic = triageHeuristic(input);
-  const claude = mem.prefs.autoTriage
+  const claude = mem.prefs.autoTriage && !input.heuristicOnly
     ? await triageWithClaude(input, { tone: mem.prefs.defaultTone, toneSamples: input.toneSamples })
     : null;
   const scored = claude
@@ -599,7 +601,7 @@ export async function ingestMessage(input: {
       kbHits: queryInboxKb({ subject: input.subject, body: input.body }),
     };
   } else if (mem.prefs.autoTriage) {
-    const smart = await smartReplyWithContext(thread, history);
+    const smart = await smartReplyWithContext(thread, history, { heuristicOnly: input.heuristicOnly });
     thread = {
       ...thread,
       draftReply: smart.draftReply || thread.draftReply,
@@ -778,11 +780,11 @@ export async function appendEmlToThread(
   return { message: updated!, duplicate: false };
 }
 
-export async function regenerateSmartReply(id: string): Promise<InboxMessage | null> {
+export async function regenerateSmartReply(id: string, opts?: { heuristicOnly?: boolean }): Promise<InboxMessage | null> {
   const thread = await getThread(id);
   if (!thread) return null;
   const history = await listThreadMessages(id);
-  const smart = await smartReplyWithContext(thread, history);
+  const smart = await smartReplyWithContext(thread, history, opts);
   const next: EmailThread = {
     ...thread,
     draftReply: smart.draftReply,

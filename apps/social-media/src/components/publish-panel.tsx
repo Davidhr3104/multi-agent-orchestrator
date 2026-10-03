@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { notifyDesk, postJson } from "@/components/notify-desk";
+import { OperatorText } from "@/components/operator-text";
 import type { Channel, Publication } from "@/lib/types";
 
 /** One approved post, one person, one confirmation. The server re-checks every gate. */
@@ -54,7 +55,7 @@ export function PublishPanel({ postId, channel, allowed, reason, publication }: 
       {reason ? <p className="text-xs text-muted-foreground">{reason}</p> : <p className="text-xs text-muted-foreground">Sends this exact approved version. Editing it afterwards needs a new approval.</p>}
       {error ? (
         <p role="alert" className="text-xs text-rose-400">
-          {error}
+          <OperatorText text={error} />
         </p>
       ) : null}
     </div>

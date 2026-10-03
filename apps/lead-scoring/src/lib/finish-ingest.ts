@@ -17,7 +17,7 @@ export async function finishLeadIngest(
   parsed: LeadIngestInput,
   emit: LeadEmit,
   orgId?: string,
-  opts?: { real?: boolean }
+  opts?: { real?: boolean; heuristicOnly?: boolean }
 ): Promise<HelixLead> {
   const existing = findDuplicate(await listLeads(orgId), parsed);
   if (existing) {
@@ -39,6 +39,7 @@ export async function finishLeadIngest(
     hitl: brain.hitl,
     addendum: brain.addendum,
     thresholds: brain.thresholds,
+    heuristicOnly: opts?.heuristicOnly,
   });
   bumpUsage(scored.aiTriage?.engine === "claude" ? "claude" : "heuristic");
   const all = await listLeads(orgId);

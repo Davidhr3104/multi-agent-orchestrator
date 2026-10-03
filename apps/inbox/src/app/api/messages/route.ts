@@ -6,6 +6,7 @@ import {
   readDeskCookie,
   upsertDeskPatch,
 } from "@/lib/desk-state-cookie";
+import { mayUseClaude } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   try {
     let state = readDeskCookie(req);
     applyDeskPatches(state.patches);
-    const message = await ingestMessage({ fromName, fromEmail, subject, body: text });
+    const message = await ingestMessage({ fromName, fromEmail, subject, body: text, heuristicOnly: !mayUseClaude(req) });
     state = upsertDeskPatch(state, message.id, patchFromThread(message));
     return jsonWithDeskCookie({ message }, state);
   } catch (err) {

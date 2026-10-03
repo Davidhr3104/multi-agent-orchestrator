@@ -1,4 +1,5 @@
 import { completeWithClaude, draftOutreachHeuristic, isClaudeConfigured } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { getLead, patchLead } from "@/lib/store";
 import { withOrgScope } from "@/lib/org-auth";
 
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     const heuristic = draftOutreachHeuristic(lead);
     let subject = heuristic.subject;
     let emailBody = heuristic.body;
-    if (isClaudeConfigured()) {
+    if (isClaudeConfigured() && !requireOperator(req)) {
       const text = await completeWithClaude(
         `Write a professional English sales email in 3-4 short paragraphs. Return ONLY JSON {"subject","body"}.
 Address ${lead.name} at ${lead.company || lead.enrichment?.company || "their company"}.

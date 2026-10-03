@@ -18,6 +18,7 @@ import { SlaCountdown } from "@/components/sla-countdown";
 import { DraftDiff } from "@/components/draft-diff";
 import { DashboardPanorama } from "@/components/dashboard-panorama";
 import { ActiveInspector } from "@/components/active-inspector";
+import { ErrorText } from "@/components/operator-notice";
 import Link from "next/link";
 
 type FilterTab = "all" | "urgent" | "review" | "routed" | "blocked";
@@ -268,7 +269,7 @@ export function InboxDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...extra }),
     });
-    const data = (await res.json()) as { message?: InboxMessage; error?: string };
+    const data = (await res.json()) as { message?: InboxMessage; error?: string; demo?: boolean };
     setActionBusy(null);
     if (!res.ok) {
       setError(data.error || `Action failed (${res.status})`);
@@ -276,7 +277,9 @@ export function InboxDashboard() {
     }
     flash(
       action === "approve"
-        ? "Reply sent"
+        ? data.demo
+          ? "Marked sent · demo, nothing emailed"
+          : "Reply sent"
         : action === "route"
           ? "Marked routed (not sent)"
           : action === "block"
@@ -348,7 +351,8 @@ export function InboxDashboard() {
     });
     setActionBusy(null);
     if (!res.ok) {
-      setError("Bulk action failed");
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error || "Bulk action failed");
       return;
     }
     setSelectedIds(new Set());
@@ -391,7 +395,7 @@ export function InboxDashboard() {
           </button>
         </div>
       </div>
-      {error ? <p className="mx-auto mb-3 max-w-[1600px] text-sm text-red-300">{error}</p> : null}
+      {error ? <p className="mx-auto mb-3 max-w-[1600px] text-sm text-red-300"><ErrorText message={error} /></p> : null}
       <div className="[&:not(:empty)]:mb-4">
         <DemoBanner message="You are exploring sample email. Connect Gmail and this desk switches to your real mail — the samples disappear." connectHref="/settings" connectLabel="Connect Gmail →" />
       </div>

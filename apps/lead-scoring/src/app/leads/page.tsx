@@ -15,6 +15,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import type { HelixLead } from "@/lib/lead-ai";
 import { AiTriagePanel, aiTriagePanelKey } from "@/components/leads-engine/AiTriagePanel";
+import { isOperatorLocked, OperatorLockedNotice } from "@/components/operator-locked";
 
 const STAGES: PipelineStage[] = ["new", "qualified", "contacted", "won", "lost"];
 
@@ -409,6 +410,7 @@ function LeadsRoster() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [operatorLocked, setOperatorLocked] = useState(false);
   const [draftEmail, setDraftEmail] = useState<{ subject: string; body: string } | null>(null);
   const [slots, setSlots] = useState<{ label?: string; start?: string; url?: string }[]>([]);
   const [lookalikes, setLookalikes] = useState<{ id: string; name: string; score: number }[]>([]);
@@ -491,6 +493,10 @@ function LeadsRoster() {
       const data = (await res.json()) as { lead?: StoredLead; error?: string; crm?: "ghl" | "hubspot" };
       if (data.lead) {
         setLeads((prev) => prev.map((l) => (l.id === data.lead!.id ? data.lead! : l)));
+      }
+      if (isOperatorLocked(res.status, data.error)) {
+        setOperatorLocked(true);
+        return;
       }
       if (!res.ok) {
         showToast(data.error || `CRM ${res.status}`);
@@ -1002,6 +1008,13 @@ function LeadsRoster() {
         </div>
 
         <div className="min-w-0 lg:col-span-5">
+          {operatorLocked ? (
+            <OperatorLockedNotice
+              action="Pushing to the CRM"
+              onDismiss={() => setOperatorLocked(false)}
+              className="mb-3"
+            />
+          ) : null}
           <LiveInspect
             lead={selected}
             busy={busy}

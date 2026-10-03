@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { readFocus } from "@/lib/desk-ui";
 import { downloadCsv } from "@/lib/download";
 import type { InboxMessage } from "@/lib/types";
+import { ErrorText } from "@/components/operator-notice";
 
 const QUERY_KEY = "helix-inbox-palette";
 
@@ -57,13 +58,13 @@ export function CommandPalette({
       body: JSON.stringify({ action }),
     });
     setBusy(false);
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    const data = (await res.json().catch(() => ({}))) as { error?: string; demo?: boolean };
     if (!res.ok) {
       setStatus(data.error || "Action failed");
       return;
     }
     window.dispatchEvent(new CustomEvent("helix:desk-refresh"));
-    setStatus(action === "approve" ? "Approved and sent." : action === "snooze" ? "Snoozed." : "Routed.");
+    setStatus(action === "approve" ? (data.demo ? "Marked sent — demo, nothing was emailed." : "Approved and sent.") : action === "snooze" ? "Snoozed." : "Routed.");
   }
 
   async function exportReport() {
@@ -183,7 +184,7 @@ export function CommandPalette({
             </li>
           ))}
         </ul>
-        {status ? <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">{status}</p> : null}
+        {status ? <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground"><ErrorText message={status} /></p> : null}
       </div>
     </div>
   );

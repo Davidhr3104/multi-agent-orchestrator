@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
+import { OperatorText } from "@/components/operator-text";
 
 type Reply = { ok: boolean; text?: string; error?: string; month: string; cached?: boolean; cost?: { inputTokens: number; outputTokens: number; estUsd: number } };
 const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
@@ -53,7 +54,7 @@ export function MarketBrief({ month, claude }: { month: string; claude: boolean 
           </div>
         ) : (
           <p role="alert" className="mt-3 text-xs text-rose-300">
-            No brief: {reply.error}
+            No brief: <OperatorText text={reply.error ?? "Request failed"} />
           </p>
         )
       ) : null}

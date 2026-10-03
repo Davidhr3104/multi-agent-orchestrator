@@ -1,17 +1,19 @@
 import { completeWithClaude, isClaudeConfigured, zombieLeads } from "@helix/core";
+import { requireOperator } from "@helix/core/operator";
 import { listLeads } from "@/lib/store";
 import { withOrgScope } from "@/lib/org-auth";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(req: Request) {
+  const useClaude = isClaudeConfigured() && !requireOperator(req);
   return withOrgScope(async (orgId) => {
     const leads = zombieLeads(await listLeads(orgId), Date.now(), 5);
     const drafts = await Promise.all(
       leads.map(async (lead) => {
         const topic = lead.message.slice(0, 120) || lead.source;
         let reactivation_email = `Hi ${lead.name.split(" ")[0]},\n\nChecking in from Helix — we spoke months ago about ${topic}. If inbound is still noisy, happy to share a 15-min recap.\n\n— Helix`;
-        if (isClaudeConfigured()) {
+        if (useClaude) {
           const text = await completeWithClaude(
             `Write a short, highly personalized re-engagement email to ${lead.name} from ${lead.company || lead.enrichment?.company || "their company"}. Reference that we spoke 6 months ago about ${topic}. Keep it under 100 words. Friendly and professional. Return plain email body only.`,
             400

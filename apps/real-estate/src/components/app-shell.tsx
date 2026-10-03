@@ -9,6 +9,7 @@ import {
   CalendarDays,
   CircleHelp,
   Handshake,
+  KeyRound,
   LayoutDashboard,
   Lock,
   Map as MapIcon,
@@ -51,6 +52,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/settings", label: "Settings", icon: Settings },
       { href: "/help", label: "How to use", icon: CircleHelp },
+      { href: "/operator", label: "Operator", icon: KeyRound },
     ],
   },
 ];

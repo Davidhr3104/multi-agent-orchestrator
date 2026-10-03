@@ -1,3 +1,4 @@
+import { requireOperator } from "@helix/core/operator";
 import { deskWriteDenied, humanActor } from "@/lib/ai-desk";
 import { deskErrorResponse } from "@/lib/http-error";
 import { draftsFromTopPosts } from "@/lib/social/ai-drafts";
@@ -13,7 +14,8 @@ type Action = (typeof ACTIONS)[number];
 
 /** Real-data actions from Analytics. None of them publishes. */
 export async function POST(req: Request) {
-  const denied = deskWriteDenied(req);
+  // Reads the operator's Meta account and calls Claude: the operator key is needed on any desk.
+  const denied = requireOperator(req) ?? deskWriteDenied(req);
   if (denied) return denied;
   const body = (await req.json().catch(() => null)) as { action?: unknown } | null;
   const action = body?.action as Action;

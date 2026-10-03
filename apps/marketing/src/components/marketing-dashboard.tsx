@@ -13,6 +13,7 @@ import type { AttributedLead, CampaignAction, DeskWasteSummary, SpendEvent, Stor
 import { AskAiCard } from "@/components/ask-ai-card";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
+import { isOperatorLocked, OperatorLockNote } from "@/components/operator-lock-note";
 import { ScatterPlot } from "@/components/scatter-plot";
 import { CostPerHotCard, FunnelCard, SpendSplitCard, TierDonutCard, useDemoMode } from "@/components/desk-charts";
 import { useDeskWindow } from "@/lib/use-desk-snapshot";
@@ -94,6 +95,7 @@ export function MarketingDashboard() {
   const [dragOver, setDragOver] = useState(false);
   const [syncing, setSyncing] = useState<"meta" | "leads" | null>(null);
   const [metaReady, setMetaReady] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   function showToast(msg: string, err = false) {
     setToast({ msg, err });
@@ -114,7 +116,12 @@ export function MarketingDashboard() {
         message?: string;
         unmatchedCount?: number;
       };
+      if (isOperatorLocked(res.status, data.error)) {
+        setLocked(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setLocked(false);
       await refresh();
       showToast(
         data.imported
@@ -140,6 +147,7 @@ export function MarketingDashboard() {
         skipped?: number;
         unmatched?: number;
       };
+      setLocked(isOperatorLocked(res.status, data.error));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       await refresh();
       showToast(
@@ -241,6 +249,7 @@ export function MarketingDashboard() {
         body: JSON.stringify({ csv }),
       });
       const data = (await res.json()) as { error?: string; unmatchedCount?: number };
+      setLocked(isOperatorLocked(res.status, data.error));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       await refresh();
       showToast(
@@ -269,6 +278,7 @@ export function MarketingDashboard() {
       adsWrite?: { attempted: boolean; ok: boolean; detail: string };
     };
     if (!res.ok) {
+      setLocked(isOperatorLocked(res.status, data.error));
       showToast(data.error || "Review failed", true);
       return;
     }
@@ -410,6 +420,7 @@ export function MarketingDashboard() {
           </div>
         </div>
 
+        {locked ? <OperatorLockNote /> : null}
         <DemoBanner message="You are exploring sample campaigns. Connect Meta Ads and this desk switches to your real spend — the samples disappear." connectHref="/settings" connectLabel="Connect Meta →" />
         <div data-tour="marketing-ask">
           <AskAiCard onOpenDrawer={(q) => {

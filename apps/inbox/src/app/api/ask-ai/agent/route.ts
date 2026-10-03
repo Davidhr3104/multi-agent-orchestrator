@@ -7,6 +7,8 @@ export const runtime = "nodejs";
 
 /** The operator's decision on a paused Ask Helix step: { state, approved }. Approval runs the call once. */
 export async function POST(req: Request) {
+  const denied = requireOperator(req);
+  if (denied) return denied;
   let body: { state?: unknown; approved?: unknown };
   try {
     body = await req.json();
@@ -14,9 +16,6 @@ export async function POST(req: Request) {
     return Response.json({ error: "JSON body required" }, { status: 400 });
   }
   const approved = body.approved === true;
-  if (approved && !mayChangeDesk(req)) {
-    return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
-  }
   const verified = verifyAgentState(body.state);
   if (!verified.ok) return Response.json({ error: verified.error }, { status: 400 });
 

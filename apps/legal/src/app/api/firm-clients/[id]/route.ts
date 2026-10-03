@@ -1,10 +1,10 @@
 import { updateFirmClient, deleteFirmClient } from "@/lib/firm-knowledge";
-import { requireOperator } from "@helix/core/operator";
+import { deskWriteDenied } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
 
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await params;
   const result = await deleteFirmClient(id);

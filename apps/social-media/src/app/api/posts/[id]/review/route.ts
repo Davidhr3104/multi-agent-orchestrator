@@ -1,5 +1,4 @@
-import { requireOperator } from "@helix/core/operator";
-import { humanActor, mayChangeDesk } from "@/lib/ai-desk";
+import { deskWriteDenied, humanActor } from "@/lib/ai-desk";
 import { deskErrorResponse } from "@/lib/http-error";
 import { reviewPost } from "@/lib/store";
 
@@ -10,9 +9,8 @@ type Decision = (typeof DECISIONS)[number];
 
 /** A person's decision from the post page. Approving records a sign-off only; nothing is published. */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  if (!mayChangeDesk(req)) {
-    return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
-  }
+  const denied = deskWriteDenied(req);
+  if (denied) return denied;
   const { id } = await ctx.params;
   let body: { decision?: unknown; note?: unknown };
   try {

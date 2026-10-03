@@ -1,5 +1,7 @@
+import { requireOperator } from "@helix/core/operator";
 import { aiCtx, deskWriteDenied } from "@/lib/ai-desk";
 import { writeListingCopy } from "@/lib/ai-copy";
+import { listingCopy } from "@/lib/listing-copy";
 import { getListingCopy, getProperty, logActivity, putListingCopy } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -23,7 +25,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return Response.json({ error: "JSON body required." }, { status: 400 });
   }
 
-  if (body.action === "generate") return Response.json(await writeListingCopy(p));
+  if (body.action === "generate") {
+    if (requireOperator(req)) return Response.json({ engine: "template", copy: listingCopy(p), note: "Operator unlock required." });
+    return Response.json(await writeListingCopy(p));
+  }
 
   if (body.action === "approve") {
     const c = body.copy ?? {};

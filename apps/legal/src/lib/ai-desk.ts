@@ -15,6 +15,12 @@ export function mayChangeDesk(req: Request): boolean {
   return currentDeskMode() === "demo" || !requireOperator(req);
 }
 
+/** The 401 for a desk write a visitor may not make, or null when the write may go ahead. */
+export function deskWriteDenied(req: Request): Response | null {
+  if (mayChangeDesk(req)) return null;
+  return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
+}
+
 type Reply = { answer: string; proposal?: ActionProposal; command?: boolean } & Record<string, unknown>;
 
 /** Risk gate for a change the operator asked for in words: run it if safe, otherwise propose it with reasons. */

@@ -7,6 +7,7 @@ import type { InboxMessage } from "@/lib/types";
 import { ColumnChart, GhostButton, Grid, IllustratedEmpty, PageFrame, SOURCE_DESK, useDeskMode, useNow, useTzOffset } from "@/components/desk-kit";
 import { dailyVolume } from "@/lib/desk-metrics";
 import { inWindow } from "@/lib/sla";
+import { ErrorText } from "@/components/operator-notice";
 
 const PAGE = 12;
 
@@ -15,6 +16,7 @@ export default function BlockedPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
+  const [error, setError] = useState<string | null>(null);
   const demo = useDeskMode() === "demo";
   const tz = useTzOffset();
   const mountedAt = useNow();
@@ -32,8 +34,14 @@ export default function BlockedPage() {
 
   async function handleUnblock(threadId: string) {
     setBusyId(threadId);
+    setError(null);
     try {
-      await fetch(`/api/threads/${threadId}/unblock`, { method: "POST" });
+      const res = await fetch(`/api/threads/${threadId}/unblock`, { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(data?.error || `Unblock failed (${res.status})`);
+        return;
+      }
       await fetchThreads();
     } finally {
       setBusyId(null);
@@ -55,6 +63,7 @@ export default function BlockedPage() {
 
   return (
     <PageFrame title="Blocked" chips={demo ? <DemoChip /> : null} subtitle="Spam and filtered emails. They never reach a person, and you can bring any of them back.">
+      {error ? <p className="text-xs text-red-500"><ErrorText message={error} /></p> : null}
       {threads.length === 0 ? (
         <IllustratedEmpty
           title="No spam caught yet"

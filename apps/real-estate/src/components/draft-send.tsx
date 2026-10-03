@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Loader2, Mail, MessageCircle, Smartphone, Sparkles } from "lucide-react";
+import { OperatorText } from "@/components/operator-text";
 import type { Delivery } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,11 @@ export function PersonalizeButton({ draftId, claude }: { draftId: string; claude
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Sparkles className="size-4 text-primary" aria-hidden />} Personalize with Claude
       </button>
-      {msg ? <span className="max-w-xs text-right text-[11px] text-muted-foreground">{msg}</span> : null}
+      {msg ? (
+        <span className="max-w-xs text-right text-[11px] text-muted-foreground">
+          <OperatorText text={msg} />
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -137,7 +142,7 @@ export function SendDraftControls({
       </button>
       {msg ? (
         <span role={msg.ok ? "status" : "alert"} className={cn("basis-full text-[11px]", msg.ok ? "text-emerald-300" : "text-rose-300")}>
-          {msg.text}
+          <OperatorText text={msg.text} />
         </span>
       ) : null}
     </div>

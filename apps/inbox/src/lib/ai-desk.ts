@@ -5,7 +5,7 @@ import { jsonWithDeskCookie, patchFromThread, readDeskCookie, upsertDeskPatch } 
 import { applyDeskPatches, currentDeskMode, getMessage } from "@/lib/store";
 
 export function aiCtx(req: Request): InboxCtx {
-  return { actor: `Helix AI · approved by ${operatorActor(req)}`, touched: new Set() };
+  return { actor: `Helix AI · approved by ${operatorActor(req)}`, touched: new Set(), heuristicOnly: !mayUseClaude(req) };
 }
 
 /**
@@ -14,6 +14,16 @@ export function aiCtx(req: Request): InboxCtx {
  */
 export function mayChangeDesk(req: Request): boolean {
   return currentDeskMode() === "demo" || !requireOperator(req);
+}
+
+export function deskWriteDenied(req: Request): Response | null {
+  if (mayChangeDesk(req)) return null;
+  return requireOperator(req) ?? Response.json({ error: "Operator unlock required." }, { status: 401 });
+}
+
+/** Claude calls are paid, so they need the operator unlock even on the demo desk. */
+export function mayUseClaude(req: Request): boolean {
+  return !requireOperator(req);
 }
 
 /** Re-applies this visitor's cookie patches so a serverless instance sees the desk as they left it. */

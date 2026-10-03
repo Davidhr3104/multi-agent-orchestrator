@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { StoredRfp } from "@helix/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isOperatorLocked, OperatorUnlockNote } from "@/components/operator-unlock-note";
 import { formatUsdEstimate, summarizeUsage } from "@/lib/ai-cost";
 import type { CitedPoint, LegalRfp } from "@/lib/legal-rfp";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ export function RfpAiInsights({ rfp, onUpdated }: { rfp: StoredRfp; onUpdated: (
   const r = rfp as LegalRfp;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const source = r.source;
   const proposal = r.goNoGoProposal;
   const cost = summarizeUsage(r.aiUsage);
@@ -50,6 +52,7 @@ export function RfpAiInsights({ rfp, onUpdated }: { rfp: StoredRfp; onUpdated: (
   async function run(extract: boolean) {
     setBusy(true);
     setError(null);
+    setLocked(false);
     try {
       const res = await fetch(`/api/rfps/${encodeURIComponent(r.id)}/ai-review`, {
         method: "POST",
@@ -57,6 +60,10 @@ export function RfpAiInsights({ rfp, onUpdated }: { rfp: StoredRfp; onUpdated: (
         body: JSON.stringify({ extract }),
       });
       const data = (await res.json().catch(() => null)) as { rfp?: StoredRfp; error?: string } | null;
+      if (isOperatorLocked(res.status, data?.error)) {
+        setLocked(true);
+        return;
+      }
       if (!res.ok || !data?.rfp) throw new Error(data?.error ?? `AI review failed (HTTP ${res.status})`);
       onUpdated(data.rfp);
     } catch (err) {
@@ -173,6 +180,7 @@ export function RfpAiInsights({ rfp, onUpdated }: { rfp: StoredRfp; onUpdated: (
         ) : (
           <p className="text-[11px] text-slate-500">No recommendation yet.</p>
         )}
+        {locked ? <OperatorUnlockNote /> : null}
         {error ? <p className="text-[11px] text-rose-300">{error}</p> : null}
         <p className="border-t border-white/10 pt-2 text-[11px] text-slate-400">
           AI cost for this RFP (estimated): {formatUsdEstimate(cost.estimatedUsd)} · {cost.calls} Claude call{cost.calls === 1 ? "" : "s"} ·{" "}

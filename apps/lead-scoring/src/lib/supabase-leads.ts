@@ -256,19 +256,25 @@ export async function supabaseListOrgIds(): Promise<string[] | null> {
   return (data ?? []).map((r) => String(r.id));
 }
 
-export async function supabaseDeleteLeads(ids: string[]): Promise<boolean> {
+type DeleteFilter = PromiseLike<{ error: { message: string } | null }> & {
+  eq: (col: string, value: string) => PromiseLike<{ error: { message: string } | null }>;
+};
+
+/** Deletes by id, scoped to orgId when given. Callers without an org must be the operator. */
+export async function supabaseDeleteLeads(ids: string[], orgId?: string): Promise<boolean> {
   const db = getSupabase();
   if (!db || ids.length === 0) return false;
   const table = (
     db as unknown as {
       schema: (name: string) => {
-        from: (table: string) => { delete: () => { in: (col: string, values: string[]) => Promise<{ error: { message: string } | null }> } };
+        from: (table: string) => { delete: () => { in: (col: string, values: string[]) => DeleteFilter } };
       };
     }
   )
     .schema("lead_scoring")
     .from("leads");
-  const { error } = await table.delete().in("id", ids);
+  const query = table.delete().in("id", ids);
+  const { error } = await (orgId ? query.eq("org_id", orgId) : query);
   if (error) {
     console.warn("[helix-leads] delete skipped:", error.message);
     return false;

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useTheme } from "@/components/theme-provider";
 import type { CustomRule, DraftTone, EmailTemplate, UserPreferences } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,37 @@ function GmailConnectCardInner() {
   );
 }
 
+function OperatorAccessCard() {
+  const [session, setSession] = useState<{ operator: boolean; configured: boolean } | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/operator")
+      .then((r) => r.json())
+      .then((d: { operator?: boolean; configured?: boolean }) => setSession({ operator: Boolean(d.operator), configured: Boolean(d.configured) }))
+      .catch(() => setSession(null));
+  }, []);
+
+  return (
+    <div className="glass-panel rounded-xl p-6">
+      <h2 className="mb-1 text-base font-semibold text-foreground">Operator access</h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        The sample desk is open to everyone. Connecting Gmail, syncing, real sends and Claude calls need the operator key.
+      </p>
+      {session == null ? (
+        <p className="text-xs text-muted-foreground">Checking…</p>
+      ) : !session.configured ? (
+        <p className="text-xs text-muted-foreground">No operator key is set on this deployment, so nothing is locked.</p>
+      ) : session.operator ? (
+        <p className="text-xs text-emerald-500">Unlocked on this browser.</p>
+      ) : (
+        <Link href="/operator" className="btn-tactile inline-block rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground">
+          Unlock at /operator
+        </Link>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [preferences, setPreferences] = useState({
@@ -185,6 +217,7 @@ export default function SettingsPage() {
         <div className="glass-panel rounded-xl p-6">
           <ApiKeysForm initialFields={KEYS_INBOX} />
         </div>
+        <OperatorAccessCard />
         <GmailConnectCard />
         <div className="glass-panel rounded-xl p-6">
           <DeskOpsForm />

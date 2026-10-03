@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { OPERATOR_LOCKED, OperatorLockNote } from "@/components/operator-lock-note";
 
 type Attachment = { type: "image"; data: string; mediaType: string };
 type Engine = "claude" | "fallback";
@@ -495,7 +496,7 @@ export function AskAiDrawer({
               ))}
             </div>
           ) : null}
-          {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+          {error === OPERATOR_LOCKED ? <OperatorLockNote /> : error ? <p className="text-xs text-rose-400">{error}</p> : null}
           <div ref={bottomRef} />
         </div>
 

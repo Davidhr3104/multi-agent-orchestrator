@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { OPERATOR_LOCKED, OperatorLockNote } from "@/components/operator-lock-note";
 
 type AskAiMessage = { role: "user" | "assistant"; content: string };
 type AskAiEngine = "claude" | "fallback";
@@ -116,7 +117,7 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
             ))}
           </div>
 
-          {error ? <p className="text-xs text-rose-500">{error}</p> : null}
+          {error === OPERATOR_LOCKED ? <OperatorLockNote /> : error ? <p className="text-xs text-rose-500">{error}</p> : null}
 
           {history.length > 0 ? (
             <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-[var(--border-hairline)] bg-surface-container-high p-3">

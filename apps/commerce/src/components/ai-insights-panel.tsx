@@ -6,6 +6,7 @@ import type { AiCostTotals } from "@/lib/claude-usage";
 import type { RestockReport } from "@/lib/restock";
 import type { StoreSummary } from "@/lib/store-summary";
 import { EngineBadge, SourceBadge } from "@/components/ai-badges";
+import { ApiErrorLine } from "@/components/operator-notice";
 
 type WithSync<T> = T & { lastShopifySyncAt: string | null };
 type Usage = AiCostTotals & { model: string; pricing: { inputUsdPerMTok: number; outputUsdPerMTok: number } };
@@ -87,7 +88,7 @@ export function AiInsightsPanel() {
       <p className="text-[11px] text-muted-foreground">
         Every number is computed by Helix from your orders and products; Claude only writes the prose. If Claude cites a number that is not in the data, its text is discarded.
       </p>
-      {error ? <p className="text-[#dc2626]">{error}</p> : null}
+      {error ? <ApiErrorLine error={error} /> : null}
 
       {summary ? (
         <div className="space-y-2 rounded-lg border border-border p-3">

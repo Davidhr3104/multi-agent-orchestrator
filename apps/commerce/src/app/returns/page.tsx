@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/format";
 import { DemoChip, KpiCard } from "@helix/ui";
 import { PackageOpen } from "lucide-react";
 import { returnStats } from "@/lib/commerce-charts";
+import { ApiErrorLine } from "@/components/operator-notice";
 
 export default function ReturnsPage() {
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
@@ -63,7 +64,7 @@ export default function ReturnsPage() {
         </p>
       </div>
 
-      {error ? <p className="text-xs text-[#dc2626]">{error}</p> : null}
+      {error ? <ApiErrorLine error={error} className="text-xs" /> : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Returns" value={String(stats.count)} accent="#10b981" />

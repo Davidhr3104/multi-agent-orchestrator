@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { StoredRfp } from "@helix/core";
+import { isOperatorLocked, OperatorUnlockNote } from "@/components/operator-unlock-note";
 import { formatUsdEstimate, summarizeDeskUsage } from "@/lib/ai-cost";
 import type { LegalRfp } from "@/lib/legal-rfp";
 import type { SamImportResult } from "@/lib/sam-import";
@@ -57,6 +58,7 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
   const [confirmLeaveDemo, setConfirmLeaveDemo] = useState(false);
   const [result, setResult] = useState<SamImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   function applyStatus(data: SamStatus | null, applyDefaults: boolean) {
@@ -87,6 +89,7 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
   async function runImport(leaveDemo: boolean) {
     setBusy(true);
     setError(null);
+    setLocked(false);
     setResult(null);
     try {
       const res = await fetch("/api/sam/import", {
@@ -95,6 +98,11 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
         body: JSON.stringify({ ncode, state, title, ptype, daysBack, limit, leaveDemo }),
       });
       const data = (await res.json().catch(() => null)) as (SamImportResult & { error?: unknown }) | null;
+      if (isOperatorLocked(res.status, data?.error)) {
+        setConfirmLeaveDemo(false);
+        setLocked(true);
+        return;
+      }
       if (!data || typeof data !== "object") throw new Error(`Import failed (HTTP ${res.status})`);
       if (typeof data.error === "string") throw new Error(data.error);
       if (data.status === "desk_in_demo") {
@@ -293,6 +301,7 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
         </div>
       ) : null}
 
+      {locked ? <OperatorUnlockNote className="mt-3" /> : null}
       {error ? <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-[11px] text-rose-200">{error}</p> : null}
 
       {last ? (

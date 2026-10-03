@@ -5,6 +5,7 @@ import {
   regenerateSmartReply,
   snoozeThread,
   applyDeskPatches,
+  currentDeskMode,
 } from "@/lib/store";
 import { queryInboxKb } from "@/lib/kb-store";
 import {
@@ -18,6 +19,7 @@ import { sendThreadReply } from "@/lib/reply-send";
 import { sendToLeadsDesk } from "@/lib/leads-handoff";
 import { getAgentProfile, setAgentProfile } from "@/lib/agent-profile";
 import { getSecret } from "@helix/core";
+import { deskWriteDenied, mayUseClaude } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
@@ -42,7 +44,7 @@ export async function GET(req: Request, ctx: Ctx) {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   const { id } = await ctx.params;
   let body: unknown;
@@ -62,10 +64,25 @@ export async function PATCH(req: Request, ctx: Ctx) {
     links?: string[];
   };
 
+  if (payload.action === "handoff_leads" || payload.action === "crm") {
+    const locked = requireOperator(req);
+    if (locked) return locked;
+  }
+
   let state = readDeskCookie(req);
   applyDeskPatches(state.patches);
 
   try {
+    if ((payload.action === "approve" || payload.action === "send") && currentDeskMode() === "demo") {
+      const message = await patchMessage(
+        id,
+        { status: "sent", needsReview: false, isRead: true, lastReplySentAt: new Date().toISOString() },
+        { actionType: `send:${operatorActor(req)}:demo`, humanOverride: true }
+      );
+      if (!message) return Response.json({ error: "Not found" }, { status: 404 });
+      state = upsertDeskPatch(state, id, patchFromThread(message));
+      return jsonWithDeskCookie({ message, demo: true }, state);
+    }
     if (payload.action === "approve" || payload.action === "send") {
       const result = await sendThreadReply(id, operatorActor(req), { human: true });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
@@ -136,7 +153,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return jsonWithDeskCookie({ message }, state);
     }
     if (payload.action === "smart_reply") {
-      const message = await regenerateSmartReply(id);
+      const message = await regenerateSmartReply(id, { heuristicOnly: !mayUseClaude(req) });
       if (!message) return Response.json({ error: "Not found" }, { status: 404 });
       state = upsertDeskPatch(state, id, patchFromThread(message));
       return jsonWithDeskCookie({ message }, state);

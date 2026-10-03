@@ -41,6 +41,7 @@ function breadcrumbFor(pathname: string) {
   if (pathname.startsWith("/settings/automations")) return { section: "Configuration", page: "Automations" };
   if (pathname.startsWith("/settings/usage")) return { section: "System", page: "API & Webhooks" };
   if (pathname.startsWith("/audit")) return { section: "System", page: "Audit Log" };
+  if (pathname.startsWith("/operator")) return { section: "System", page: "Operator" };
   if (pathname === "/settings" || pathname.startsWith("/settings/brand"))
     return { section: "System", page: "Desk Settings" };
   if (pathname.startsWith("/settings")) return { section: "Configuration", page: "Settings" };
@@ -203,6 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/settings", label: "Desk Settings", icon: "settings" },
     { href: "/audit", label: "Audit Log & Security", icon: "security" },
     { href: "/settings/usage", label: "API & Webhooks", icon: "webhook" },
+    { href: "/operator", label: "Operator", icon: "key" },
   ];
 
   function NavGroup({ title, items }: { title: string; items: NavItem[] }) {

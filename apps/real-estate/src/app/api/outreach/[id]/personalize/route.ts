@@ -1,3 +1,4 @@
+import { requireOperator } from "@helix/core/operator";
 import { aiCtx, deskWriteDenied } from "@/lib/ai-desk";
 import { writeMatchAlert } from "@/lib/ai-copy";
 import { isTone } from "@/lib/outreach";
@@ -20,6 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (d.status !== "pending") return Response.json({ error: `This draft is already ${d.status}.` }, { status: 409 });
   const [lead, p] = await Promise.all([getLead(d.leadId), getProperty(d.propertyIds[0] ?? "")]);
   if (!lead || !p) return Response.json({ error: "The buyer or the listing is no longer on the desk." }, { status: 404 });
+  if (requireOperator(req)) return Response.json({ updated: false, note: "Operator unlock required.", cost: null }, { status: 200 });
 
   const r = await writeMatchAlert(lead, p, isTone(body.tone) ? body.tone : "friendly");
   if (r.engine !== "claude") return Response.json({ updated: false, note: r.note, cost: r.cost ?? null }, { status: 200 });

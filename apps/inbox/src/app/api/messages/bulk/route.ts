@@ -1,17 +1,18 @@
-import { getMessage, patchMessage, applyDeskPatches } from "@/lib/store";
+import { currentDeskMode, getMessage, patchMessage, applyDeskPatches } from "@/lib/store";
 import {
   jsonWithDeskCookie,
   patchFromThread,
   readDeskCookie,
   upsertDeskPatch,
 } from "@/lib/desk-state-cookie";
-import { operatorActor, requireOperator } from "@helix/core/operator";
+import { operatorActor } from "@helix/core/operator";
 import { sendReply } from "@/lib/send";
+import { deskWriteDenied } from "@/lib/ai-desk";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const denied = requireOperator(req);
+  const denied = deskWriteDenied(req);
   if (denied) return denied;
   let body: unknown;
   try {
@@ -54,18 +55,21 @@ export async function POST(req: Request) {
     } else if (action === "approve") {
       const thread = await getMessage(id);
       if (!thread) continue;
-      const sent = await sendReply({
-        to: thread.fromEmail,
-        subject: thread.subject,
-        text: thread.draftReply || thread.body,
-      });
-      if ("error" in sent) {
-        return Response.json({ error: sent.error, id }, { status: sent.status });
+      const demo = currentDeskMode() === "demo";
+      if (!demo) {
+        const sent = await sendReply({
+          to: thread.fromEmail,
+          subject: thread.subject,
+          text: thread.draftReply || thread.body,
+        });
+        if ("error" in sent) {
+          return Response.json({ error: sent.error, id }, { status: sent.status });
+        }
       }
       const message = await patchMessage(
         id,
         { status: "sent", needsReview: false, isRead: true },
-        { actionType: `bulk_send:${actor}`, humanOverride: true }
+        { actionType: `bulk_send:${actor}${demo ? ":demo" : ""}`, humanOverride: true }
       );
       if (message) {
         state = upsertDeskPatch(state, id, patchFromThread(message));

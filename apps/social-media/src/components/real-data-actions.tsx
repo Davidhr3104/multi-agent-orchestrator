@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { notifyDesk, postJson } from "@/components/notify-desk";
+import { OperatorText } from "@/components/operator-text";
 
 type Action = "refresh" | "drafts" | "weekly_report";
 
@@ -50,7 +51,7 @@ export function RealDataActions({ claude }: { claude: boolean }) {
       {!claude ? <p className="text-xs text-muted-foreground">Drafts and the weekly report need ANTHROPIC_API_KEY on this deployment.</p> : null}
       {error ? (
         <p role="alert" className="text-xs text-rose-400">
-          {error}
+          <OperatorText text={error} />
         </p>
       ) : null}
     </div>

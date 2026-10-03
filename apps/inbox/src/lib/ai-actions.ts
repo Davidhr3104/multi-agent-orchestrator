@@ -15,7 +15,7 @@ import { currentDeskMode, getThread, patchMessage, regenerateSmartReply, snoozeT
  * `touched` lets the route write the changes into the desk cookie, which is how Inbox survives serverless.
  */
 
-export type InboxCtx = { actor: string; touched: Set<string> };
+export type InboxCtx = { actor: string; touched: Set<string>; heuristicOnly?: boolean };
 
 const STATUSES: ThreadStatus[] = ["open", "review", "routed", "sent", "blocked", "archived"];
 const CATEGORIES: ThreadCategory[] = ["action_required", "fyi", "meeting", "spam"];
@@ -103,7 +103,7 @@ export const inboxActions: DeskActionRegistry<InboxCtx> = {
     assess: (ids) => gate(ids, () => []),
     snapshot,
     apply: async (id, _p, ctx) => {
-      const m = await regenerateSmartReply(id);
+      const m = await regenerateSmartReply(id, { heuristicOnly: ctx.heuristicOnly });
       if (m) ctx.touched.add(id);
       return m !== null;
     },

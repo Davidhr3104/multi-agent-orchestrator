@@ -6,6 +6,7 @@ import type { ReturnRequest, StoredOrder } from "@helix/core";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import type { FraudExplanation } from "@/lib/fraud-explanation";
 import { EngineBadge, SourceBadge } from "@/components/ai-badges";
+import { ApiErrorLine } from "@/components/operator-notice";
 import { formatCurrency, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -172,7 +173,7 @@ export function OrderInspector({
               {explainBusy ? "…" : explanation ? "Re-explain" : "Explain with Claude"}
             </button>
           </div>
-          {explainError ? <p className="mt-1 text-[#dc2626]">{explainError}</p> : null}
+          {explainError ? <ApiErrorLine error={explainError} className="mt-1" /> : null}
           {explanation ? (
             <div className="mt-2 space-y-1.5">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -298,7 +299,7 @@ export function OrderInspector({
                     Restock items
                   </label>
                 </div>
-                {returnError ? <p className="text-[#dc2626]">{returnError}</p> : null}
+                {returnError ? <ApiErrorLine error={returnError} /> : null}
                 <div className="flex gap-2 pt-1">
                   <button
                     disabled={returnBusy}

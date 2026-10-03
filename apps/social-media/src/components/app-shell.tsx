@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarDays, CircleHelp, Images, LayoutDashboard, ListChecks, Menu, Palette, PanelLeft, Plug, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarDays, CircleHelp, Images, KeyRound, LayoutDashboard, ListChecks, Menu, Palette, PanelLeft, Plug, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { CommandPalette, type PalettePost } from "@/components/command-palette";
 import { CreditMeter } from "@/components/credit-meter";
@@ -22,6 +22,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/brand", label: "Brand voice", icon: Palette },
   { href: "/connections", label: "Connections", icon: Plug },
   { href: "/help", label: "How to use", icon: CircleHelp },
+  { href: "/operator", label: "Operator", icon: KeyRound },
 ];
 
 function isActive(pathname: string, href: string) {

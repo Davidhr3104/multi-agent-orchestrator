@@ -7,11 +7,13 @@ import type { InboxMessage } from "@/lib/types";
 import { Avatar } from "@helix/ui";
 import { Clock } from "lucide-react";
 import { IllustratedEmpty, PageFrame } from "@/components/desk-kit";
+import { ErrorText } from "@/components/operator-notice";
 
 export default function FollowupQueuePage() {
   const [threads, setThreads] = useState<InboxMessage[]>([]);
   const [selected, setSelected] = useState<InboxMessage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchThreads = useCallback(async () => {
     const res = await fetch("/api/threads?overdue=true");
@@ -76,16 +78,25 @@ export default function FollowupQueuePage() {
                 type="button"
                 className="mt-3 min-h-10 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white md:min-h-8"
                 onClick={() => {
+                  setError(null);
                   void fetch(`/api/messages/${selected.id}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "smart_reply" }),
-                  }).then(() => fetchThreads());
+                  }).then(async (res) => {
+                    if (!res.ok) {
+                      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+                      setError(data?.error || `Draft failed (${res.status})`);
+                      return;
+                    }
+                    await fetchThreads();
+                  });
                 }}
               >
                 Draft follow-up
               </button>
             ) : null}
+            {error ? <p className="mt-2 text-xs text-red-500"><ErrorText message={error} /></p> : null}
           </div>
           <div className="min-w-0">{selected ? <ActiveInspector thread={selected} onUpdate={() => void fetchThreads()} /> : null}</div>
         </div>
