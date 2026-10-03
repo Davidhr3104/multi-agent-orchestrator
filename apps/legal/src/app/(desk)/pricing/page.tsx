@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { StoredRfp } from "@helix/core";
+import { ChartCard, EmptyChart, HBarList } from "@helix/ui";
+import { fmtUsd, Ink, INK } from "@/components/desk-charts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -35,7 +37,7 @@ export default function PricingPage() {
   const selected = rfps.find((r) => r.id === selectedId) ?? null;
 
   return (
-    <main className="mx-auto w-full max-w-[1780px] flex-1 space-y-6 px-6 py-7 lg:px-8">
+    <main className="mx-auto w-full max-w-[1780px] flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <div>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-white">Smart pricing</h1>
         <p className="mt-1 text-sm text-slate-400">
@@ -43,7 +45,7 @@ export default function PricingPage() {
         </p>
       </div>
 
-      <section className="rounded-2xl border border-white/10 bg-[#111827] p-5">
+      <section className="rounded-2xl border border-white/10 bg-[#0f1b30] p-5">
         <h2 className="text-lg font-semibold text-white">Review-hours simulator</h2>
         <p className="mt-1 text-sm text-slate-400">
           Compares a manual first pass with Helix&apos;s 12-minute extract. It does not include partner strategy time.
@@ -75,7 +77,7 @@ export default function PricingPage() {
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {(book?.rules ?? []).map((rule) => (
           <Card key={rule.id}>
             <CardHeader>
@@ -90,6 +92,28 @@ export default function PricingPage() {
           </Card>
         ))}
       </section>
+
+      <Ink>
+        <ChartCard
+          title="Proposed vs won, historical matters"
+          subtitle="What the firm proposed, and what it was awarded when it won"
+          demo={book?.source !== "supabase"}
+          source={`Source: historical pricing book (${book?.source ?? "loading"}). Matters not won show the proposal only.`}
+        >
+          {(book?.historical ?? []).length === 0 ? (
+            <EmptyChart label="No historical pricing yet" />
+          ) : (
+            <HBarList
+              format={fmtUsd}
+              items={(book?.historical ?? []).flatMap((h) => {
+                const rows: { label: string; value: number; color: string; hint?: string }[] = [{ label: `${h.rfpTitle} · proposed`, value: h.proposedAmount, color: INK.neutral as string }];
+                if (h.wonAmount != null) rows.push({ label: `${h.rfpTitle} · won`, value: h.wonAmount, color: INK.won as string, hint: h.proposedAmount > 0 ? `${Math.round(((h.wonAmount - h.proposedAmount) / h.proposedAmount) * 100)}% vs proposed` : undefined });
+                return rows;
+              })}
+            />
+          )}
+        </ChartCard>
+      </Ink>
 
       <div className="grid gap-6 lg:grid-cols-5">
         <section className="glass-card overflow-hidden rounded-2xl lg:col-span-3">

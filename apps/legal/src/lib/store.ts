@@ -1,11 +1,10 @@
 import {
   DEFAULT_LEGAL_PROFILE,
   resolveDeskMode,
-  scoreRfpHeuristic,
-  type RfpIngestInput,
   type StoredRfp,
 } from "@helix/core";
 import type { AuditEvent } from "@/lib/audit-types";
+import { buildDemoSeed } from "@/lib/demo-seed";
 import { modelForMethod, traceSuffix } from "@/lib/audit-trace";
 import type { ConflictReport } from "@/lib/conflict-types";
 import { heuristicConflictReport, runConflictCheck } from "@/lib/conflicts";
@@ -80,29 +79,6 @@ function desk(): LegalDesk {
   return g.__helixLegalDesk;
 }
 
-const SAMPLES: RfpIngestInput[] = [
-  {
-    title: "Medical record abstraction — mass tort docket",
-    issuer: "Northstar PI Consortium",
-    body: "Due: 2026-09-18. Q&A deadline: 2026-09-11. Budget $85,000. Method: BEAR. Need clinical chart review and IME summarization for personal injury files in Texas. Submit by September 18, 2026. Malpractice coverage $2M required. Incumbent Harbor Review Group. Penalty of 10% for late deliverables.",
-  },
-  {
-    title: "SPI coding for workers' compensation clinic",
-    issuer: "Harbor Occupational Health",
-    body: "Deadline 2026-10-02. $42,000. SPI preferred. Extract ICD and work-status from clinical notes. Injury clinic, not a software vendor RFP. Five years experience in workers' compensation coding. E&O insurance required.",
-  },
-  {
-    title: "County IT — Kubernetes refresh",
-    issuer: "Lake County CIO",
-    body: "Due 2026-11-01. $210,000 for cluster migration and SaaS catalog sync. No medical records. Shopify-adjacent vendor portal. SOC2 Type II mandatory. Incumbent Nimbus Cloud. IP ownership assigned to County. Site visit 2026-10-15.",
-  },
-  {
-    title: "Clinical NLP RFP (thin posting)",
-    issuer: "Unspecified",
-    body: "Looking for AI help with documents. Timeline TBD. Method not stated. ISO 27001 preferred.",
-  },
-];
-
 function applyDemoCatalog() {
   const d = desk();
   d.memory.clear();
@@ -110,114 +86,10 @@ function applyDemoCatalog() {
   d.audit.length = 0;
   d.conflicts.clear();
   d.quotes.clear();
-  SAMPLES.forEach((sample, i) => {
-    const scored = scoreRfpHeuristic(sample);
-    const rfp: StoredRfp = {
-      ...scored,
-      id: `seed-${sample.title.replace(/[^a-z0-9]/gi, "").slice(0, 14)}`,
-      createdAt: new Date(Date.now() - i * 2 * 86_400_000).toISOString(),
-      runId: `seed-run-${i}`,
-      title: sample.title,
-      issuer: sample.issuer ?? "unspecified",
-      body: sample.body,
-      clientProfile: sample.clientProfile ?? getClientProfile(),
-      corpusStatus: "not_asked",
-    };
-    d.memory.set(rfp.id, rfp);
-  });
-
-  // Closed-loop demo outcomes for /outcomes win-rate story
-  const now = new Date().toISOString();
-  const byTitle = [...d.memory.values()];
-  const medical = byTitle.find((r) => r.title.startsWith("Medical record"));
-  const spi = byTitle.find((r) => r.title.startsWith("SPI coding"));
-  const county = byTitle.find((r) => r.title.startsWith("County IT"));
-  const nlp = byTitle.find((r) => r.title.startsWith("Clinical NLP"));
-  if (medical) {
-    medical.needsReview = false;
-    medical.partnerDecision = {
-      verdict: "GO",
-      coiCleared: true,
-      bidAmount: "$85,000",
-      notes: "Strong BEAR fit — clinical chart review core practice.",
-      decidedBy: "Maya Chen",
-      decidedAt: now,
-      outcome: "won",
-      outcomeAt: now,
-      wonAmount: "$92,000",
-    };
-    d.memory.set(medical.id, medical);
-  }
-  if (spi) {
-    spi.needsReview = false;
-    spi.partnerDecision = {
-      verdict: "GO",
-      coiCleared: true,
-      bidAmount: "$42,000",
-      notes: "SPI preferred — pursued.",
-      decidedBy: "Luis Ortega",
-      decidedAt: now,
-      outcome: "lost",
-      outcomeAt: now,
-      outcomeNotes: "Incumbent retained on price.",
-    };
-    d.memory.set(spi.id, spi);
-  }
-  if (county) {
-    county.needsReview = false;
-    county.partnerDecision = {
-      verdict: "NO-GO",
-      coiCleared: true,
-      bidAmount: "$210,000",
-      notes: "No medical records — outside practice.",
-      decidedBy: "Priya Shah",
-      decidedAt: now,
-      outcome: "no_bid",
-      outcomeAt: now,
-    };
-    d.memory.set(county.id, county);
-  }
-  if (nlp) {
-    nlp.needsReview = true;
-    nlp.partnerDecision = {
-      verdict: "CONDITIONAL",
-      coiCleared: false,
-      bidAmount: "Unspecified",
-      notes: "Thin posting — need clearer scope before GO.",
-      decidedBy: "Luis Ortega",
-      decidedAt: now,
-      outcome: "pending",
-      outcomeAt: now,
-    };
-    d.memory.set(nlp.id, nlp);
-  }
-  d.comms.set("seed-Medicalrecord", [
-    {
-      id: "c1",
-      at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
-      kind: "email",
-      text: "Sent capability deck to Northstar intake counsel.",
-    },
-    {
-      id: "c2",
-      at: new Date(Date.now() - 1 * 86_400_000).toISOString(),
-      kind: "call",
-      text: "15m scoping call — they want BEAR samples by Friday.",
-    },
-  ]);
-  pushAuditSync("system", "seed", "Loaded evaluation desk with 4 RFPs");
-  pushAuditSync("Maya Chen", "ingest", "Medical record abstraction — mass tort docket scored BEAR / hot");
-  pushAuditSync("ethics", "coi", "Medical record abstraction — mass tort docket: CONDITIONAL (62) via heuristic");
-  pushAuditSync("pricing", "quote", "Medical record abstraction — mass tort docket: $216,000 clinical via heuristic");
-  pushAuditSync("Luis Ortega", "review", "SPI coding RFP marked for partner review");
-  pushAuditSync("ethics", "coi", "SPI coding for workers' compensation clinic: CONDITIONAL (58) via heuristic");
-  pushAuditSync("pricing", "quote", "SPI coding for workers' compensation clinic: $128,000 SPI via heuristic");
-  pushAuditSync("Priya Shah", "compliance", "Lake County Kubernetes posting flagged SOC2 + IP assignment");
-  pushAuditSync("ethics", "coi", "County IT — Kubernetes refresh: GO (88) via heuristic");
-  pushAuditSync("pricing", "quote", "County IT — Kubernetes refresh: $288,000 other via heuristic");
-  pushAuditSync("Maya Chen", "outcome", "Medical record abstraction — mass tort docket: won");
-  pushAuditSync("Luis Ortega", "outcome", "SPI coding for workers' compensation clinic: lost");
-  pushAuditSync("Priya Shah", "partner", "County IT — Kubernetes refresh: NO-GO · capacity avoided");
+  const seed = buildDemoSeed(Date.now(), getClientProfile());
+  for (const rfp of seed.rfps) d.memory.set(rfp.id, rfp);
+  for (const [id, events] of Object.entries(seed.comms)) d.comms.set(id, events);
+  d.audit.push(...seed.audit);
   d.seeded = true;
 }
 

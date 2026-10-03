@@ -9,6 +9,9 @@ import {
   serializeProfile,
   type StructuredProfile,
 } from "@/lib/client-profile";
+import { StackedBar } from "@helix/ui";
+import { Ink } from "@/components/desk-charts";
+import { normalizeWeights } from "@/lib/desk-metrics";
 import { formatUsdAmount } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { KEYS_LEGAL } from "@helix/core/secret-fields";
@@ -53,8 +56,16 @@ export default function SettingsPage() {
     window.setTimeout(() => setSaved(false), 2000);
   }
 
+  const WEIGHT_META: Record<string, { label: string; color: string }> = {
+    jurisdiction: { label: "Jurisdiction", color: "#f59e0b" },
+    margin: { label: "Margin", color: "#cbd5e1" },
+    effort: { label: "Effort", color: "#3b5b8c" },
+  };
+  const shares = normalizeWeights(weights).map((w) => ({ ...w, label: WEIGHT_META[w.key]?.label ?? w.key, color: WEIGHT_META[w.key]?.color ?? "#94a3b8" }));
+  const shareOf = (key: string) => shares.find((x) => x.key === key)?.share ?? 0;
+
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-6 py-7 lg:px-8">
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <div>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-white">Settings</h1>
         <p className="mt-1 text-sm text-slate-400">
@@ -76,9 +87,15 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-sm font-semibold text-white">Desk strategy weights</h2>
           <p className="mt-1 text-xs text-slate-400">
-            Relative weights for jurisdiction, financial margin, and effort. Stored on this browser.
+            Relative weights for jurisdiction, financial margin, and effort. The bar shows each as a share of the total. Stored on this browser.
           </p>
         </div>
+        <Ink>
+          <StackedBar
+            ariaLabel={`Desk strategy mix: ${shares.map((x) => `${x.share}% ${x.label}`).join(", ")}`}
+            segments={shares.map((x) => ({ label: `${x.label} ${x.share}%`, value: x.value, color: x.color }))}
+          />
+        </Ink>
         {(
           [
             ["jurisdiction", "Jurisdiction"],
@@ -87,7 +104,7 @@ export default function SettingsPage() {
           ] as const
         ).map(([key, label]) => (
           <label key={key} className="block text-xs text-slate-300">
-            {label} · {weights[key]}%
+            {label} · weight {weights[key]} · {shareOf(key)}% of the mix
             <input
               type="range"
               min={0}
@@ -100,7 +117,7 @@ export default function SettingsPage() {
         ))}
         <button
           type="button"
-          className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white"
+          className="min-h-10 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white"
           onClick={() => {
             saveDeskWeights(weights);
             setWeightsSaved(true);
@@ -121,7 +138,7 @@ export default function SettingsPage() {
                   key={area}
                   type="button"
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium",
+                    "min-h-9 rounded-full border px-3 py-1 text-xs font-medium",
                     on
                       ? "border-gold-500/25 bg-gold-500/12 text-gold-500"
                       : "border-white/10 bg-white/5 text-slate-400"

@@ -33,7 +33,7 @@ export default function AuthorizePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#0B0F19] p-6 text-[#F3F4F6]">
+    <main className="min-h-screen bg-[#0a1322] p-6 text-[#F3F4F6]">
       <p className="text-[11px] tracking-widest text-[#9CA3AF] uppercase">Helix for Legal · partner decision</p>
       <h1 className="mt-2 text-xl font-semibold">Authorize or block this RFP</h1>
       <p className="mt-2 max-w-xl text-sm text-[#9CA3AF]">

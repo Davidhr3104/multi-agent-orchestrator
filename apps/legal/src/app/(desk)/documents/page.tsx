@@ -4,6 +4,9 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { CorpusDocument, StoredRfp } from "@helix/core";
+import { ChartCard, EmptyChart, Gauge, HBarList } from "@helix/ui";
+import { INK, Ink, KpiRow } from "@/components/desk-charts";
+import { corpusCoverage, isDemoDesk, isoDay } from "@/lib/desk-metrics";
 import { DocumentSplit } from "@/components/document-split";
 import { complianceGaps, downloadProposalDoc, nearestDeadline, similarRfp } from "@/lib/rfp-intel";
 import { cn } from "@/lib/utils";
@@ -58,6 +61,7 @@ function DocumentsPageInner() {
   const open = useMemo(() => rfps.find((r) => r.id === openId) ?? rfps[0] ?? null, [rfps, openId]);
   const corpusLive = rfps.filter((r) => r.corpusStatus === "live").length;
   const review = rfps.filter((r) => r.needsReview).length;
+  const coverage = corpusCoverage(rfps);
 
   async function ingestFirmDoc() {
     setBusy(true);
@@ -84,7 +88,7 @@ function DocumentsPageInner() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5">
+    <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-4 sm:p-5">
       <div className="animate-entrance stagger-1 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[18px] font-semibold text-[#F3F4F6]">Documents</h1>
@@ -94,29 +98,69 @@ function DocumentsPageInner() {
         </div>
         <Link
           href="/#legal-documents"
-          className="btn-tactile rounded-[4px] bg-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#0B0F19] hover:bg-[#D97706]"
+          className="btn-tactile rounded-[4px] bg-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#0a1322] hover:bg-[#D97706]"
         >
           Ingest an RFP PDF
         </Link>
       </div>
 
-      <section className="animate-entrance stagger-2 grid gap-4 sm:grid-cols-4">
-        {(
-          [
-            ["SOURCE RFPS", rfps.length, "text-[#F3F4F6]"],
-            ["FIRM DOCS", docs.length, "text-[#FCD34D]"],
-            ["CORPUS LIVE", corpusLive, "text-[#6EE7B7]"],
-            ["NEEDS REVIEW", review, "text-[#FCA5A5]"],
-          ] as const
-        ).map(([label, value, color]) => (
-          <div key={label} className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
-            <p className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">{label}</p>
-            <p className={cn("font-mono-numbers mt-2 text-[28px] leading-none font-bold", color)}>{value}</p>
+      <div className="animate-entrance stagger-2 space-y-4">
+        <KpiRow
+          items={[
+            { label: "Source RFPs", value: rfps.length, hint: "In the vault" },
+            { label: "Firm docs", value: docs.length, hint: docs.length ? `${chunkCount} chunks indexed` : "No playbooks added yet", accent: INK.conditional },
+            {
+              label: "Corpus lookups",
+              value: corpusLive === 0 ? "None live" : `${corpusLive} of ${rfps.length}`,
+              hint: corpusLive === 0 ? "No RFP has had a live firm-corpus lookup yet" : "RFPs with a live firm-corpus lookup",
+              accent: INK.go,
+            },
+            { label: "Needs review", value: review, hint: review ? "Waiting on a partner" : "Nothing waiting", accent: INK.noGo },
+          ]}
+        />
+        <Ink className="grid gap-4 lg:grid-cols-5">
+          <div className="lg:col-span-2">
+            <ChartCard
+              title="Corpus coverage"
+              subtitle="RFPs checked against the firm corpus"
+              demo={isDemoDesk(rfps)}
+              source="Source: corpus status per RFP (live lookup ran, or cites returned)."
+            >
+              {rfps.length === 0 ? (
+                <EmptyChart label="No RFPs yet" />
+              ) : (
+                <div className="flex justify-center">
+                  <Gauge value={coverage.pct} max={100} label="Covered by the corpus" caption={`${coverage.covered} of ${coverage.total} RFPs`} />
+                </div>
+              )}
+            </ChartCard>
           </div>
-        ))}
-      </section>
+          <div className="lg:col-span-3">
+            <ChartCard
+              title="Extraction confidence by field"
+              subtitle={open ? open.title : "Select an RFP"}
+              demo={isDemoDesk(rfps)}
+              source="Source: the extractor's per-field confidence. Unverified fields are listed as human review."
+            >
+              {open && open.fields.length ? (
+                <HBarList
+                  format={(n) => `${n}%`}
+                  items={open.fields.map((f) => ({
+                    label: f.label,
+                    value: Math.round(f.confidence <= 1 ? f.confidence * 100 : f.confidence),
+                    color: f.verified ? INK.go : INK.conditional,
+                    hint: f.verified ? "verified" : "needs review",
+                  }))}
+                />
+              ) : (
+                <EmptyChart label="No extracted fields for this RFP" />
+              )}
+            </ChartCard>
+          </div>
+        </Ink>
+      </div>
 
-      <section className="animate-entrance stagger-3 rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
+      <section className="animate-entrance stagger-3 rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-[13px] font-semibold text-[#F3F4F6]">Firm corpus</h2>
@@ -129,7 +173,7 @@ function DocumentsPageInner() {
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <ul className="max-h-48 space-y-2 overflow-y-auto">
             {docs.map((doc) => (
-              <li key={doc.id} className="rounded-[4px] border border-[#1F2937] bg-[#0B0F19] px-3 py-2">
+              <li key={doc.id} className="rounded-[4px] border border-[#1b2a45] bg-[#0a1322] px-3 py-2">
                 <p className="text-[12px] font-medium text-[#F3F4F6]">{doc.title}</p>
                 <p className="mt-0.5 text-[10px] text-[#6B7280]">
                   {doc.practiceArea ?? "general"} · {doc.body.length.toLocaleString()} chars
@@ -139,19 +183,19 @@ function DocumentsPageInner() {
           </ul>
           <div className="space-y-2">
             <input
-              className="h-8 w-full rounded-[4px] border border-[#1F2937] bg-[#0B0F19] px-2 text-[11px] text-[#F3F4F6]"
+              className="h-8 w-full rounded-[4px] border border-[#1b2a45] bg-[#0a1322] px-2 text-[11px] text-[#F3F4F6]"
               placeholder="Playbook title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
             <input
-              className="h-8 w-full rounded-[4px] border border-[#1F2937] bg-[#0B0F19] px-2 text-[11px] text-[#F3F4F6]"
+              className="h-8 w-full rounded-[4px] border border-[#1b2a45] bg-[#0a1322] px-2 text-[11px] text-[#F3F4F6]"
               placeholder="Practice area (optional)"
               value={practiceArea}
               onChange={(e) => setPracticeArea(e.target.value)}
             />
             <textarea
-              className="min-h-[88px] w-full rounded-[4px] border border-[#1F2937] bg-[#0B0F19] px-2 py-1.5 text-[11px] text-[#F3F4F6]"
+              className="min-h-[88px] w-full rounded-[4px] border border-[#1b2a45] bg-[#0a1322] px-2 py-1.5 text-[11px] text-[#F3F4F6]"
               placeholder="Paste firm playbook / capability statement (≥ 40 chars)"
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -160,7 +204,7 @@ function DocumentsPageInner() {
               type="button"
               disabled={busy}
               onClick={() => void ingestFirmDoc()}
-              className="btn-tactile rounded-[4px] bg-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#0B0F19] hover:bg-[#D97706] disabled:opacity-40"
+              className="btn-tactile rounded-[4px] bg-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#0a1322] hover:bg-[#D97706] disabled:opacity-40"
             >
               {busy ? "Ingesting…" : "Add to firm corpus"}
             </button>
@@ -169,8 +213,8 @@ function DocumentsPageInner() {
       </section>
 
       <div className="animate-entrance stagger-4 grid gap-4 lg:grid-cols-5">
-        <section className="overflow-hidden rounded-[6px] border border-[#1F2937] bg-[#111827] shadow-subtle lg:col-span-2">
-          <div className="border-b border-[#1F2937] px-4 py-3">
+        <section className="overflow-hidden rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] shadow-subtle lg:col-span-2">
+          <div className="border-b border-[#1b2a45] px-4 py-3">
             <h2 className="text-[13px] font-semibold text-[#F3F4F6]">RFP vault</h2>
           </div>
           {rfps.length === 0 ? (
@@ -179,13 +223,13 @@ function DocumentsPageInner() {
               <p className="text-[11px] text-[#6B7280]">Drop an RFP PDF on the dashboard to start the vault.</p>
               <Link
                 href="/#legal-documents"
-                className="btn-tactile inline-flex rounded-[4px] border border-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0B0F19]"
+                className="btn-tactile inline-flex rounded-[4px] border border-[#F59E0B] px-3 py-1.5 text-[11px] font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0a1322]"
               >
                 Go to ingest →
               </Link>
             </div>
           ) : (
-            <ul className="divide-y divide-[#1F2937]">
+            <ul className="divide-y divide-[#1b2a45]">
               {rfps.map((rfp) => {
                 const on = open?.id === rfp.id;
                 return (
@@ -212,16 +256,16 @@ function DocumentsPageInner() {
           )}
         </section>
 
-        <section className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle lg:col-span-3">
+        <section className="rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle lg:col-span-3">
           {open ? (
             <div className="space-y-3">
               <div>
                 <h3 className="text-[14px] font-semibold text-[#F3F4F6]">{open.title}</h3>
                 <p className="mt-1 text-[11px] text-[#6B7280]">
-                  {open.issuer} · ingested {new Date(open.createdAt).toISOString().slice(0, 10)}
+                  {open.issuer} · ingested {isoDay(Date.parse(open.createdAt))}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span className="rounded-[3px] bg-[#1F2937] px-1.5 py-0.5 font-mono-numbers text-[9px] text-[#9CA3AF]">
+                  <span className="rounded-[3px] bg-[#1b2a45] px-1.5 py-0.5 font-mono-numbers text-[9px] text-[#9CA3AF]">
                     {open.method}
                   </span>
                   <span
@@ -231,7 +275,7 @@ function DocumentsPageInner() {
                         ? "bg-[#064E3B]/40 text-[#6EE7B7]"
                         : open.corpusStatus === "unavailable"
                           ? "bg-[#7F1D1D]/30 text-[#FCA5A5]"
-                          : "bg-[#1F2937] text-[#9CA3AF]"
+                          : "bg-[#1b2a45] text-[#9CA3AF]"
                     )}
                   >
                     corpus {open.corpusStatus}
@@ -245,7 +289,7 @@ function DocumentsPageInner() {
                 </div>
               </div>
               {open.corpusHits && open.corpusHits.length > 0 ? (
-                <ul className="space-y-2 rounded-[4px] border border-[#1F2937] bg-[#0B0F19] p-3">
+                <ul className="space-y-2 rounded-[4px] border border-[#1b2a45] bg-[#0a1322] p-3">
                   {open.corpusHits.map((hit) => (
                     <li key={hit.chunkId} className="text-[11px]">
                       <p className="font-medium text-[#F3F4F6]">{hit.docTitle}</p>
@@ -257,14 +301,14 @@ function DocumentsPageInner() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn-tactile rounded-[4px] border border-[#374151] bg-[#1F2937] px-2.5 py-1 text-[11px] text-[#9CA3AF] hover:text-[#F3F4F6]"
+                  className="btn-tactile rounded-[4px] border border-[#374151] bg-[#1b2a45] px-2.5 py-1 text-[11px] text-[#9CA3AF] hover:text-[#F3F4F6]"
                   onClick={() => downloadSource(open)}
                 >
                   Download source .txt
                 </button>
                 <button
                   type="button"
-                  className="btn-tactile rounded-[4px] bg-[#F59E0B] px-2.5 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-[#D97706]"
+                  className="btn-tactile rounded-[4px] bg-[#F59E0B] px-2.5 py-1 text-[11px] font-semibold text-[#0a1322] hover:bg-[#D97706]"
                   onClick={() => {
                     const peer = similarRfp(open, rfps);
                     downloadProposalDoc(open, open.clientProfile, peer);

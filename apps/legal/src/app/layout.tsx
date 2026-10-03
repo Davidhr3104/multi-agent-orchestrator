@@ -27,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable} ${ibmPlexMono.variable} h-full bg-[#0B0F19] text-[#9CA3AF] antialiased`}
+      className={`dark ${inter.variable} ${ibmPlexMono.variable} h-full bg-[#0a1322] text-[#9CA3AF] antialiased`}
     >
       <head>
         <link
@@ -35,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           rel="stylesheet"
         />
       </head>
-      <body className="flex min-h-full flex-col bg-[#0B0F19] font-sans text-xs text-[#9CA3AF]">
+      <body className="flex min-h-full flex-col bg-[#0a1322] font-sans text-xs text-[#9CA3AF]">
         <TooltipProvider>
           <MaybeDeskShell>{children}</MaybeDeskShell>
           <LegalOnboardingHost />

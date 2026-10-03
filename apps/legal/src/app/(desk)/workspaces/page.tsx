@@ -64,7 +64,7 @@ export default function WorkspacesPage() {
           const active = desk.status === "active";
           const card = (
             <div
-              className={`rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle transition-colors duration-150 ${
+              className={`rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle transition-colors duration-150 ${
                 active ? "hover:border-[#F59E0B]/50" : "opacity-70"
               }`}
             >
@@ -76,7 +76,7 @@ export default function WorkspacesPage() {
                       ? "bg-[#064E3B] text-[#6EE7B7]"
                       : desk.status === "planned"
                         ? "border border-[#F59E0B]/40 text-[#F59E0B]"
-                        : "bg-[#1F2937] text-[#6B7280]"
+                        : "bg-[#1b2a45] text-[#6B7280]"
                   }`}
                 >
                   {desk.status}

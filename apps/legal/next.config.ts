@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@helix/core", "@helix/help"],
+  transpilePackages: ["@helix/core", "@helix/help", "@helix/ui"],
   serverExternalPackages: ["unpdf"],
   // Dev: Playwright / tools hitting 127.0.0.1 while Next binds as localhost
   allowedDevOrigins: ["127.0.0.1", "localhost"],

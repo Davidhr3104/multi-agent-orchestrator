@@ -45,15 +45,22 @@ export type WinSlice = {
 };
 
 const DEADLINE_PATTERNS: { label: string; re: RegExp }[] = [
-  { label: "Submission", re: /(?:due|deadline|submit by|submission)[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/gi },
+  // "Q&A deadline: …" belongs to the Q&A pattern, so the lookbehind keeps it out of Submission.
+  { label: "Submission", re: /(?<!Q&A\s)(?:due|deadline|submit by|submission)[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/gi },
   { label: "Q&A", re: /Q&A(?:\s+deadline)?[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/gi },
   { label: "Site visit", re: /site visit[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/gi },
   { label: "Document delivery", re: /(?:document delivery|deliverables due)[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2})/gi },
 ];
 
-function parseDate(s: string): number | null {
-  const t = Date.parse(s);
-  return Number.isNaN(t) ? null : t;
+/** Canonical `YYYY-MM-DD` for any parsable date string (the desk shows one date format everywhere), or null. */
+export function toIsoDate(raw: string): string | null {
+  const iso = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const t = Date.parse(raw);
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Whole local calendar days until a date. Date-only values (2026-10-02) count as that civil day, not UTC midnight, so "today" is not past due. */
@@ -89,7 +96,7 @@ export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(blob))) {
-      const date = m[1];
+      const date = toIsoDate(m[1]) ?? m[1];
       const key = `${label}:${date}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -103,7 +110,7 @@ export function extractDeadlines(rfp: StoredRfp, now: number): DeadlineHit[] {
   if (hits.length === 0 && rfp.deadline && !/unspecified|tbd/i.test(rfp.deadline)) {
     hits.push({
       label: "Submission",
-      date: rfp.deadline,
+      date: toIsoDate(rfp.deadline) ?? rfp.deadline,
       days: calendarDayOffset(rfp.deadline, now),
     });
   }
@@ -614,14 +621,15 @@ export function winAnalytics(rfps: StoredRfp[]): { slices: WinSlice[]; insight: 
   return { slices, insight };
 }
 
-export function winProbability(rfp: StoredRfp, all: StoredRfp[]): number {
-  const peers = all.filter((r) => r.method === rfp.method);
-  const base = peers.length
-    ? Math.round((peers.filter((r) => r.tier === "hot").length / peers.length) * 100)
-    : rfp.matchScore;
+/**
+ * Modeled chance of winning, 8-92. One definition for every page: the desk's match score, nudged by the Go/No-Go
+ * verdict (GO +6, CONDITIONAL -8, NO-GO -22). It is a pre-decision estimate: a decided RFP keeps its estimate and
+ * the recorded outcome is shown beside it, never replaced by it.
+ */
+export function winProbability(rfp: StoredRfp): number {
   const go = goNoGo(rfp);
   const adj = go.verdict === "NO-GO" ? -22 : go.verdict === "CONDITIONAL" ? -8 : 6;
-  return Math.max(8, Math.min(92, base + adj));
+  return Math.max(8, Math.min(92, rfp.matchScore + adj));
 }
 
 export function ingestProgress(logCount: number, running: boolean): number {

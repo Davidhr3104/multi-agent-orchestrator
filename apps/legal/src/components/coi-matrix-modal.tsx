@@ -124,7 +124,7 @@ export function CoiMatrixModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Conflict matrix">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl border border-[#1F2937] bg-[#111827] p-5 shadow-subtle">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl border border-[#1b2a45] bg-[#0f1b30] p-5 shadow-subtle">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-semibold tracking-widest text-[#9CA3AF] uppercase">Conflict of interest</p>
@@ -137,7 +137,7 @@ export function CoiMatrixModal({
         </div>
         <table className="mt-4 w-full border-collapse text-left text-[12px]">
           <thead>
-            <tr className="border-b border-[#1F2937] text-[10px] tracking-wide text-[#6B7280] uppercase">
+            <tr className="border-b border-[#1b2a45] text-[10px] tracking-wide text-[#6B7280] uppercase">
               <th className="py-2 pr-3">Lane</th>
               <th className="py-2 pr-3">Party</th>
               <th className="py-2">Finding</th>
@@ -145,7 +145,7 @@ export function CoiMatrixModal({
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr key={`${row.lane}-${row.party}-${i}`} className="border-b border-[#1F2937]/80">
+              <tr key={`${row.lane}-${row.party}-${i}`} className="border-b border-[#1b2a45]/80">
                 <td className="py-2 pr-3 text-[#9CA3AF]">{row.lane}</td>
                 <td className="py-2 pr-3 font-medium text-[#F3F4F6]">{row.party}</td>
                 <td className="py-2">
@@ -169,7 +169,7 @@ export function CoiMatrixModal({
           <label className="text-[11px] text-[#9CA3AF]">
             Partner
             <input
-              className="mt-1 h-8 w-full rounded border border-[#1F2937] bg-[#0B0F19] px-2 text-[12px] text-[#F3F4F6]"
+              className="mt-1 h-8 w-full rounded border border-[#1b2a45] bg-[#0a1322] px-2 text-[12px] text-[#F3F4F6]"
               value={partner}
               onChange={(e) => setPartner(e.target.value)}
             />
@@ -178,7 +178,7 @@ export function CoiMatrixModal({
             Partner email
             <input
               type="email"
-              className="mt-1 h-8 w-full rounded border border-[#1F2937] bg-[#0B0F19] px-2 text-[12px] text-[#F3F4F6]"
+              className="mt-1 h-8 w-full rounded border border-[#1b2a45] bg-[#0a1322] px-2 text-[12px] text-[#F3F4F6]"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="partner@firm.com"
@@ -187,7 +187,7 @@ export function CoiMatrixModal({
           <label className="text-[11px] text-[#9CA3AF]">
             Why
             <input
-              className="mt-1 h-8 w-full rounded border border-[#1F2937] bg-[#0B0F19] px-2 text-[12px] text-[#F3F4F6]"
+              className="mt-1 h-8 w-full rounded border border-[#1b2a45] bg-[#0a1322] px-2 text-[12px] text-[#F3F4F6]"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Required for the audit trail"

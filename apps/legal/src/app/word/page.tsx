@@ -72,7 +72,7 @@ function WordTaskPane() {
   }
 
   return (
-    <main className="min-h-screen space-y-4 bg-[#0B0F19] p-4 text-[#E5E7EB]">
+    <main className="min-h-screen space-y-4 bg-[#0a1322] p-4 text-[#E5E7EB]">
       <div>
         <p className="text-[10px] font-semibold tracking-widest text-[#9CA3AF] uppercase">Helix for Legal</p>
         <h1 className="mt-1 text-lg font-semibold">Word task pane</h1>
@@ -84,7 +84,7 @@ function WordTaskPane() {
       </div>
       <label className="block text-[11px] text-[#9CA3AF]">
         RFP
-        <select className="mt-1 h-8 w-full rounded border border-[#1F2937] bg-[#111827] px-2 text-[12px]" value={id} onChange={(e) => setId(e.target.value)}>
+        <select className="mt-1 h-8 w-full rounded border border-[#1b2a45] bg-[#0f1b30] px-2 text-[12px]" value={id} onChange={(e) => setId(e.target.value)}>
           {rfps.map((row) => (
             <option key={row.id} value={row.id}>
               {row.title}
@@ -111,7 +111,7 @@ function WordTaskPane() {
           <p className="text-[12px] text-[#9CA3AF]">No flagged clauses on this RFP.</p>
         ) : (
           suggestions.map((item) => (
-            <div key={item.suggestion} className="rounded border border-[#1F2937] bg-[#111827] p-3">
+            <div key={item.suggestion} className="rounded border border-[#1b2a45] bg-[#0f1b30] p-3">
               <p className="text-[10px] text-[#FCD34D]">{item.label}</p>
               <p className="mt-1 text-[12px]">{item.suggestion}</p>
               <button type="button" className="mt-2 text-[11px] underline" onClick={() => void insert(item.suggestion)}>

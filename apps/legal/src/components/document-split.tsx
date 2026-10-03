@@ -15,11 +15,11 @@ export type SplitField = {
 };
 
 function markClass(tone: SplitTone | undefined, active: boolean) {
-  if (!active) return "bg-[#1F2937] text-[#E5E7EB]";
-  if (tone === "money") return "bg-[#FCD34D] text-[#0B0F19]";
+  if (!active) return "bg-[#1b2a45] text-[#E5E7EB]";
+  if (tone === "money") return "bg-[#FCD34D] text-[#0a1322]";
   if (tone === "penalty") return "bg-[#FCA5A5] text-[#450A0A]";
-  if (tone === "rule") return "bg-[#93C5FD] text-[#0B0F19]";
-  return "bg-[#E5E7EB] text-[#0B0F19]";
+  if (tone === "rule") return "bg-[#93C5FD] text-[#0a1322]";
+  return "bg-[#E5E7EB] text-[#0a1322]";
 }
 
 function highlight(body: string, quote: string, tone: SplitTone | undefined) {
@@ -58,14 +58,14 @@ export function DocumentSplit({
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      <div className="min-h-[220px] rounded-[6px] border border-[#1F2937] bg-[#0B0F19] p-3">
+      <div className="min-h-[220px] rounded-[6px] border border-[#1b2a45] bg-[#0a1322] p-3">
         <p className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">Source text · clause highlights</p>
         <p className="mt-1 text-[10px] text-[#6B7280]">
           {title}. Gold is financial, blue is regulatory, red is penalty. The original PDF file is not stored, so this is the extracted text.
         </p>
         <div className="mt-2 flex gap-2 text-[9px]">
-          <span className="rounded bg-[#FCD34D] px-1.5 py-0.5 text-[#0B0F19]">Financial</span>
-          <span className="rounded bg-[#93C5FD] px-1.5 py-0.5 text-[#0B0F19]">Regulatory</span>
+          <span className="rounded bg-[#FCD34D] px-1.5 py-0.5 text-[#0a1322]">Financial</span>
+          <span className="rounded bg-[#93C5FD] px-1.5 py-0.5 text-[#0a1322]">Regulatory</span>
           <span className="rounded bg-[#FCA5A5] px-1.5 py-0.5 text-[#450A0A]">Penalty</span>
         </div>
         <div className="mt-2 max-h-80 overflow-auto text-[11px] leading-relaxed whitespace-pre-wrap text-[#9CA3AF]">
@@ -80,7 +80,7 @@ export function DocumentSplit({
             type="button"
             className={cn(
               "w-full rounded-[4px] border px-3 py-2 text-left",
-              active === item.id ? "border-[#F59E0B] bg-[#162032]" : "border-[#1F2937] bg-[#0B0F19]"
+              active === item.id ? "border-[#F59E0B] bg-[#162032]" : "border-[#1b2a45] bg-[#0a1322]"
             )}
             onClick={() => {
               setActive(item.id);

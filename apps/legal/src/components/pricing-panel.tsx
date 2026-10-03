@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { PRACTICE_AREAS, type PricingQuote } from "@/lib/pricing-types";
 import { formatUsdNumber } from "@/lib/money";
+import { rangePosition } from "@/lib/desk-metrics";
 import { cn } from "@/lib/utils";
 
 function fitClass(fit: PricingQuote["vsBudget"]) {
@@ -26,6 +27,35 @@ function fitClass(fit: PricingQuote["vsBudget"]) {
   if (fit === "under") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
   if (fit === "at") return "border-gold-500/40 bg-gold-500/10 text-gold-300";
   return "border-white/15 text-slate-400";
+}
+
+/** Floor / target / ceiling as one range, with the RFP budget marked on the same scale. */
+function PriceRange({ quote }: { quote: PricingQuote }) {
+  const budget = quote.rfpBudget;
+  const lo0 = Math.min(quote.floor, budget ?? quote.floor);
+  const hi0 = Math.max(quote.ceiling, budget ?? quote.ceiling);
+  const pad = (hi0 - lo0) * 0.08 || 1;
+  const lo = lo0 - pad;
+  const hi = hi0 + pad;
+  const pos = (v: number) => rangePosition(v, lo, hi);
+  const label = `Bid range ${formatUsdNumber(quote.floor)} to ${formatUsdNumber(quote.ceiling)}, target ${formatUsdNumber(quote.target)}${budget != null ? `, RFP budget ${formatUsdNumber(budget)}` : ""}`;
+  return (
+    <div className="pt-3 pb-1" role="img" aria-label={label}>
+      <div className="relative h-3 rounded-full bg-white/10">
+        <div className="absolute inset-y-0 rounded-l-full bg-slate-300/70" style={{ left: `${pos(quote.floor)}%`, width: `${pos(quote.target) - pos(quote.floor)}%` }} />
+        <div className="absolute inset-y-0 rounded-r-full bg-[#f59e0b]" style={{ left: `${pos(quote.target)}%`, width: `${pos(quote.ceiling) - pos(quote.target)}%` }} />
+        <span className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#0a1322] bg-white" style={{ left: `${pos(quote.target)}%` }} title="Target" />
+        {budget != null ? (
+          <span className="absolute -top-2 -bottom-2 w-0.5 bg-sky-300" style={{ left: `${pos(budget)}%` }} title={`RFP budget ${formatUsdNumber(budget)}`} />
+        ) : null}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
+        <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-slate-300/70" />Floor to target</span>
+        <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-[#f59e0b]" />Target to ceiling</span>
+        {budget != null ? <span className="flex items-center gap-1.5"><span className="h-3 w-0.5 bg-sky-300" />RFP budget {formatUsdNumber(budget)}</span> : <span>No budget stated on the RFP</span>}
+      </div>
+    </div>
+  );
 }
 
 export function PricingPanel({
@@ -113,10 +143,9 @@ export function PricingPanel({
   return (
     <div className="space-y-3">
       {quote.claudeFailed ? (
-        <Alert className="border-amber-500/30">
-          <AlertTitle className="text-amber-200">Claude unavailable</AlertTitle>
-          <AlertDescription>Showing the historical rate-card quote. Partner should still sign off on the bid.</AlertDescription>
-        </Alert>
+        <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+          Rate-card quote from the heuristic engine; Claude was not used for this one. A partner should still sign off on the bid.
+        </p>
       ) : null}
       <Card className={cn("ring-1", fitClass(quote.vsBudget))}>
         <CardHeader className="border-b border-white/5">
@@ -128,6 +157,9 @@ export function PricingPanel({
           </CardTitle>
           <CardDescription>{quote.why}</CardDescription>
         </CardHeader>
+        <CardContent className="pt-3">
+          <PriceRange quote={quote} />
+        </CardContent>
         <CardContent className="grid gap-3 pt-3 sm:grid-cols-3">
           <div>
             <p className="text-[11px] text-slate-500 uppercase">Floor</p>

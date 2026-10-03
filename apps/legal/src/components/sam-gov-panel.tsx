@@ -22,7 +22,7 @@ type SamStatus = {
 };
 
 const PANEL_STYLE = {
-  background: "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+  background: "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
   backdropFilter: "blur(12px)",
   border: "1px solid rgba(226, 232, 240, 0.12)",
   boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)",
@@ -57,6 +57,7 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
   const [confirmLeaveDemo, setConfirmLeaveDemo] = useState(false);
   const [result, setResult] = useState<SamImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   function applyStatus(data: SamStatus | null, applyDefaults: boolean) {
     setStatus(data);
@@ -117,6 +118,25 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
   const last = result ?? status?.lastRun ?? null;
   const lastOk = last?.status === "imported";
 
+  // Not connected: one quiet line instead of a 400px setup panel. Setup steps open on demand.
+  if (status && !status.configured && !expanded && !result && !error && !confirmLeaveDemo) {
+    return (
+      <section id="legal-sam-gov" className="flex min-h-10 items-center justify-between gap-3 rounded-xl px-4 py-1.5 text-[12px]" style={PANEL_STYLE}>
+        <span className="text-slate-300">
+          <span className="font-semibold text-slate-100">SAM.gov:</span> not connected
+        </span>
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={() => setExpanded(true)}
+          className="min-h-10 rounded-[4px] px-3 text-[11px] font-semibold text-slate-100 underline decoration-slate-500 underline-offset-4 hover:text-white"
+        >
+          Configure
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section id="legal-sam-gov" className="animate-entrance relative overflow-hidden rounded-xl p-4" style={PANEL_STYLE}>
       <div className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-start sm:justify-between" style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.1)" }}>
@@ -126,7 +146,7 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
             <span
               className={cn(
                 "rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold",
-                status?.configured ? "bg-[#064E3B] text-[#6EE7B7]" : "bg-[#1F2937] text-[#9CA3AF]"
+                status?.configured ? "bg-[#064E3B] text-[#6EE7B7]" : "bg-[#1b2a45] text-[#9CA3AF]"
               )}
             >
               {status == null ? "Checking…" : status.configured ? "API key set" : "Not connected"}
@@ -141,7 +161,12 @@ export function SamGovPanel({ rfps, onImported }: { rfps: StoredRfp[]; onImporte
             Imports real federal notices as RFPs proposed for partner review. Helix extracts, checks conflicts and recommends; the partner decides.
           </p>
         </div>
-        <div className="text-right text-[11px] text-slate-400">
+        <div className="text-[11px] text-slate-400 sm:text-right">
+          {status && !status.configured ? (
+            <button type="button" aria-expanded onClick={() => setExpanded(false)} className="mb-1 min-h-8 rounded-[4px] px-2 text-[11px] text-slate-300 underline underline-offset-4 hover:text-white">
+              Hide setup
+            </button>
+          ) : null}
           <div>
             {samRfps.length} from SAM.gov · <span className="text-slate-200">{proposed} proposed for review</span>
           </div>

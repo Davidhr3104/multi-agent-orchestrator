@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { LegalOutcomesSummary, MatterOutcome, StoredRfp } from "@helix/core";
+import { ChartCard, Donut, EmptyChart, HBarList } from "@helix/ui";
+import { fmtUsd, Ink, INK } from "@/components/desk-charts";
+import { bidRows, deskStage, isDemoDesk, STAGE_LABEL } from "@/lib/desk-metrics";
 import { formatUsdNumber } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -173,6 +176,28 @@ export function OutcomesDesk({
     return { wonUsd, hours: Math.round(hours), rate, delta, won: won.length, lost: lost.length };
   }, [scoped, rfps, range, now]);
 
+  const demo = isDemoDesk(rfps);
+  const stageCounts = useMemo(() => {
+    const n = (s: ReturnType<typeof deskStage>) => scoped.filter((r) => deskStage(r) === s).length;
+    return [
+      { label: "Won", value: n("won"), color: INK.won },
+      { label: "Lost", value: n("lost"), color: INK.lost },
+      { label: "Bid pending", value: n("pending"), color: INK.pending },
+      { label: "Awaiting partner", value: n("awaiting"), color: INK.neutral },
+      { label: "No bid", value: n("no_bid") + n("withdrawn"), color: INK.cold },
+    ];
+  }, [scoped]);
+  const bars = useMemo(
+    () =>
+      bidRows(scoped).flatMap((b) => {
+        const color = b.stage === "won" ? INK.won : b.stage === "lost" ? INK.lost : b.stage === "pending" ? INK.pending : INK.cold;
+        const rows: { label: string; value: number; color: string; hint: string }[] = [{ label: `${b.title} · bid`, value: b.bid, color: INK.neutral as string, hint: STAGE_LABEL[b.stage] }];
+        if (b.won != null) rows.push({ label: `${b.title} · won`, value: b.won, color, hint: `${b.won >= b.bid ? "+" : ""}${Math.round(((b.won - b.bid) / b.bid) * 100)}% vs bid` });
+        return rows;
+      }),
+    [scoped]
+  );
+
   const factors = useMemo(() => {
     const won = scoped.filter((r) => effectiveOutcome(r) === "won");
     const lost = scoped.filter((r) => effectiveOutcome(r) === "lost");
@@ -256,7 +281,7 @@ export function OutcomesDesk({
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5 font-sans">
+    <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 overflow-x-clip p-4 font-sans sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[18px] font-semibold text-[#F3F4F6]">Outcomes</h1>
@@ -272,7 +297,7 @@ export function OutcomesDesk({
               onClick={() => setRange(item.id)}
               className={cn(
                 "rounded-full border px-3 py-1 text-[11px] transition",
-                range === item.id ? "border-[#93C5FD] bg-[#1E3A8A]/40 text-[#DBEAFE]" : "border-[#1F2937] text-[#9CA3AF] hover:border-[#334155]"
+                range === item.id ? "border-[#93C5FD] bg-[#1E3A8A]/40 text-[#DBEAFE]" : "border-[#1b2a45] text-[#9CA3AF] hover:border-[#334155]"
               )}
             >
               {item.label}
@@ -290,7 +315,7 @@ export function OutcomesDesk({
       {error ? <p className="rounded-[4px] border border-[#7F1D1D] px-3 py-2 text-[11px] text-[#FCA5A5]">{error}</p> : null}
 
       <section className="grid gap-3 min-[1100px]:grid-cols-5">
-        <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-4 shadow-subtle transition hover:border-blue-500/40 hover:shadow-lg min-[1100px]:col-span-3">
+        <div className="rounded-xl border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle transition hover:border-blue-500/40 hover:shadow-lg min-[1100px]:col-span-3">
           <h2 className="text-[13px] font-semibold text-[#F3F4F6]">Procurement funnel</h2>
           <p className="mt-1 text-[11px] text-[#6B7280]">Click a stage to filter the table.</p>
           <div className="mt-4 flex flex-col items-center gap-1.5">
@@ -326,12 +351,40 @@ export function OutcomesDesk({
         </div>
       </section>
 
+      <Ink className="grid grid-cols-1 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
+        <ChartCard
+          title="Where each RFP stands"
+          subtitle="Recorded partner outcomes in this window"
+          demo={demo}
+          source="Source: partner decisions and outcomes on this desk. Win rate = won / (won + lost)."
+        >
+          <Donut
+            ariaLabel={`Outcomes: ${stageCounts.map((s) => `${s.value} ${s.label}`).join(", ")}`}
+            centerValue={hero.rate == null ? "—" : `${Math.round(hero.rate * 100)}%`}
+            centerLabel="win rate"
+            slices={stageCounts.filter((s) => s.value > 0)}
+          />
+        </ChartCard>
+        <ChartCard
+          title="Bid vs won amount"
+          subtitle="Bid recorded by the partner, and the awarded amount when won"
+          demo={demo}
+          source="Source: bid and won amounts entered with the partner decision. Lost and pending bids have no awarded amount."
+        >
+          {bars.length === 0 ? (
+            <EmptyChart label="No bid amounts recorded in this window" />
+          ) : (
+            <HBarList format={fmtUsd} items={bars} />
+          )}
+        </ChartCard>
+      </Ink>
+
       <section className="grid gap-3 lg:grid-cols-2">
         <FactorPanel title="Why we won" empty="No awarded matters in this window." rows={factors.win} tone="win" />
         <FactorPanel title="Why we lost" empty="No lost matters in this window." rows={factors.loss} tone="loss" />
       </section>
 
-      <section className="rounded-xl border border-[#1F2937] bg-[#111827] p-4 transition hover:border-[#334155]">
+      <section className="rounded-xl border border-[#1b2a45] bg-[#0f1b30] p-4 transition hover:border-[#334155]">
         <h2 className="text-[13px] font-semibold text-[#F3F4F6]">Incumbent matrix</h2>
         <p className="mt-1 text-[11px] text-[#6B7280]">Win rate when the solicitation names an incumbent versus when it does not.</p>
         <table className="mt-3 w-full text-left text-[12px]">
@@ -345,7 +398,7 @@ export function OutcomesDesk({
           </thead>
           <tbody>
             {incumbent.map((row) => (
-              <tr key={row.label} className="border-t border-[#1F2937]">
+              <tr key={row.label} className="border-t border-[#1b2a45]">
                 <td className="py-2 text-[#E5E7EB]">{row.label}</td>
                 <td className="font-mono-numbers text-[#6EE7B7]">{row.won}</td>
                 <td className="font-mono-numbers text-[#FCA5A5]">{row.lost}</td>
@@ -378,7 +431,7 @@ export function OutcomesDesk({
             onClick={() => setPill(id)}
             className={cn(
               "rounded-full border px-3 py-1 text-[11px]",
-              pill === id ? "border-white bg-white text-[#0B0F19]" : "border-[#1F2937] text-[#9CA3AF] hover:border-[#475569]"
+              pill === id ? "border-white bg-white text-[#0a1322]" : "border-[#1b2a45] text-[#9CA3AF] hover:border-[#475569]"
             )}
           >
             {label}
@@ -387,7 +440,7 @@ export function OutcomesDesk({
         <select
           value={issuer}
           onChange={(event) => setIssuer(event.target.value)}
-          className="rounded-full border border-[#1F2937] bg-[#0B0F19] px-3 py-1 text-[11px] text-[#E5E7EB]"
+          className="rounded-full border border-[#1b2a45] bg-[#0a1322] px-3 py-1 text-[11px] text-[#E5E7EB]"
           aria-label="Client"
         >
           <option value="all">All clients</option>
@@ -399,10 +452,10 @@ export function OutcomesDesk({
         </select>
       </div>
 
-      <section className="overflow-x-auto rounded-xl border border-[#1F2937] bg-[#111827]">
+      <section className="overflow-x-auto rounded-xl border border-[#1b2a45] bg-[#0f1b30]">
         <table className="w-full min-w-[920px] text-left">
           <thead>
-            <tr className="border-b border-[#1F2937] text-[10px] tracking-wide text-[#6B7280] uppercase">
+            <tr className="border-b border-[#1b2a45] text-[10px] tracking-wide text-[#6B7280] uppercase">
               <th className="px-4 py-3">Matter</th>
               <th className="px-3 py-3">Fit</th>
               <th className="px-3 py-3">Outcome</th>
@@ -422,7 +475,7 @@ export function OutcomesDesk({
                 const outcome = effectiveOutcome(rfp);
                 const value = parseMoneyLoose(rfp.partnerDecision?.wonAmount) ?? parseMoneyLoose(rfp.amount);
                 return (
-                  <tr key={rfp.id} className="border-b border-[#1F2937]/80 transition hover:bg-white/[0.03] hover:shadow-inner">
+                  <tr key={rfp.id} className="border-b border-[#1b2a45]/80 transition hover:bg-white/[0.03] hover:shadow-inner">
                     <td className="px-4 py-3">
                       <p className="text-[12px] font-semibold text-[#F3F4F6]">{rfp.title}</p>
                       <p className="mt-0.5 text-[10px] text-[#6B7280]">
@@ -431,7 +484,7 @@ export function OutcomesDesk({
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[#0B0F19]">
+                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[#0a1322]">
                           <div
                             className={cn("h-full", rfp.matchScore >= 75 ? "bg-[#6EE7B7]" : rfp.matchScore >= 50 ? "bg-[#FCD34D]" : "bg-[#FCA5A5]")}
                             style={{ width: `${rfp.matchScore}%` }}
@@ -448,7 +501,7 @@ export function OutcomesDesk({
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-1">
-                        <button type="button" className="rounded border border-[#334155] px-2 py-1 text-[10px] text-[#E5E7EB] hover:border-[#93C5FD]" onClick={() => setCompare(rfp)}>
+                        <button type="button" className="min-h-9 rounded border border-[#334155] px-2 py-1 text-[10px] text-[#E5E7EB] hover:border-[#93C5FD]" onClick={() => setCompare(rfp)}>
                           Draft vs result
                         </button>
                         {rfp.partnerDecision && rfp.partnerDecision.verdict !== "NO-GO"
@@ -458,7 +511,7 @@ export function OutcomesDesk({
                                 type="button"
                                 disabled={busyId === rfp.id || outcome === next}
                                 onClick={() => void setOutcome(rfp.id, next)}
-                                className="rounded border border-[#1F2937] px-1.5 py-1 text-[10px] text-[#9CA3AF] disabled:opacity-40"
+                                className="min-h-9 rounded border border-[#1b2a45] px-2 py-1 text-[10px] text-[#9CA3AF] disabled:opacity-40"
                               >
                                 {next}
                               </button>
@@ -508,7 +561,7 @@ function FactorPanel({
 }) {
   const any = rows.some((row) => row.n > 0);
   return (
-    <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-4 transition hover:border-[#334155]">
+    <div className="rounded-xl border border-[#1b2a45] bg-[#0f1b30] p-4 transition hover:border-[#334155]">
       <h2 className="text-[13px] font-semibold text-[#F3F4F6]">{title}</h2>
       <p className="mt-1 text-[10px] text-[#6B7280]">Share of closed matters in this window that show the signal. A matter can count in more than one row.</p>
       {!any ? <p className="mt-3 text-[12px] text-[#6B7280]">{empty}</p> : null}
@@ -519,7 +572,7 @@ function FactorPanel({
               <span>{row.label}</span>
               <span className="font-mono-numbers">{row.total === 0 ? "—" : `${share(row.n, row.total)}%`}</span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#0B0F19]">
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#0a1322]">
               <div className={cn("h-full", tone === "win" ? "bg-[#6EE7B7]" : "bg-[#FCA5A5]")} style={{ width: `${share(row.n, row.total)}%` }} />
             </div>
           </li>
@@ -550,7 +603,7 @@ function CompareModal({ rfp, signals, onClose }: { rfp: StoredRfp; signals: stri
   const outcome = effectiveOutcome(rfp);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl border border-[#1F2937] bg-[#111827] p-5">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl border border-[#1b2a45] bg-[#0f1b30] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] tracking-widest text-[#9CA3AF] uppercase">Draft vs result</p>
@@ -561,13 +614,13 @@ function CompareModal({ rfp, signals, onClose }: { rfp: StoredRfp; signals: stri
           </button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded border border-[#1F2937] p-3">
+          <div className="rounded border border-[#1b2a45] p-3">
             <p className="text-[10px] text-[#9CA3AF] uppercase">What the desk scored</p>
             <p className="mt-2 text-[12px] text-[#E5E7EB]">Fit {rfp.matchScore} · {rfp.method} · {rfp.tier}</p>
             <p className="mt-1 text-[12px] text-[#9CA3AF]">Amount on the RFP: {rfp.amount}</p>
             <p className="mt-2 max-h-40 overflow-auto text-[11px] leading-relaxed text-[#9CA3AF]">{rfp.body.slice(0, 500)}</p>
           </div>
-          <div className="rounded border border-[#1F2937] p-3">
+          <div className="rounded border border-[#1b2a45] p-3">
             <p className="text-[10px] text-[#9CA3AF] uppercase">What was recorded</p>
             <p className="mt-2 text-[12px] text-[#E5E7EB]">
               {rfp.partnerDecision ? `${rfp.partnerDecision.verdict} by ${rfp.partnerDecision.decidedBy}` : "No partner decision"}

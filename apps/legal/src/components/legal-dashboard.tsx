@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PartnerVerdict, PipelineLog, RfpStreamEvent, StoredRfp } from "@helix/core";
+import { ChartCard, Donut, ScoreRing } from "@helix/ui";
+import { INK, Ink } from "@/components/desk-charts";
 import { AskAiCard } from "@/components/ask-ai-card";
 import { CoiMatrixModal, coiStatusFromVerdict, type CoiDeskStatus } from "@/components/coi-matrix-modal";
 import { DocumentSplit, type SplitField } from "@/components/document-split";
@@ -40,12 +42,12 @@ import {
   goNoGo,
   googleCalendarUrl,
   ingestProgress,
-  nearestDeadline,
   nextDeadline,
   similarRfp,
   winAnalytics,
   winProbability,
 } from "@/lib/rfp-intel";
+import { deadlineSummary, deskStage, isDemoDesk, rfpDeadline, STAGE_LABEL } from "@/lib/desk-metrics";
 import {
   last7Buckets,
   previous7Count,
@@ -122,7 +124,7 @@ function previewFields(text: string, form: { title: string; issuer: string }): S
 function MiniBar({ value, className }: { value: number; className?: string; wide?: boolean }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
-    <div className="h-[3px] w-10 shrink-0 bg-[#1F2937]">
+    <div className="h-[3px] w-10 shrink-0 bg-[#1b2a45]">
       <div className={cn("bar-animate h-full", className)} style={{ width: `${pct}%` }} />
     </div>
   );
@@ -131,19 +133,7 @@ function MiniBar({ value, className }: { value: number; className?: string; wide
 function methodClass(method: StoredRfp["method"]) {
   if (method === "BEAR") return "bg-[#1E3A8A] text-[#93C5FD]";
   if (method === "SPI") return "bg-[#4C1D95] text-[#C4B5FD]";
-  return "bg-[#1F2937] text-[#9CA3AF]";
-}
-
-function matchBarClass(tier: StoredRfp["tier"]) {
-  if (tier === "hot") return "bg-[#10B981]";
-  if (tier === "warm") return "bg-[#F59E0B]";
-  return "bg-[#EF4444]";
-}
-
-function matchTextClass(tier: StoredRfp["tier"]) {
-  if (tier === "hot") return "text-[#10B981]";
-  if (tier === "warm") return "text-[#F59E0B]";
-  return "text-[#EF4444]";
+  return "bg-[#1b2a45] text-[#9CA3AF]";
 }
 
 export function LegalDashboard() {
@@ -254,10 +244,10 @@ export function LegalDashboard() {
       rfps.length === 0 ? 0 : Math.round(rfps.reduce((s, r) => s + r.matchScore, 0) / rfps.length);
     const hotShare =
       rfps.length === 0 ? 0 : Math.round((rfps.filter((r) => r.tier === "hot").length / rfps.length) * 100);
-    const dueDays = rfps.map((r) => nearestDeadline(r, now)?.days ?? null);
-    const pastDue = dueDays.filter((d) => d != null && d < 0).length;
-    const soon = dueDays.filter((d) => d != null && d >= 0 && d <= 14).length;
-    const close = pastDue + soon;
+    const dl = deadlineSummary(rfps, now);
+    const pastDue = dl.pastDue;
+    const soon = dl.within14;
+    const close = soon;
     const review = rfps.filter((r) => r.needsReview).length;
     const hot = rfps.filter((r) => r.tier === "hot").length;
     const warm = rfps.filter((r) => r.tier === "warm").length;
@@ -286,8 +276,9 @@ export function LegalDashboard() {
     return rfps.filter((rfp) => {
       if (filter === "review" && !rfp.needsReview) return false;
       if (filter === "due") {
-        const days = nearestDeadline(rfp, now)?.days;
-        if (days == null || days > 14) return false;
+        const dl = rfpDeadline(rfp, now);
+        const days = dl.hit?.days;
+        if (dl.kind === "closed" || days == null || days > 14) return false;
       }
       if (filter === "hot" || filter === "warm" || filter === "cold") {
         if (rfp.tier !== filter) return false;
@@ -511,6 +502,7 @@ export function LegalDashboard() {
   const extractPct = ingestProgress(logs.length, running);
   const firstReview = rfps.find((r) => r.needsReview);
   const totalTier = Math.max(metrics.hot + metrics.warm + metrics.cold, 1);
+  const demoDesk = isDemoDesk(rfps);
   const goldSpark = sparkGold(metrics.spark, 240, 28);
   const bearWin = winLoss.find((w) => w.method === "BEAR")?.rate ?? 0;
   const modeledWin =
@@ -519,7 +511,7 @@ export function LegalDashboard() {
 
   return (
     <>
-      <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5">
+      <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-4 sm:p-5">
         <section
           id="legal-dashboard"
           data-tour="legal-metrics"
@@ -529,7 +521,7 @@ export function LegalDashboard() {
             className="group animate-entrance stagger-1 relative overflow-hidden rounded-xl p-4 transition-all duration-300"
             style={{
               background:
-                "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(226, 232, 240, 0.12)",
               boxShadow:
@@ -554,24 +546,18 @@ export function LegalDashboard() {
               >
                 {metrics.hotShare}%
               </span>
-              <span className="font-mono-numbers text-[10px] text-slate-400">{metrics.delta} vs last week</span>
+              <span className="font-mono-numbers text-[10px] text-slate-400">
+                {demoDesk ? "fit index, not a win rate" : metrics.delta}
+              </span>
             </div>
             <div className="relative z-10 mt-3 flex h-8 w-full items-end">
-              <svg
-                className="h-7 w-full overflow-visible"
-                fill="none"
-                viewBox={`0 0 ${goldSpark.width} ${goldSpark.height}`}
-              >
-                <path
-                  className="sparkline-line"
-                  d={goldSpark.line}
-                  stroke="#e2e8f0"
-                  strokeLinecap="square"
-                  strokeLinejoin="miter"
-                  strokeWidth="1.5"
-                  fill="none"
-                />
-              </svg>
+              {demoDesk ? (
+                <span className="text-[10px] text-slate-500">Demo data: no real arrival history to chart.</span>
+              ) : (
+                <svg className="h-7 w-full overflow-visible" fill="none" viewBox={`0 0 ${goldSpark.width} ${goldSpark.height}`} role="img" aria-label="Hot RFPs added per day, last 7 days">
+                  <path className="sparkline-line" d={goldSpark.line} stroke="#e2e8f0" strokeLinecap="square" strokeLinejoin="miter" strokeWidth="1.5" fill="none" />
+                </svg>
+              )}
             </div>
           </div>
 
@@ -579,7 +565,7 @@ export function LegalDashboard() {
             className="group animate-entrance stagger-2 relative overflow-hidden rounded-xl p-4 transition-all duration-300"
             style={{
               background:
-                "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(226, 232, 240, 0.12)",
               boxShadow:
@@ -642,7 +628,7 @@ export function LegalDashboard() {
             }}
             style={{
               background:
-                "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(226, 232, 240, 0.12)",
               boxShadow:
@@ -668,7 +654,7 @@ export function LegalDashboard() {
                 {metrics.close}
               </span>
               <span className="text-[11px] text-slate-300">
-                {metrics.pastDue} past due · {metrics.soon} in 14d
+                {metrics.pastDue} past due · open RFPs only
                 {filter === "due" ? " · filtering the table" : ""}
               </span>
             </div>
@@ -688,7 +674,7 @@ export function LegalDashboard() {
               background:
                 metrics.review > 0
                   ? "linear-gradient(145deg, rgba(32, 24, 28, 0.75) 0%, rgba(18, 14, 18, 0.85) 100%)"
-                  : "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                  : "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
               backdropFilter: "blur(12px)",
               border:
                 metrics.review > 0 ? "1px solid rgba(248, 113, 113, 0.25)" : "1px solid rgba(226, 232, 240, 0.12)",
@@ -753,15 +739,15 @@ export function LegalDashboard() {
         ) : null}
         <AiToast message={toast} />
 
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
-          <div className="animate-entrance stagger-5 space-y-4 lg:col-span-8">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="animate-entrance stagger-5 space-y-4">
             <section
               id="legal-opportunities"
               data-tour="legal-opportunities"
               className="relative overflow-hidden rounded-xl p-4"
               style={{
                 background:
-                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                  "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(226, 232, 240, 0.12)",
                 boxShadow:
@@ -817,7 +803,7 @@ export function LegalDashboard() {
                     <button
                       type="button"
                       className={cn(
-                        "btn-tactile rounded-[4px] px-2.5 py-1 text-[11px] transition-colors",
+                        "btn-tactile min-h-10 rounded-[4px] px-3 py-1 text-[11px] transition-colors sm:min-h-8",
                         filter === f.id ? "font-semibold" : "text-slate-400 hover:text-slate-100"
                       )}
                       style={
@@ -836,7 +822,7 @@ export function LegalDashboard() {
                 ))}
               </div>
 
-              <div className="group relative my-2 h-[32px]">
+              <div className="group relative my-2 h-10 sm:h-[32px]">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400 transition-colors duration-150 group-focus-within:text-white">
                   <span className="material-symbols-outlined text-[16px]">search</span>
                 </div>
@@ -851,24 +837,26 @@ export function LegalDashboard() {
               </div>
 
               <div className="mt-2 overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-left">
+                <table className="w-full min-w-[800px] border-collapse text-left">
                   <thead>
                     <tr
                       className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase"
                       style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.1)", background: "rgba(9, 11, 16, 0.6)" }}
                     >
-                      <th className="px-3 py-2">Licitación / Emisor</th>
-                      <th className="px-2 py-2">Método</th>
-                      <th className="px-2 py-2">Estimado vs puja</th>
+                      <th className="px-3 py-2">RFP / Issuer</th>
+                      <th className="px-2 py-2">Method</th>
+                      <th className="px-2 py-2">Estimate vs bid</th>
                       <th className="px-2 py-2">Match & confidence</th>
-                      <th className="px-2 py-2">Estado COI</th>
-                      <th className="py-2 pr-3 pl-2 text-right">Action</th>
+                      <th className="px-2 py-2">COI status</th>
+                      <th className="sticky right-0 bg-[#0b1426] py-2 pr-3 pl-2 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="text-xs">
                     {visible.map((rfp) => {
-                      const due = nearestDeadline(rfp, now);
-                      const past = due?.days != null && due.days < 0;
+                      const dl = rfpDeadline(rfp, now);
+                      const due = dl.hit;
+                      const closedRfp = dl.kind === "closed";
+                      const past = dl.kind === "past_due";
                       const coi = conflicts[rfp.id];
                       const quote = pricing[rfp.id];
                       const coiStatus = coiOverrides[rfp.id] ?? coiStatusFromVerdict(coi?.verdict);
@@ -906,7 +894,7 @@ export function LegalDashboard() {
                               </div>
                             ) : null}
                             <div className={cn("mt-1 text-[10px]", past ? "font-medium text-[#FCA5A5]" : "text-slate-500")}>
-                              {countdownLabel(due?.days ?? null)}
+                              {closedRfp ? `Closed · ${STAGE_LABEL[deskStage(rfp)]}` : countdownLabel(due?.days ?? null)}
                             </div>
                           </td>
                           <td className="whitespace-nowrap px-2 py-2">
@@ -923,8 +911,9 @@ export function LegalDashboard() {
                           </td>
                           <td className="whitespace-nowrap px-2 py-2">
                             <div className="flex items-center gap-1.5">
-                              <MiniBar value={rfp.matchScore} className={matchBarClass(rfp.tier)} />
-                              <span className={cn("font-mono-numbers text-[11px]", matchTextClass(rfp.tier))}>{rfp.matchScore}</span>
+                              <span className="text-slate-200">
+                                <ScoreRing score={rfp.matchScore} size={38} label={`Match score ${rfp.matchScore} of 100`} />
+                              </span>
                             </div>
                             <div className="mt-1 flex items-center gap-1.5">
                               <MiniBar value={rfp.confidence * 100} className="bg-[#F59E0B]" />
@@ -934,7 +923,7 @@ export function LegalDashboard() {
                           <td className="whitespace-nowrap px-2 py-2" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
-                              className={cn("rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold", coiChipClass(coiStatus))}
+                              className={cn("min-h-10 rounded-[3px] px-2 py-0.5 text-[10px] font-semibold sm:min-h-0", coiChipClass(coiStatus))}
                               onClick={() => {
                                 setCoiToken(null);
                                 setCoiRfp(rfp);
@@ -944,15 +933,16 @@ export function LegalDashboard() {
                             </button>
                           </td>
                           <td
-                            className="whitespace-nowrap py-2 pr-3 pl-2 text-right"
+                            className="sticky right-0 bg-[#0d172b] py-2 pr-3 pl-2 text-right whitespace-nowrap"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="flex items-center justify-end gap-1.5">
                               <div className="flex items-center gap-1 text-slate-400">
                                 <button
                                   type="button"
-                                  className="btn-tactile rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100"
+                                  className="btn-tactile flex size-10 items-center justify-center rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100 sm:size-8"
                                   title="View"
+                                  aria-label={`View ${rfp.title}`}
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -963,20 +953,9 @@ export function LegalDashboard() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn-tactile rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100"
-                                  title="Edit"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openRfp(rfp, "overview");
-                                  }}
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">edit</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-tactile rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100"
+                                  className="btn-tactile flex size-10 items-center justify-center rounded-[4px] p-1 transition-colors hover:bg-white/10 hover:text-slate-100 sm:size-8"
                                   title="Download"
+                                  aria-label={`Download ${rfp.title}`}
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -988,7 +967,7 @@ export function LegalDashboard() {
                               </div>
                               <button
                                 type="button"
-                                className="btn-tactile rounded-[3px] px-2 py-[3px] text-[10px] leading-none font-semibold text-slate-100 transition-all hover:brightness-110"
+                                className="btn-tactile min-h-10 rounded-[3px] px-3 py-[3px] text-[10px] leading-none font-semibold text-slate-100 transition-all hover:brightness-110 sm:min-h-8"
                                 style={{ border: "1px solid rgba(226, 232, 240, 0.3)", background: "rgba(226, 232, 240, 0.08)" }}
                                 onClick={(e) => {
                                   e.preventDefault();
@@ -1026,7 +1005,7 @@ export function LegalDashboard() {
               className="relative flex flex-col items-start justify-between gap-3 overflow-hidden rounded-xl p-3 md:flex-row md:items-center"
               style={{
                 background:
-                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                  "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(226, 232, 240, 0.12)",
                 boxShadow:
@@ -1040,7 +1019,7 @@ export function LegalDashboard() {
                 <div className="text-[11px] leading-snug">
                   <span className="font-semibold text-slate-100">Win / Loss (modeled):</span>
                   <span className="ml-1 text-[10px] text-slate-400">
-                    {modeledWin}% desk alignment
+                    {modeledWin}% hot share (fit index)
                     {bearWin ? ` · BEAR ${bearWin}%` : ""}. Hot = modeled win, not a closed-file archive.
                   </span>
                   <p className="mt-1 text-[10px] text-slate-400">{analytics.insight}</p>
@@ -1076,14 +1055,35 @@ export function LegalDashboard() {
             </div>
           </div>
 
-          <div className="animate-entrance stagger-6 space-y-4 lg:col-span-4">
+          <div className="animate-entrance stagger-6 space-y-4">
+            <Ink>
+              <ChartCard
+                title="Fit tier"
+                subtitle="Hot / warm / cold by match score"
+                demo={demoDesk}
+                source="Source: heuristic match scoring of each RFP."
+              >
+                <Donut
+                  size={116}
+                  thickness={20}
+                  ariaLabel={`Fit tier: ${metrics.hot} hot, ${metrics.warm} warm, ${metrics.cold} cold`}
+                  centerValue={rfps.length}
+                  centerLabel="RFPs"
+                  slices={[
+                    { label: "Hot", value: metrics.hot, color: INK.hot },
+                    { label: "Warm", value: metrics.warm, color: INK.warm },
+                    { label: "Cold", value: metrics.cold, color: INK.cold },
+                  ].filter((x) => x.value > 0)}
+                />
+              </ChartCard>
+            </Ink>
             <section
               id="legal-documents"
               data-tour="legal-ingest"
               className="relative overflow-hidden rounded-xl p-4"
               style={{
                 background:
-                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                  "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(226, 232, 240, 0.12)",
                 boxShadow:
@@ -1217,7 +1217,7 @@ export function LegalDashboard() {
               className="relative overflow-hidden rounded-xl p-4"
               style={{
                 background:
-                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                  "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(226, 232, 240, 0.12)",
                 boxShadow:
@@ -1253,7 +1253,7 @@ export function LegalDashboard() {
               className="relative space-y-2.5 overflow-hidden rounded-xl p-3"
               style={{
                 background:
-                  "linear-gradient(145deg, rgba(24, 29, 41, 0.75) 0%, rgba(13, 16, 23, 0.85) 100%)",
+                  "linear-gradient(145deg, rgba(24, 38, 64, 0.75) 0%, rgba(11, 19, 36, 0.88) 100%)",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(226, 232, 240, 0.12)",
                 boxShadow:
@@ -1380,7 +1380,7 @@ function RfpSheet({
   const peer = similarRfp(selected, all);
   const diff = peer ? diffBodies(peer.body, selected.body) : null;
   const go = goNoGo(selected);
-  const prob = winProbability(selected, all);
+  const prob = winProbability(selected);
   const [events, setEvents] = useState<{ id: string; at: string; kind: string; text: string }[]>([]);
   const [note, setNote] = useState("");
   const [kind, setKind] = useState("note");
@@ -1467,7 +1467,7 @@ function RfpSheet({
                 </p>
                 <ul className="space-y-2">
                   {selected.corpusHits.map((hit) => (
-                    <li key={hit.chunkId} className="rounded-lg bg-[#0B0F19]/60 p-2 text-xs">
+                    <li key={hit.chunkId} className="rounded-lg bg-[#0a1322]/60 p-2 text-xs">
                       <p className="font-medium text-[#F3F4F6]">{hit.docTitle}</p>
                       <p className="mt-1 text-[#9CA3AF]">“{hit.quote}”</p>
                       <p className="mt-1 font-mono text-[10px] text-[#6B7280]">
@@ -1657,7 +1657,7 @@ function RfpSheet({
             <p className="text-sm text-muted-foreground">
               Proposal pack: draft + COI + bid target + compliance checklist. Partner review before send.
             </p>
-            <div className="rounded-lg border border-[#1F2937] bg-[#0B0F19] p-3 text-[11px] text-[#9CA3AF]">
+            <div className="rounded-lg border border-[#1b2a45] bg-[#0a1322] p-3 text-[11px] text-[#9CA3AF]">
               <p className="mb-2 font-semibold tracking-wide text-[#F59E0B] uppercase">Pack checklist</p>
               <ul className="space-y-1">
                 <li>[ ] Partner sign-off on Go/No-Go ({go.verdict})</li>

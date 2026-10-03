@@ -187,7 +187,7 @@ export function AskAiCard({
           ) : null}
         </div>
 
-        <div className="flex justify-center lg:col-span-5 lg:justify-end">
+        <div className="hidden justify-center lg:flex lg:col-span-5 lg:justify-end">
           <div
             role="button"
             tabIndex={0}

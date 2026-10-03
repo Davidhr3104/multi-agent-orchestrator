@@ -34,7 +34,7 @@ export function ShortcutsModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-[#D4AF37]/25 bg-[#111827] p-5 shadow-2xl"
+        className="w-full max-w-md rounded-2xl border border-[#D4AF37]/25 bg-[#0f1b30] p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">

@@ -1,12 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChartCard, StackedBar } from "@helix/ui";
+import { Ink } from "@/components/desk-charts";
+import { countBy } from "@/lib/desk-metrics";
 import type { AuditEvent } from "@/lib/audit-types";
 import { splitAuditDetail } from "@/lib/audit-trace";
 import { cn } from "@/lib/utils";
 
+const STAGE_COLOR: Record<string, string> = {
+  seed: "#64748b",
+  ingest: "#3b82f6",
+  coi: "#f59e0b",
+  quote: "#fbbf24",
+  review: "#f87171",
+  compliance: "#a78bfa",
+  proposal: "#34d399",
+  partner: "#93c5fd",
+  settings: "#94a3b8",
+  comms: "#22d3ee",
+  outcome: "#34d399",
+};
+
 const STAGE: Record<string, { label: string; className: string; order: number }> = {
-  seed: { label: "System", className: "bg-[#1F2937] text-[#9CA3AF]", order: 0 },
+  seed: { label: "System", className: "bg-[#1b2a45] text-[#9CA3AF]", order: 0 },
   ingest: { label: "Ingest", className: "bg-[#1E3A8A] text-[#93C5FD]", order: 1 },
   coi: { label: "COI", className: "border border-[#F59E0B] text-[#F59E0B]", order: 2 },
   quote: { label: "Bid", className: "bg-[#422006] text-[#FCD34D]", order: 3 },
@@ -14,12 +31,13 @@ const STAGE: Record<string, { label: string; className: string; order: number }>
   compliance: { label: "Compliance", className: "bg-[#4C1D95] text-[#C4B5FD]", order: 5 },
   proposal: { label: "Proposal", className: "bg-[#064E3B] text-[#6EE7B7]", order: 5.5 },
   partner: { label: "Partner", className: "bg-[#1E3A8A] text-[#93C5FD]", order: 4.5 },
-  settings: { label: "Settings", className: "bg-[#1F2937] text-[#9CA3AF]", order: 6 },
+  settings: { label: "Settings", className: "bg-[#1b2a45] text-[#9CA3AF]", order: 6 },
+  outcome: { label: "Outcome", className: "bg-[#064E3B] text-[#6EE7B7]", order: 5.8 },
   comms: { label: "Comms", className: "bg-[#164E63] text-[#67E8F9]", order: 7 },
 };
 
 function stageOf(action: string) {
-  return STAGE[action] ?? { label: action, className: "bg-[#1F2937] text-[#9CA3AF]", order: 9 };
+  return STAGE[action] ?? { label: action, className: "bg-[#1b2a45] text-[#9CA3AF]", order: 9 };
 }
 
 export default function AuditPage() {
@@ -29,13 +47,24 @@ export default function AuditPage() {
   useEffect(() => {
     void fetch("/api/audit")
       .then((r) => r.json())
-      .then((d: { events?: AuditEvent[] }) => setEvents(d.events ?? []));
+      .then((d: { events?: AuditEvent[] }) => setEvents(d.events ?? []))
+      .catch(() => setEvents([]));
   }, []);
 
   const filters = useMemo(() => {
     const keys = new Set(events.map((e) => e.action));
     return ["all", ...[...keys].sort((a, b) => (STAGE[a]?.order ?? 9) - (STAGE[b]?.order ?? 9))];
   }, [events]);
+
+  const segments = useMemo(
+    () =>
+      countBy(events, (e) => e.action)
+        .sort((a, b) => (STAGE[a.key]?.order ?? 9) - (STAGE[b.key]?.order ?? 9))
+        .map((c) => ({ label: stageOf(c.key).label, value: c.count, color: STAGE_COLOR[c.key] ?? "#94a3b8" })),
+    [events]
+  );
+  // The seed ids are stable: a desk whose log is all seed events is the demo desk.
+  const demo = events.length > 0 && events.every((e) => e.id.startsWith("seed-a-"));
 
   const visible = filter === "all" ? events : events.filter((e) => e.action === filter);
 
@@ -53,7 +82,7 @@ export default function AuditPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-5">
+    <main className="mx-auto w-full max-w-[1720px] flex-1 space-y-4 p-4 sm:p-5">
       <div className="animate-entrance stagger-1 flex flex-wrap items-end justify-between gap-3 print:block">
         <div>
           <h1 className="text-[18px] font-semibold text-[#F3F4F6]">Audit Log</h1>
@@ -64,14 +93,14 @@ export default function AuditPage() {
         <div className="flex gap-2 print:hidden">
           <button
             type="button"
-            className="rounded-[4px] border border-[#374151] px-3 py-1.5 text-[11px] text-[#F3F4F6]"
+            className="min-h-10 rounded-[4px] border border-[#374151] px-3 py-1.5 text-[11px] text-[#F3F4F6]"
             onClick={() => void exportJson()}
           >
             Export JSON
           </button>
           <button
             type="button"
-            className="rounded-[4px] border border-[#374151] px-3 py-1.5 text-[11px] text-[#F3F4F6]"
+            className="min-h-10 rounded-[4px] border border-[#374151] px-3 py-1.5 text-[11px] text-[#F3F4F6]"
             onClick={() => window.print()}
           >
             Export PDF
@@ -79,15 +108,26 @@ export default function AuditPage() {
         </div>
       </div>
 
+      <Ink className="animate-entrance stagger-2 print:hidden">
+        <ChartCard
+          title="Events by type"
+          subtitle={`${events.length} recorded event${events.length === 1 ? "" : "s"}`}
+          demo={demo}
+          source="Source: this desk's audit log. Every event carries an actor and a timestamp."
+        >
+          <StackedBar segments={segments} ariaLabel={`Audit events by type: ${segments.map((s) => `${s.value} ${s.label}`).join(", ")}`} />
+        </ChartCard>
+      </Ink>
+
       <div className="animate-entrance stagger-2 flex flex-wrap gap-2">
         {filters.map((f) => (
           <button
             key={f}
             type="button"
             className={cn(
-              "btn-tactile rounded-[4px] px-2.5 py-1 text-[11px]",
+              "btn-tactile min-h-9 rounded-[4px] px-3 py-1 text-[11px]",
               filter === f
-                ? "bg-[#F59E0B] font-semibold text-[#0B0F19]"
+                ? "bg-[#F59E0B] font-semibold text-[#0a1322]"
                 : "border border-[#374151] text-[#9CA3AF] hover:border-[#6B7280] hover:text-[#F3F4F6]"
             )}
             onClick={() => setFilter(f)}
@@ -97,11 +137,11 @@ export default function AuditPage() {
         ))}
       </div>
 
-      <section className="animate-entrance stagger-3 rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
+      <section className="animate-entrance stagger-3 rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle">
         {visible.length === 0 ? (
           <p className="py-8 text-center text-[12px] text-[#9CA3AF]">No audit events yet.</p>
         ) : (
-          <ol className="relative ml-2 space-y-0 border-l border-[#1F2937] pl-5">
+          <ol className="relative ml-2 space-y-0 border-l border-[#1b2a45] pl-5">
             {visible.map((ev, i) => {
               const stage = stageOf(ev.action);
               const parsed = splitAuditDetail(ev.detail);
@@ -109,7 +149,7 @@ export default function AuditPage() {
                 <li key={ev.id} className="relative pb-5 last:pb-0">
                   <span
                     className={cn(
-                      "absolute top-1.5 -left-[23px] size-2.5 rounded-full border-2 border-[#111827]",
+                      "absolute top-1.5 -left-[23px] size-2.5 rounded-full border-2 border-[#0f1b30]",
                       i === 0 ? "bg-[#F59E0B]" : "bg-[#374151]"
                     )}
                   />

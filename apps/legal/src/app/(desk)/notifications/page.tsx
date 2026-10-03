@@ -97,21 +97,21 @@ export default function NotificationsPage() {
             ["COI", counts.conflict, "text-[#F59E0B]"],
           ] as const
         ).map(([label, n, color]) => (
-          <div key={label} className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle">
+          <div key={label} className="rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle">
             <p className="text-[10px] font-semibold tracking-wide text-[#9CA3AF] uppercase">{label}</p>
             <p className={cn("font-mono-numbers mt-2 text-[28px] leading-none font-bold", color)}>{n}</p>
           </div>
         ))}
       </section>
 
-      <section className="animate-entrance stagger-3 overflow-hidden rounded-[6px] border border-[#1F2937] bg-[#111827] shadow-subtle">
+      <section className="animate-entrance stagger-3 overflow-hidden rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] shadow-subtle">
         {notes.length === 0 ? (
           <div className="px-4 py-10 text-center">
             <p className="text-[12px] text-[#9CA3AF]">No open alerts.</p>
             <p className="mt-1 text-[11px] text-[#6B7280]">Review, deadline, and COI items appear here.</p>
           </div>
         ) : (
-          <ul className="divide-y divide-[#1F2937]">
+          <ul className="divide-y divide-[#1b2a45]">
             {notes.map((note) => (
               <li key={note.id} className="table-row-interactive flex items-start justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
@@ -134,7 +134,7 @@ export default function NotificationsPage() {
                 </div>
                 <Link
                   href={note.href}
-                  className="btn-tactile shrink-0 rounded-[3px] border border-[#F59E0B] px-2.5 py-1 text-[10px] font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0B0F19]"
+                  className="btn-tactile shrink-0 rounded-[3px] border border-[#F59E0B] px-2.5 py-1 text-[10px] font-semibold text-[#F59E0B] hover:bg-[#F59E0B] hover:text-[#0a1322]"
                 >
                   Open →
                 </Link>

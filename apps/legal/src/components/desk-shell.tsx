@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { StoredRfp } from "@helix/core";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { LegalChrome, LEGAL_HREF, type LegalNavId } from "@/components/legal-chrome";
-import { nearestDeadline } from "@/lib/rfp-intel";
+import { deadlineSummary } from "@/lib/desk-metrics";
 
 export function DeskShell({
   children,
@@ -34,12 +34,9 @@ export function DeskShell({
         const now = Date.now();
         setOpportunityCount(rfps.length);
         setReviewCount(rfps.filter((r) => r.needsReview).length);
-        setDeadlineCount(
-          rfps.filter((r) => {
-            const days = nearestDeadline(r, now)?.days;
-            return days != null && days <= 14;
-          }).length
-        );
+        const dl = deadlineSummary(rfps, now);
+        // One definition: open RFPs due within 14 days, plus open RFPs already past due.
+        setDeadlineCount(dl.within14 + dl.pastDue);
       })
       .catch(() => undefined);
   }, []);

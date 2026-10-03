@@ -451,7 +451,7 @@ export function AskAiDrawer({
                   </ul>
                   {t.proposalStatus === "pending" ? (
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => void confirm(i)} className="rounded-md bg-amber-500 px-3 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-amber-400">
+                      <button type="button" onClick={() => void confirm(i)} className="rounded-md bg-amber-500 px-3 py-1 text-[11px] font-semibold text-[#0a1322] hover:bg-amber-400">
                         Confirm
                       </button>
                       <button type="button" onClick={() => patch(i, { proposalStatus: "dismissed" })} className={`rounded-md border ${border} px-3 py-1 text-[11px] text-slate-300 hover:bg-[var(--ai-accent-soft)]`}>

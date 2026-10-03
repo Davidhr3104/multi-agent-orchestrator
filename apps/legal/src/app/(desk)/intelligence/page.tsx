@@ -56,7 +56,7 @@ export default function IntelligencePage() {
           <Link
             key={mod.href}
             href={mod.href}
-            className="rounded-[6px] border border-[#1F2937] bg-[#111827] p-4 shadow-subtle transition-colors duration-150 hover:border-[#F59E0B]/50"
+            className="rounded-[6px] border border-[#1b2a45] bg-[#0f1b30] p-4 shadow-subtle transition-colors duration-150 hover:border-[#F59E0B]/50"
           >
             <h2 className="text-[13px] font-semibold text-[#F3F4F6]">{mod.title}</h2>
             <p className="mt-2 text-[11px] text-[#9CA3AF]">{mod.blurb}</p>
