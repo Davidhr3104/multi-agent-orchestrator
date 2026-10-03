@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { KEYS_COMMERCE } from "@helix/core/secret-fields";
 import { DeskOpsForm } from "@helix/help/desk-form";
 import { ApiKeysForm } from "@helix/help/keys-form";
+import { AiCostLine } from "@/components/ai-insights-panel";
+import { SHOPIFY_SCOPES, SHOPIFY_WEBHOOK_TOPICS } from "@/lib/shopify-setup";
 
 type Status = { shopify: boolean; claude: boolean; supabase: boolean };
 
@@ -18,7 +20,7 @@ const ROWS: { key: keyof Status; label: string; hint: string }[] = [
   {
     key: "claude",
     label: "Claude (Anthropic API)",
-    hint: "ANTHROPIC_API_KEY — heuristic engines run instead until configured.",
+    hint: "ANTHROPIC_API_KEY — order scoring, fraud explanations, daily summary and restock reasoning. Deterministic engines run (and are labelled) until configured.",
   },
   {
     key: "supabase",
@@ -86,6 +88,62 @@ export default function SettingsPage() {
             </div>
           );
         })}
+      </div>
+
+      <div className="glass-panel glass-panel-glow space-y-3 rounded-xl p-5 text-xs">
+        <h2 className="text-sm font-semibold text-foreground">Connect a free Shopify development store</h2>
+        <ol className="list-decimal space-y-1.5 pl-4 text-secondary-foreground">
+          <li>
+            Create a free Shopify Partner account at <span className="font-mono">partners.shopify.com</span>.
+          </li>
+          <li>
+            In the Partner Dashboard: <b>Stores → Add store → Create development store</b>. It is free and cannot take real payments.
+          </li>
+          <li>
+            In the dev store admin: <b>Settings → Apps and sales channels → Develop apps</b>, allow custom app development, then <b>Create an app</b>. If your admin sends you to
+            Shopify&apos;s Dev Dashboard instead, create the app there and install it on the dev store — scopes and token work the same way.
+          </li>
+          <li>
+            <b>Configuration → Admin API integration</b>: tick the scopes listed below and save.
+          </li>
+          <li>
+            <b>Install app → API credentials</b>: reveal the Admin API access token (starts with <span className="font-mono">shpat_</span>). Shopify shows it only once.
+          </li>
+          <li>
+            Paste <span className="font-mono">your-store.myshopify.com</span> as the store domain and the token above, save, then Sync Shopify. The desk switches to your real orders
+            only after Shopify answers; demo data is dropped, never mixed in.
+          </li>
+          <li>
+            Test orders: enable the <b>Bogus Gateway</b> under Settings → Payments and check out on the storefront, or create draft orders and mark them paid.
+          </li>
+          <li>
+            Optional webhooks (instant scoring): Settings → Notifications → Webhooks, URL <span className="font-mono">https://&lt;this-app&gt;/api/webhooks/shopify</span>, topics{" "}
+            <span className="font-mono">{SHOPIFY_WEBHOOK_TOPICS.join(", ")}</span>. Copy the signing secret into Shopify webhook secret.
+          </li>
+          <li>
+            Optional automation: set <span className="font-mono">CRON_SECRET</span> in the Vercel project. Vercel Cron then calls{" "}
+            <span className="font-mono">/api/cron/poll-orders</span> daily (12:30 UTC) to score new orders and queue proposals — it never approves or cancels. Add{" "}
+            <span className="font-mono">SLACK_WEBHOOK_URL</span> to get an alert.
+          </li>
+        </ol>
+
+        <h3 className="pt-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Admin API scopes this app calls</h3>
+        <ul className="space-y-1">
+          {SHOPIFY_SCOPES.map((s) => (
+            <li key={s.scope} className="flex gap-2">
+              <span className={cn("shrink-0 font-mono", s.required ? "text-foreground" : "text-muted-foreground")}>{s.scope}</span>
+              <span className="text-muted-foreground">{s.usedFor}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-muted-foreground">
+          Approving fulfils the order and cancelling voids it in your real Shopify store; Helix cannot undo either. Both always wait for a human click.
+        </p>
+      </div>
+
+      <div className="glass-panel glass-panel-glow rounded-xl p-5">
+        <h2 className="mb-1 text-sm font-semibold text-foreground">AI usage (estimated)</h2>
+        <AiCostLine />
       </div>
     </div>
   );

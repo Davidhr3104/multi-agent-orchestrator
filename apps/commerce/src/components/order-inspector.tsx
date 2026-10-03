@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { ReturnRequest, StoredOrder } from "@helix/core";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
+import type { FraudExplanation } from "@/lib/fraud-explanation";
+import { EngineBadge, SourceBadge } from "@/components/ai-badges";
 import { formatCurrency, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,33 @@ export function OrderInspector({
   const [restock, setRestock] = useState(true);
   const [returnBusy, setReturnBusy] = useState(false);
   const [returnError, setReturnError] = useState<string | null>(null);
+
+  const [explanation, setExplanation] = useState<FraudExplanation | null>(null);
+  const [explainBusy, setExplainBusy] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
+  const [explainedId, setExplainedId] = useState(order.id);
+  if (explainedId !== order.id) {
+    setExplainedId(order.id);
+    setExplanation(null);
+    setExplainError(null);
+  }
+
+  async function explain() {
+    setExplainBusy(true);
+    setExplainError(null);
+    try {
+      const res = await fetch("/api/ai/fraud-explanation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as FraudExplanation & { error?: string };
+      if (!res.ok) setExplainError(data.error ?? `HTTP ${res.status}`);
+      else setExplanation(data);
+    } finally {
+      setExplainBusy(false);
+    }
+  }
 
   async function submitReturn() {
     const amount = Number(returnAmount);
@@ -127,6 +156,34 @@ export function OrderInspector({
               <span>{reason}.</span>
             </div>
           ))}
+        </div>
+
+        <div className="rounded border border-border p-2 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Why this score</span>
+            <button
+              disabled={explainBusy}
+              onClick={() => void explain()}
+              className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-black/[0.04] disabled:opacity-50 dark:hover:bg-white/[0.06]"
+            >
+              {explainBusy ? "…" : explanation ? "Re-explain" : "Explain with Claude"}
+            </button>
+          </div>
+          {explainError ? <p className="mt-1 text-[#dc2626]">{explainError}</p> : null}
+          {explanation ? (
+            <div className="mt-2 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <EngineBadge engine={explanation.engine} />
+                <SourceBadge source={explanation.source} lastSyncAt={explanation.fetchedFromShopify ? explanation.generatedAt : null} />
+              </div>
+              <p className="leading-relaxed text-secondary-foreground">{explanation.explanation}</p>
+              {explanation.engineNote ? <p className="text-[10px] text-muted-foreground">{explanation.engineNote}</p> : null}
+              {explanation.source === "shopify" && !explanation.fetchedFromShopify ? (
+                <p className="text-[10px] text-muted-foreground">Shopify did not answer just now; explained from the stored order fields.</p>
+              ) : null}
+              <p className="text-[10px] text-muted-foreground">Explanation only — the score and the review requirement are unchanged.</p>
+            </div>
+          ) : null}
         </div>
 
         {order.requiresReview ? (

@@ -11,6 +11,9 @@ export interface ShopifyClient {
   fetchProducts(): Promise<ProductInput[]>;
 }
 
+/** Page size of every orders.json read (no pagination yet): velocity and polling only see this many orders per call. */
+export const ORDER_FETCH_LIMIT = 50;
+
 export function isShopifyConfigured(): boolean {
   return Boolean(getSecret("SHOPIFY_STORE_DOMAIN") && getSecret("SHOPIFY_ACCESS_TOKEN"));
 }
@@ -323,7 +326,7 @@ class LiveShopifyClient implements ShopifyWriteClient {
   }
 
   async fetchOrders(): Promise<OrderInput[]> {
-    const res = await this.admin("orders.json?status=any&limit=50");
+    const res = await this.admin(`orders.json?status=any&limit=${ORDER_FETCH_LIMIT}`);
     if (!res.ok) throw new Error(`Shopify orders HTTP ${res.status}`);
     const payload = (await res.json()) as { orders?: unknown[] };
     const mapped = (payload.orders ?? []).map(mapShopifyOrderRow);
@@ -336,11 +339,34 @@ class LiveShopifyClient implements ShopifyWriteClient {
   }
 
   /**
+   * Orders created at or after `sinceIso`, without risk lookups — the cron uses this so it only
+   * spends risks.json calls (and Shopify rate limit) on orders Helix has not seen yet.
+   */
+  async fetchOrdersCreatedSince(sinceIso: string): Promise<OrderInput[]> {
+    const res = await this.admin(`orders.json?status=any&limit=${ORDER_FETCH_LIMIT}&created_at_min=${encodeURIComponent(sinceIso)}`);
+    if (!res.ok) throw new Error(`Shopify orders HTTP ${res.status}`);
+    const payload = (await res.json()) as { orders?: unknown[] };
+    return (payload.orders ?? []).map(mapShopifyOrderRow);
+  }
+
+  /**
    * Fetches one order by its numeric Shopify id — used by the webhook
    * handler for topics that don't carry the full order (fulfillments/*,
    * refunds/*), where the payload only has order_id and we need the current
    * order state to re-score/persist it.
    */
+  /** The unmapped Shopify order resource (billing address, gateways, customer stats…) — null on any failure. */
+  async fetchRawOrder(numericOrderId: string): Promise<Record<string, unknown> | null> {
+    try {
+      const res = await this.admin(`orders/${numericOrderId}.json`);
+      if (!res.ok) return null;
+      const payload = (await res.json()) as { order?: unknown };
+      return asRecord(payload.order);
+    } catch {
+      return null;
+    }
+  }
+
   async fetchOrderById(numericOrderId: string): Promise<OrderInput | null> {
     const res = await this.admin(`orders/${numericOrderId}.json`);
     if (!res.ok) return null;
@@ -470,6 +496,8 @@ export interface ShopifyWriteClient extends ShopifyClient {
   fulfillOrder(shopifyOrderId: string): Promise<void>;
   cancelOrder(shopifyOrderId: string): Promise<void>;
   fetchOrderById(numericOrderId: string): Promise<OrderInput | null>;
+  fetchRawOrder(numericOrderId: string): Promise<Record<string, unknown> | null>;
+  fetchOrdersCreatedSince(sinceIso: string): Promise<OrderInput[]>;
   fetchOrderRisks(numericOrderId: string): Promise<OrderInput["shopifyRisks"]>;
   refundOrder(shopifyOrderId: string, amount: number, restock: boolean): Promise<string>;
 }

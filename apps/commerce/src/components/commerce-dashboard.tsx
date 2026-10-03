@@ -10,6 +10,8 @@ import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-event
 import { MetricCard } from "@/components/metric-card";
 import { Sparkline } from "@/components/sparkline";
 import { DailyBriefCard } from "@/components/daily-brief-card";
+import { AiInsightsPanel } from "@/components/ai-insights-panel";
+import { ApprovalQueue } from "@/components/approval-queue";
 import { LiveOrdersTable } from "@/components/live-orders-table";
 import { OrderInspector } from "@/components/order-inspector";
 import { ReorderQueue } from "@/components/reorder-queue";
@@ -135,7 +137,7 @@ export function CommerceDashboard() {
           <p className="mt-1 text-xs text-muted-foreground">
             {orders.length === 0
               ? "Empty until you Sync Shopify or Load demo in Settings · Agent pipeline automated"
-              : `${orders.length} live orders · demo seed or Shopify · Agent pipeline automated`}
+              : `${orders.length} orders · demo seed or Shopify · Agent pipeline automated`}
           </p>
         </div>
       </div>
@@ -162,7 +164,7 @@ export function CommerceDashboard() {
           icon={<TrendingUp className="size-4" />}
           label="Total Revenue"
           value={formatCurrency(metrics.revenue)}
-          hint="From seeded mock orders"
+          hint="Sum of loaded orders"
           right={
             <Sparkline
               points={revenueSpark.length ? revenueSpark : [0, 0]}
@@ -192,6 +194,11 @@ export function CommerceDashboard() {
       </section>
 
       <DailyBriefCard />
+
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+        <AiInsightsPanel />
+        <ApprovalQueue onChanged={() => void refresh()} />
+      </div>
 
       {metrics.risk.atRiskUsd > 0 ? (
         <Link

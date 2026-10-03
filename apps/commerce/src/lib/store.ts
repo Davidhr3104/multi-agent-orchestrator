@@ -13,6 +13,7 @@ import {
   type StoredProduct,
 } from "@helix/core";
 import { getMockShopifyClient, getLiveShopifyClient } from "./shopify";
+import { computeSalesVelocity, skuKey } from "./restock";
 import {
   commerceGate,
   supabaseProbeDesk,
@@ -35,6 +36,7 @@ const reorders = new Map<string, ReorderRequest>();
 const returns = new Map<string, ReturnRequest>();
 let seeded = false;
 let seeding: Promise<void> | null = null;
+const syncState = globalThis as { __helixCommerceLastSync?: string };
 
 function id(prefix: string, seed: string): string {
   // Slicing the sanitized seed (rather than hashing it) previously truncated every
@@ -150,6 +152,7 @@ async function ensureDeskMode(): Promise<void> {
     returns.clear();
     seeded = false;
     seeding = null;
+    syncState.__helixCommerceLastSync = undefined;
   }
 }
 
@@ -428,7 +431,10 @@ export async function syncShopifyLive(): Promise<{ ok: true } | { ok: false; err
   for (const input of orderInputs) {
     await upsertOrderFromInput(input);
   }
-  for (const input of productInputs) {
+  // Shopify's REST product payload has no sales velocity: derive it from the real order line items.
+  const velocity = computeSalesVelocity([...orders.values()]);
+  for (const raw of productInputs) {
+    const input = { ...raw, salesVelocity: velocity.bySku[skuKey(raw.sku, raw.title)]?.perDay ?? 0 };
     const predicted = await runInventoryPrediction(input);
     const existing = [...products.values()].find((p) => p.shopifyProductId === input.shopifyProductId);
     const product: StoredProduct = {
@@ -441,7 +447,18 @@ export async function syncShopifyLive(): Promise<{ ok: true } | { ok: false; err
     await supabaseUpsertProduct(product);
   }
   seeded = true;
+  markShopifySync();
   return { ok: true };
+}
+
+/** Records that the real Shopify Admin API just answered successfully (sync or cron poll). */
+export function markShopifySync(at = new Date().toISOString()): void {
+  syncState.__helixCommerceLastSync = at;
+}
+
+/** Last successful Shopify answer seen by this server instance, or null. Never set in demo mode. */
+export function lastShopifySyncAt(): string | null {
+  return syncState.__helixCommerceLastSync ?? null;
 }
 
 export async function clearDesk(): Promise<DeskModeStatus> {
