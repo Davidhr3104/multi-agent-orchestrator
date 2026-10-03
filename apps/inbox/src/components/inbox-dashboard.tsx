@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, RefreshCw, Search, Zap } from "lucide-react";
-import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
-import type { InboxMessage, ThreadMessage } from "@/lib/types";
+import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";import type { InboxMessage, ThreadMessage } from "@/lib/types";
 import { categoryLabel } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
@@ -393,7 +392,9 @@ export function InboxDashboard() {
         </div>
       </div>
       {error ? <p className="mx-auto mb-3 max-w-[1600px] text-sm text-red-300">{error}</p> : null}
-      <DemoBanner message="You are exploring sample email. Connect Gmail and this desk switches to your real mail — the samples disappear." connectHref="/settings" connectLabel="Connect Gmail →" />
+      <div className="[&:not(:empty)]:mb-4">
+        <DemoBanner message="You are exploring sample email. Connect Gmail and this desk switches to your real mail — the samples disappear." connectHref="/settings" connectLabel="Connect Gmail →" />
+      </div>
       <AiToast message={aiToast} />
       {ingestOpen ? (
         <form

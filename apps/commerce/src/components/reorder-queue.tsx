@@ -46,14 +46,14 @@ export function ReorderQueue({
 
   return (
     <div className="glass-panel space-y-4 rounded-xl p-5">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <h3 className="text-sm font-medium text-foreground">Critical Low Stock Reorder Queue</h3>
           <p className="text-xs text-muted-foreground">
             Products projected to stock out within 14 days
           </p>
         </div>
-        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
           {urgent.length} Urgent
         </span>
       </div>
@@ -72,10 +72,10 @@ export function ReorderQueue({
             <div
               key={product.id}
               data-ai-id={product.id}
-              className="flex items-center justify-between rounded-lg border border-border bg-black/[0.015] p-3 transition hover:border-black/10 dark:bg-white/[0.02] dark:hover:border-white/10"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-black/[0.015] p-3 transition hover:border-black/10 dark:bg-white/[0.02] dark:hover:border-white/10"
             >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-xs font-medium text-foreground">{product.title}</span>
                   <span className="rounded bg-black/[0.04] px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground dark:bg-white/[0.04]">
                     SKU: {product.sku}
@@ -94,7 +94,7 @@ export function ReorderQueue({
                   ) : null}
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="h-1 w-36 rounded-full bg-black/[0.06] dark:bg-white/[0.06]">
+                  <div className="h-1 w-28 rounded-full bg-black/[0.06] dark:bg-white/[0.06]">
                     <div
                       className={cn("h-1 rounded-full", critical ? "bg-[#dc2626]" : "bg-amber-500")}
                       style={{ width: `${pct}%` }}

@@ -132,11 +132,20 @@ export function DashboardPanorama({
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-4">
-      <section aria-label="Key numbers" className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Active queue" value={String(counts.openCount)} hint={`${counts.atRiskCount} at risk · ${counts.breachCount} past SLA`} bar={Math.min(100, counts.openCount * 12)} tone="violet" spark={daily.map((d) => d.total)} sparkLabel="Threads received per day, last 14 days" chip={chip} />
-        <Metric label="Auto-intercept" value={`${autoShare}%`} hint="threads not waiting on a person" bar={autoShare} tone="indigo" spark={daily.map((d) => (d.total ? Math.round((d.auto / d.total) * 100) : 0))} sparkLabel="Share handled automatically per day" chip={chip} />
-        <Metric label="Open breaches" value={String(counts.breachCount)} hint={`${daily[daily.length - 1]?.urgent ?? 0} urgent arrivals today`} bar={counts.breachCount ? 100 : 8} tone="sky" spark={daily.map((d) => d.urgent)} sparkLabel="Urgent threads arriving per day" chip={chip} />
-        <Metric label="Avg confidence" value={`${counts.avgConfidence}%`} hint={modelLabel} bar={counts.avgConfidence} tone="violet" spark={daily.map((d) => d.confidence)} sparkLabel="Average AI confidence per day" chip={chip} />
+      <section aria-label="Key numbers" className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
+          <Metric label="Active queue" value={String(counts.openCount)} hint={`${counts.atRiskCount} at risk · ${counts.breachCount} past SLA`} bar={Math.min(100, counts.openCount * 12)} tone="violet" spark={daily.map((d) => d.total)} sparkLabel="Threads received per day, last 14 days" chip={chip} />
+          <Metric label="Auto-intercept" value={`${autoShare}%`} hint="threads not waiting on a person" bar={autoShare} tone="indigo" spark={daily.map((d) => (d.total ? Math.round((d.auto / d.total) * 100) : 0))} sparkLabel="Share handled automatically per day" chip={chip} />
+          <Metric label="Open breaches" value={String(counts.breachCount)} hint={`${daily[daily.length - 1]?.urgent ?? 0} urgent arrivals today`} bar={counts.breachCount ? 100 : 8} tone="sky" spark={daily.map((d) => d.urgent)} sparkLabel="Urgent threads arriving per day" chip={chip} />
+          <Metric label="Avg confidence" value={`${counts.avgConfidence}%`} hint={modelLabel} bar={counts.avgConfidence} tone="violet" spark={daily.map((d) => d.confidence)} sparkLabel="Average AI confidence per day" chip={chip} />
+        </div>
+        <div className="flex flex-col justify-center rounded-xl border border-violet-400/20 bg-[#121520] p-4 text-slate-200">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="font-mono text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Where threads stand</p>
+            {chip}
+          </div>
+          <Donut slices={statusSlices} size={120} thickness={20} centerValue={messages.length} centerLabel="threads" ariaLabel="Threads by status" />
+        </div>
       </section>
 
       <section className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-[#121520] p-4 shadow-[0_4px_30px_rgba(139,92,246,0.12)] sm:p-5">
@@ -175,13 +184,18 @@ export function DashboardPanorama({
               ))}
             </div>
           </div>
-          <div className="relative w-full shrink-0 rounded-xl border border-violet-400/20 bg-[#0b0e14]/80 p-3 text-slate-200 lg:w-[27rem]">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Where threads stand</p>
-              {chip}
-            </div>
-            <Donut slices={statusSlices} size={104} thickness={18} centerValue={messages.length} centerLabel="threads" ariaLabel="Threads by status" />
-          </div>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("helix:ask", { detail: "" }))}
+            aria-label="Open Ask Helix AI assistant"
+            className="group relative hidden shrink-0 rounded-xl transition-transform hover:scale-[1.02] lg:block"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ask-ai/ask-ai-visual.png" alt="" className="h-44 w-auto rounded-xl object-contain" />
+            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+              Ask Helix <span aria-hidden>→</span>
+            </span>
+          </button>
         </div>
       </section>
 

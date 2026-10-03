@@ -244,13 +244,6 @@ export function CommerceDashboard() {
         </div>
       </div>
 
-      <DailyBriefCard />
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-        <AiInsightsPanel />
-        <ApprovalQueue onChanged={() => void refresh()} />
-      </div>
-
       {metrics.risk.atRiskUsd > 0 ? (
         <Link
           href="/risk"
@@ -264,11 +257,14 @@ export function CommerceDashboard() {
         </Link>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-6 pt-2 lg:grid-cols-12">
-        <div data-tour="commerce-orders" className="animate-enter delay-3 space-y-4 lg:col-span-8">
-          <LiveOrdersTable orders={orders} selectedId={selectedId} onSelect={(o) => setSelectedId(o.id)} />
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <div className="min-w-0 space-y-6 lg:col-span-8">
+          <div data-tour="commerce-orders" className="animate-enter delay-3">
+            <LiveOrdersTable orders={orders} selectedId={selectedId} onSelect={(o) => setSelectedId(o.id)} />
+          </div>
+          <ApprovalQueue onChanged={() => void refresh()} />
         </div>
-        <div data-tour="commerce-inspector" className="animate-enter delay-4 space-y-4 lg:col-span-4">
+        <div data-tour="commerce-inspector" className="animate-enter delay-4 space-y-4 lg:sticky lg:top-4 lg:col-span-4">
           {selected ? (
             <OrderInspector
               order={selected}
@@ -283,15 +279,21 @@ export function CommerceDashboard() {
         </div>
       </div>
 
-      <div className="animate-enter delay-5 grid grid-cols-1 gap-6 pt-2 lg:grid-cols-12">
-        <div data-tour="commerce-restock" className="lg:col-span-6">
+      <div className="animate-enter delay-5 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="flex flex-col gap-4 lg:col-span-2 xl:col-span-1">
+          <DailyBriefCard />
+          <div className="flex-1 [&>section]:h-full">
+            <AiInsightsPanel />
+          </div>
+        </div>
+        <div data-tour="commerce-restock" className="[&>div]:h-full">
           <ReorderQueue
             products={products}
             reorders={reorders}
             onReorderCreated={(r) => setReorders((prev) => [r, ...prev])}
           />
         </div>
-        <div className="lg:col-span-6">
+        <div>
           <DeskChartCard
             title="Stock vs reorder point"
             subtitle="Units on hand, tick = reorder point"

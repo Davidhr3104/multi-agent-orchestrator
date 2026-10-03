@@ -74,7 +74,7 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
         }}
         aria-hidden
       />
-      <div className="relative flex flex-col gap-5 ">
+      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2 className="text-base font-bold tracking-tight text-on-surface">Ask Helix AI</h2>
@@ -138,6 +138,21 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
           ) : null}
         </div>
 
+        <button
+          type="button"
+          onClick={() => onOpenDrawer?.()}
+          disabled={!onOpenDrawer}
+          aria-label="Open Ask Helix AI assistant"
+          className="group relative hidden shrink-0 rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100 lg:block"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ask-ai/ask-ai-visual.png" alt="" className="h-36 w-auto rounded-lg object-contain" />
+          {onOpenDrawer ? (
+            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+              Ask Helix <span aria-hidden>→</span>
+            </span>
+          ) : null}
+        </button>
       </div>
     </div>
   );

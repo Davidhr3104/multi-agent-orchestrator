@@ -58,34 +58,33 @@ export default function OrdersPage() {
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <DeskChartCard
-          title="Orders by risk level"
-          subtitle={pluralize(orders.length, "order")}
-          source="Source: risk level assigned to each order."
-          className="lg:col-span-5"
-        >
-          <StackedBar segments={riskSegments(orders)} ariaLabel="Orders by risk level" />
-        </DeskChartCard>
-        <DeskChartCard
-          title="Orders per day"
-          subtitle="Last 7 days, by day placed"
-          source="Source: orders on this desk."
-          className="lg:col-span-7"
-        >
-          <AreaChart
-            points={days.map((d) => ({ label: d.label, value: d.orders, detail: pluralize(d.orders, "order") }))}
-            height={120}
-            color="#10b981"
-            ariaLabel="Orders placed per day, last 7 days"
-          />
-        </DeskChartCard>
-      </div>
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        <div className="min-w-0 space-y-4 lg:col-span-8">
+        <div className="min-w-0 space-y-6 lg:col-span-8">
           <LiveOrdersTable orders={orders} selectedId={selectedId} onSelect={(o) => setSelectedId(o.id)} />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
+            <DeskChartCard
+              title="Orders by risk level"
+              subtitle={pluralize(orders.length, "order")}
+              source="Source: risk level assigned to each order."
+              className="h-full md:col-span-2"
+            >
+              <StackedBar segments={riskSegments(orders)} ariaLabel="Orders by risk level" />
+            </DeskChartCard>
+            <DeskChartCard
+              title="Orders per day"
+              subtitle="Last 7 days, by day placed"
+              source="Source: orders on this desk."
+              className="h-full md:col-span-3"
+            >
+              <AreaChart
+                points={days.map((d) => ({ label: d.label, value: d.orders, detail: pluralize(d.orders, "order") }))}
+                height={120}
+                color="#10b981"
+                ariaLabel="Orders placed per day, last 7 days"
+              />
+            </DeskChartCard>
+          </div>
         </div>
-        <div className="space-y-4 lg:col-span-4">
+        <div className="space-y-4 lg:sticky lg:top-4 lg:col-span-4">
           {selected ? (
             <OrderInspector order={selected} onClose={() => setSelectedId(null)} onReview={(d) => void decide(d)} />
           ) : (
