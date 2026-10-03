@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { connectionReport } from "@/lib/connections";
+import { cachedInsights, metaConnected } from "@/lib/social/insights";
 import { getBrand, listPosts } from "@/lib/store";
 
-/** Setup progress from facts already on the desk. Connecting an account stays incomplete until a token env is set. */
+/** Setup progress from facts already on the desk. Connecting an account stays incomplete until Meta answered a real read. */
 export async function SetupChecklist() {
   const [posts, brand] = await Promise.all([listPosts(), getBrand()]);
-  const connected = connectionReport().channels.some((row) => row.tokenState === "set");
+  const meta = metaConnected(cachedInsights());
+  const connected = meta.instagram || meta.facebook;
   const steps = [
     { done: connected, label: "Connect an account", href: "/connections" },
     { done: brand.voice.length > 0, label: "Brand voice", href: "/brand" },

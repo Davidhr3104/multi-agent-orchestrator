@@ -78,7 +78,9 @@ function summary(posts: ScoredPost[], brand: Brand, now: number): string {
     `${brand.name} has ${plural(posts.length, "post")} on the calendar: ${by("approved").length} approved, ${queue.length} waiting for review, ${by("changes").length} sent back, ${by("draft").length} drafts.`,
     `${plural(week.length, "post")} fall in the next 7 days.`,
     queue.length ? `In the review queue, ${readyQueue.length} of ${queue.length} pass every readiness check.` : "The review queue is empty.",
-    "Nothing has been published — no social network is connected on this desk.",
+    by("published").length
+      ? `${plural(by("published").length, "post")} went out after a person approved and published each one.`
+      : "Nothing has been published from this desk. Publishing needs a person to approve and press Publish on each post.",
   ].join(" ");
 }
 

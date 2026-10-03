@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { DeskRefresher } from "@/components/ask-ai-section";
 import { ChannelBadge, ReadinessPill, StatusBadge } from "@/components/bits";
 import { PostStudio } from "@/components/post-studio";
+import { PublishPanel } from "@/components/publish-panel";
 import { CommentsPanel } from "@/components/comments-panel";
 import { DeskAction } from "@/components/desk-actions";
 import { MediaPanel } from "@/components/media-panel";
@@ -14,14 +15,14 @@ import { formatSlot, PILLAR_LABEL } from "@/lib/format";
 import { regulatedWords } from "@/lib/compose";
 import { hardBlockers, postLength } from "@/lib/readiness";
 import { sameSlot, suggestSlot } from "@/lib/schedule";
-import { getBrand, getPost, listAssets } from "@/lib/store";
+import { getBrand, getPost, listAssets, publishStatus } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function PostPage({ params }: PageProps<"/posts/[id]">) {
   const { id } = await params;
-  const [post, brand, assets] = await Promise.all([getPost(id), getBrand(), listAssets()]);
+  const [post, brand, assets, gate] = await Promise.all([getPost(id), getBrand(), listAssets(), publishStatus(id)]);
   if (!post) notFound();
   const blockers = hardBlockers(post.readiness.factors);
   const suggestion = suggestSlot(post.channel, post.pillar);
@@ -111,6 +112,39 @@ export default async function PostPage({ params }: PageProps<"/posts/[id]">) {
             {post.internalSignOff ? <p className="mb-3 text-xs text-amber-200">Internal sign-off by {post.internalSignOff.by}. The client finishes this approval.</p> : null}
             <ReviewActions postId={post.id} status={post.status} blocked={blockers.length ? blockers.map((b) => b.detail).join("; ") : null} />
           </section>
+
+          {post.status === "approved" || post.publication ? (
+            <section className="rounded-xl border border-border bg-card/80 p-5" aria-labelledby="publish-heading">
+              <h2 id="publish-heading" className="mb-3 text-lg font-semibold text-foreground">
+                Publish
+              </h2>
+              <PublishPanel postId={post.id} channel={post.channel} allowed={Boolean(gate?.allowed)} reason={gate?.reason ?? null} publication={post.publication ?? null} />
+            </section>
+          ) : null}
+
+          {post.inspiredBy?.length ? (
+            <section className="rounded-xl border border-border bg-card/80 p-5" aria-labelledby="inspired-heading">
+              <h2 id="inspired-heading" className="text-lg font-semibold text-foreground">
+                Inspired by real posts
+              </h2>
+              <ul className="mt-2 space-y-1 text-xs">
+                {post.inspiredBy.map((source) => (
+                  <li key={source.id}>
+                    {source.permalink ? (
+                      <a href={source.permalink} target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">
+                        {source.network} post {source.id}
+                      </a>
+                    ) : (
+                      <span className="text-foreground">
+                        {source.network} post {source.id}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-muted-foreground">The results behind each source are in the notes, computed from the Graph API.</p>
+            </section>
+          ) : null}
         </div>
 
         <div className="space-y-6 lg:col-span-2">

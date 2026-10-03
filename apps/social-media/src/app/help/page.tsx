@@ -62,7 +62,7 @@ export default function HelpPage() {
         ))}
       </ol>
       <p className="max-w-3xl rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
-        No social network is connected yet: Helix for Social Media does not publish or schedule anything on Instagram, LinkedIn, X, TikTok or Facebook, and it shows no engagement numbers because it has none.
+        Helix never publishes on its own. With a Meta token it reads real Instagram and Facebook results into Analytics. Instagram, Facebook and LinkedIn posts go out only when a person approves a post, presses Publish on it, and the operator has set HELIX_SOCIAL_PUBLISH=live. X and TikTok are token-only: nothing is sent there.
       </p>
     </>
   );

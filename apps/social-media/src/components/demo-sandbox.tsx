@@ -37,7 +37,7 @@ export function DemoSandbox() {
         </div>
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">
-          Likes, comments, shares and reach are not available. Nothing from this desk has been published, and there is no audience history. The sample sandbox is labeled fiction and does not change the charts above.
+          Likes, comments, shares and reach for planned posts are not available here. Real results appear only under Real account data, read from Meta. The sample sandbox is labeled fiction and does not change the charts above.
         </p>
       )}
     </section>

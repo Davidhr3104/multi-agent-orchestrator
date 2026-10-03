@@ -5,7 +5,7 @@ export type Channel = "instagram" | "linkedin" | "x" | "tiktok" | "facebook";
  * needs_review   waiting for a person to approve or send back
  * changes        a person sent it back with notes
  * approved       a person signed off; it is queued for its date
- * published      went out (only possible once the channel is connected)
+ * published      the network API answered with a post id after a person approved it and pressed Publish
  */
 export type PostStatus = "draft" | "needs_review" | "changes" | "approved" | "published";
 
@@ -60,7 +60,13 @@ export type Post = {
   internalSignOff?: { by: string; at: string };
   approvedBy?: string;
   approvedAt?: string;
+  /** Set only after the network API answered with a post id. */
+  publication?: Publication;
+  /** Real posts whose computed results this AI draft started from. */
+  inspiredBy?: { network: "instagram" | "facebook"; id: string; permalink: string | null }[];
 };
+
+export type Publication = { network: Channel; externalId: string; permalink: string | null; at: string; by: string };
 
 export type AccessRole = "owner" | "manager" | "creator" | "client";
 export type ApprovalMode = "manager" | "manager_then_client";

@@ -78,7 +78,7 @@ export function ReviewActions({ postId, status, blocked }: { postId: string; sta
           {error}
         </p>
       ) : null}
-      <p className="text-[11px] text-muted-foreground">No social network is connected. Approving records your sign-off on this desk; it does not post anything.</p>
+      <p className="text-[11px] text-muted-foreground">Approving records your sign-off on this desk; it does not post anything. Publishing is a separate button on each approved post.</p>
     </div>
   );
 }

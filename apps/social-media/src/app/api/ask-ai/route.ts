@@ -23,9 +23,9 @@ const SYSTEM_PROMPT = `You are Ask AI inside Helix for Social Media, a content-c
 How the app works:
 - Posts are planned per channel (Instagram, LinkedIn, X, TikTok, Facebook) on a calendar, with a status: draft, needs review, changes requested, approved.
 - Each post gets a readiness score 0-100 from length for its channel, hashtag count, call to action, brand voice (avoid list) and visual brief. It checks form, not taste.
-- A person approves every post. No social network is connected yet, so approval records a sign-off and nothing is published.
+- A person approves every post. Approval records a sign-off. A post goes out only when a person presses Publish on that approved post and the operator enabled live publishing; you can never publish.
 
-Rules: answer only from the desk snapshot below and never invent posts, dates, scores or engagement numbers (there are none on this desk). When you mention a post, write it as a markdown link: [label](/posts/<post id>).`;
+Rules: answer only from the desk snapshot below and never invent posts, dates, scores or engagement numbers (planned posts have none; real account results live on the Analytics page). When you mention a post, write it as a markdown link: [label](/posts/<post id>).`;
 
 async function snapshot(): Promise<string> {
   const [posts, brand] = await Promise.all([listPosts(), getBrand()]);

@@ -1,6 +1,7 @@
 import { CreateReportButton } from "@/components/create-report-button";
 import { DemoSandbox } from "@/components/demo-sandbox";
 import { PillarDonut, PlanHeatmap, PlannedArea } from "@/components/plan-charts";
+import { RealDataPanel } from "@/components/real-data-panel";
 import { plannedHours, summarizeCalendar } from "@/lib/analytics";
 import { channelLabel, PILLAR_LABEL } from "@/lib/format";
 import { listPosts } from "@/lib/store";
@@ -39,11 +40,15 @@ export default async function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-semibold text-foreground">Analytics</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Counts from the planned calendar and readiness scores. Engagement is empty because nothing from this desk has been published, and there is no audience history to suggest a posting hour.
+            Real account results from Meta come first, when a token is set. Everything below them counts the planned calendar and readiness scores, which are not engagement.
           </p>
         </div>
         <CreateReportButton />
       </header>
+
+      <RealDataPanel />
+
+      <h2 className="pt-2 text-sm font-semibold tracking-wider text-muted-foreground uppercase">Planned calendar (not engagement)</h2>
 
       <section className="rounded-xl border border-primary/30 bg-primary/5 p-5">
         <h2 className="text-sm font-semibold tracking-wider text-primary uppercase">From this calendar</h2>

@@ -7,6 +7,9 @@ import { PLANS } from "./plans";
 import { hardBlockers, scoreReadiness } from "./readiness";
 import { suggestSlot } from "./schedule";
 import { buildHarborPosts, buildSeedPosts, DEMO_BRAND, HARBOR_BRAND } from "./seed";
+import type { FetchLike } from "./social/config";
+import type { PollOptions } from "./social/meta-publish";
+import { publishEnv, publishGate, sendToNetwork } from "./social/publish";
 import { STOCK, stockById } from "./stock";
 import type { AccessRole, ApprovalMode, Brand, Channel, Comment, DeskRole, ExecutiveReport, LibraryAsset, MediaItem, Member, PlanId, Post, PostStatus, Readiness, Revision, WebhookDelivery, WebhookEndpoint } from "./types";
 
@@ -54,6 +57,8 @@ const clone = (p: Post): StoredPost => ({
   comments: (p.comments ?? []).map((c) => ({ ...c })),
   revisions: (p.revisions ?? []).map((r) => ({ ...r })),
   media: (p.media ?? []).map((m) => ({ ...m })),
+  ...(p.publication ? { publication: { ...p.publication } } : {}),
+  ...(p.inspiredBy ? { inspiredBy: p.inspiredBy.map((s) => ({ ...s })) } : {}),
 });
 
 function nid(prefix: string) {
@@ -698,7 +703,7 @@ export async function createReport(): Promise<ExecutiveReport> {
     perfect: scores.filter((score) => score === 100).length,
     avgScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0,
     pillars,
-    note: "This report counts planned posts and readiness scores. It has no engagement, because nothing from this desk has been published.",
+    note: "This report counts planned posts and readiness scores. It has no engagement. Results from connected accounts are on Analytics, under real account data.",
   };
   ws.reports.unshift(report);
   return report;
@@ -874,6 +879,59 @@ export async function setAutopilot(on: boolean, actor: string): Promise<{ on: bo
 
 export async function autopilotEnabled(): Promise<boolean> {
   return Boolean(ensure().autopilot);
+}
+
+export class PublishError extends Error {}
+
+/** Publish gate for the post page. Reasons are shown as-is. */
+export async function publishStatus(id: string): Promise<{ allowed: boolean; reason: string | null } | null> {
+  const post = ensure().posts.get(id);
+  if (!post) return null;
+  const gate = publishGate(post, publishEnv(currentDeskMode()));
+  return gate.allowed ? { allowed: true, reason: null } : { allowed: false, reason: gate.reason };
+}
+
+function inFlight(): Set<string> {
+  const g = globalThis as typeof globalThis & { __helixSocialPublishing?: Set<string> };
+  g.__helixSocialPublishing ??= new Set();
+  return g.__helixSocialPublishing;
+}
+
+/**
+ * Sends one approved post to its network after a person pressed Publish on it.
+ * The post becomes "published" only when the network answered with a post id.
+ */
+export async function publishApprovedPost(id: string, actor: string, opts: { fetchImpl?: FetchLike; poll?: PollOptions } = {}): Promise<ScoredPost | null> {
+  if (!can(root().sessionRole, "approve")) throw new AccessError("Only a manager or the owner publishes.");
+  const ws = ensure();
+  const post = ws.posts.get(id);
+  if (!post) return null;
+  const env = publishEnv(currentDeskMode());
+  const gate = publishGate(post, env);
+  if (!gate.allowed) throw new PublishError(gate.reason);
+  if (inFlight().has(id)) throw new PublishError("This post is already being sent.");
+  inFlight().add(id);
+  try {
+    const result = await sendToNetwork(post, env, opts.fetchImpl ?? fetch, opts.poll);
+    const next = clone(ws.posts.get(id) ?? post);
+    next.status = "published";
+    next.publication = { network: post.channel, externalId: result.externalId, permalink: result.permalink, at: new Date().toISOString(), by: actor };
+    next.notes.push(`${actor}: Published to ${post.channel}. The network returned post id ${result.externalId}.`);
+    ws.posts.set(id, next);
+    record(ws, "post.published", { id, network: post.channel, externalId: result.externalId });
+    return scored(next, ws.brand);
+  } finally {
+    inFlight().delete(id);
+  }
+}
+
+/** Puts AI drafts built from real results into the review queue. Never on the demo desk, so sample and real data stay apart. */
+export async function addReviewDrafts(drafts: Post[]): Promise<ScoredPost[]> {
+  if (currentDeskMode() === "demo") throw new DraftError("This desk is in demo mode. Drafts from real results only go into a live desk (HELIX_DESK_SEED=off).");
+  const ws = ensure();
+  const placed = drafts.map((draft) => placeDraft(ws, { ...draft, status: "needs_review", createdBy: "helix_ai" }));
+  if (placed.length) record(ws, "post.ai_drafts", { ids: placed.map((p) => p.id) });
+  return placed;
 }
 
 export async function ensureReviewToken(): Promise<string> {

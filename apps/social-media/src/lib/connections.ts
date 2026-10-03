@@ -17,17 +17,38 @@ const EXPIRES_ENV: Record<Channel, string> = {
   tiktok: "HELIX_TIKTOK_TOKEN_EXPIRES",
 };
 
+/** read_and_publish: Graph API reads and posts. publish: posts only. token_only: no code reads or writes with the token. */
+export type AdapterKind = "read_and_publish" | "publish" | "token_only";
+
+const ADAPTER: Record<Channel, AdapterKind> = {
+  instagram: "read_and_publish",
+  facebook: "read_and_publish",
+  linkedin: "publish",
+  x: "token_only",
+  tiktok: "token_only",
+};
+
+const EXTRA_ENV: Record<Channel, { name: string; optional?: boolean }[]> = {
+  instagram: [{ name: "HELIX_META_IG_USER_ID" }],
+  facebook: [{ name: "HELIX_META_PAGE_ID" }, { name: "HELIX_META_PAGE_ACCESS_TOKEN", optional: true }],
+  linkedin: [{ name: "HELIX_LINKEDIN_ORGANIZATION_URN" }],
+  x: [],
+  tiktok: [],
+};
+
 export type ChannelConnection = {
   channel: Channel;
   tokenEnv: string;
   expiresEnv: string;
   credentialPresent: boolean;
-  /** missing = no token. set = token present, expiry unknown or still ahead. expired = expiry is in the past. */
+  /** missing = no token. set = token present, expiry unknown or still ahead. expired = expiry is in the past. Not proof the token works. */
   tokenState: "missing" | "set" | "expired";
+  adapter: AdapterKind;
+  extraEnv: { name: string; optional: boolean; present: boolean }[];
 };
 
 export type ConnectionReport = {
-  /** True only when an operator set the live switch. This build still has no adapter that posts. */
+  /** True only when an operator set the live switch. Each post still needs a person's approval and Publish press. */
   publishSwitch: boolean;
   channels: ChannelConnection[];
 };
@@ -46,6 +67,8 @@ export function connectionReport(): ConnectionReport {
         expiresEnv: EXPIRES_ENV[channel],
         credentialPresent,
         tokenState: !credentialPresent ? "missing" : expired ? "expired" : "set",
+        adapter: ADAPTER[channel],
+        extraEnv: EXTRA_ENV[channel].map((env) => ({ name: env.name, optional: Boolean(env.optional), present: Boolean(process.env[env.name]?.trim()) })),
       } as const;
     }),
   };

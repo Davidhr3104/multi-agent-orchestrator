@@ -9,7 +9,7 @@ import type { Channel, Pillar, Post, PostStatus } from "@/lib/types";
  *   request_changes   send a post back with a reason                  -> auto (+Undo), bulk asks
  *   reschedule_post   move a post's slot                              -> auto for drafts, asks once approved
  *   approve_post      sign off a post for publishing                  -> always asks a person
- * Nothing here publishes: no network is connected, so approval is a recorded sign-off only.
+ * Nothing here publishes. Approval is a recorded sign-off; publishing is a separate button a person presses per post.
  */
 
 export type SocialCtx = { actor: string };
@@ -116,7 +116,7 @@ export const socialActions: DeskActionRegistry<SocialCtx> = {
     apply: async (id, p, ctx) => (await reviewPost(id, "approve", ctx.actor, noteOf(p) || undefined)) !== null,
     restore,
     resultText: (done, failed) =>
-      `Approved ${plural(done.length, "post")}. Nothing was published — no social network is connected yet.${failed ? ` ${failed} couldn't be approved.` : ""}`,
+      `Approved ${plural(done.length, "post")}. Nothing was published — publishing is a separate per-post step a person takes.${failed ? ` ${failed} couldn't be approved.` : ""}`,
     announce: (l) => `Approved ${names(l)} (not published)`,
   },
 };
