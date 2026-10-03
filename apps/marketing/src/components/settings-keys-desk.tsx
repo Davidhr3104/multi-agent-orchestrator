@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { KEYS_MARKETING } from "@helix/core/secret-fields";
 import { loadJson, saveJson } from "@/lib/desk-prefs";
+import { ConnectorFlow } from "@/components/desk-charts";
 import { cn } from "@/lib/utils";
 
 type KeyField = { name: string; label: string; hint: string; stub?: boolean };
@@ -93,14 +94,17 @@ function saveLocal(v: SettingsLocal) {
 function Toggle({
   enabled,
   onToggle,
+  label,
 }: {
   enabled: boolean;
   onToggle: () => void;
+  label: string;
 }) {
   return (
     <button
       type="button"
       aria-pressed={enabled}
+      aria-label={label}
       onClick={onToggle}
       className={cn(
         "relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors",
@@ -185,7 +189,7 @@ function ReadOnlySourceCard({
             <p className="text-xs font-semibold text-white">{name}</p>
             <p
               className={cn(
-                "mt-0.5 font-mono text-[10px]",
+                "mt-0.5 font-mono text-[11px]",
                 state === "verified" ? "text-emerald-400" : state === "error" ? "text-rose-400" : "text-on-surface-variant"
               )}
             >
@@ -195,7 +199,7 @@ function ReadOnlySourceCard({
         </div>
         <span
           className={cn(
-            "shrink-0 rounded border px-2 py-0.5 font-mono text-[10px]",
+            "shrink-0 rounded border px-2 py-0.5 font-mono text-[11px]",
             state === "verified"
               ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
               : "border-amber-500/20 bg-amber-500/10 text-amber-300"
@@ -204,7 +208,7 @@ function ReadOnlySourceCard({
           {badge}
         </span>
       </div>
-      <p className="text-[10px] leading-relaxed text-on-surface-variant">
+      <p className="text-[11px] leading-relaxed text-on-surface-variant">
         Read-only spend (campaign spend, clicks, conversions). Helix never writes to this platform. Set as server
         environment variables: <span className="font-mono text-slate-300">{envNames.join(", ")}</span>
         {info?.missing.length ? ` · Missing: ${info.missing.join(", ")}` : ""}
@@ -455,14 +459,14 @@ export function SettingsKeysDesk() {
             />
             <span className="text-xs font-semibold text-white">{row.label}</span>
             {row.stub ? (
-              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] text-amber-300 border border-amber-500/20">
+              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[11px] text-amber-300 border border-amber-500/20">
                 STUB
               </span>
             ) : null}
           </div>
           <span
             className={cn(
-              "font-mono text-[10px]",
+              "font-mono text-[11px]",
               row.configured ? "text-emerald-400" : "text-on-surface-variant"
             )}
           >
@@ -503,12 +507,12 @@ export function SettingsKeysDesk() {
             </span>
           </button>
         </div>
-        <p className="text-[10px] leading-relaxed text-on-surface-variant">
+        <p className="text-[11px] leading-relaxed text-on-surface-variant">
           {row.hint}
           {row.stub ? " · Saving does not enable live writes this sprint." : ""}
         </p>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="rounded bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
+          <span className="rounded bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 font-mono text-[11px] text-cyan-300">
             {row.name}
           </span>
           <div className="flex items-center gap-1 text-[11px]">
@@ -551,7 +555,7 @@ export function SettingsKeysDesk() {
             <span className="rounded-md border border-primary-container/30 bg-primary-container/15 px-2 py-0.5 font-mono text-[11px] font-semibold text-marketing-amber">
               v4.2-STABLE
             </span>
-            <div className="flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-400">
+            <div className="flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-emerald-400">
               <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
               {runtime?.meta ? "META LIVE · Insights + HITL write" : "META OFFLINE · paste token"}
             </div>
@@ -586,6 +590,10 @@ export function SettingsKeysDesk() {
         </div>
       </div>
 
+      <div className="mb-4">
+        <ConnectorFlow sources={runtime?.sources} csv={Boolean(runtime?.csv)} />
+      </div>
+
       {/* KPI strip */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Active Keys & Tokens" icon="vpn_key" accent="#f97316">
@@ -596,7 +604,7 @@ export function SettingsKeysDesk() {
                 / {keys.length}
               </span>
             </div>
-            <span className="rounded border border-orange-500/20 bg-orange-500/10 px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
+            <span className="rounded border border-orange-500/20 bg-orange-500/10 px-2 py-0.5 font-mono text-[11px] text-marketing-amber">
               {runtime?.meta ? "Meta live" : "Meta off"}
             </span>
           </div>
@@ -636,7 +644,7 @@ export function SettingsKeysDesk() {
                 }}
               />
             </div>
-            <div className="flex justify-between font-mono text-[10px] text-on-surface-variant">
+            <div className="flex justify-between font-mono text-[11px] text-on-surface-variant">
               <span>CSV always on</span>
               <span>
                 Google {runtime?.google ? "read OK" : "token only"} · TikTok {runtime?.tiktok ? "read OK" : "token only"}
@@ -653,7 +661,7 @@ export function SettingsKeysDesk() {
               </span>
               <span className="font-mono text-xs text-on-surface-variant">unmatched</span>
             </div>
-            <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-400">
+            <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-400">
               30d
             </span>
           </div>
@@ -670,7 +678,7 @@ export function SettingsKeysDesk() {
               <span className="font-mono text-2xl font-bold text-white">{desk?.count ?? "—"}</span>
               <span className="font-mono text-xs text-on-surface-variant">rows</span>
             </div>
-            <span className="rounded border border-white/[0.08] bg-surface-container-high px-2 py-0.5 font-mono text-[10px] text-slate-300">
+            <span className="rounded border border-white/[0.08] bg-surface-container-high px-2 py-0.5 font-mono text-[11px] text-slate-300">
               {desk?.demo ? "demo" : desk?.empty ? "empty" : "live"}
             </span>
           </div>
@@ -714,7 +722,7 @@ export function SettingsKeysDesk() {
             {t.badge ? (
               <span
                 className={cn(
-                  "rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold",
+                  "rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold",
                   tab === t.id
                     ? "bg-primary-container/20 text-marketing-amber"
                     : "bg-surface-container-highest text-slate-300"
@@ -753,7 +761,7 @@ export function SettingsKeysDesk() {
                     .env.
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 rounded border border-white/[0.08] bg-[#0b0d13] px-2 py-1 font-mono text-[10px] text-slate-300">
+                <div className="flex items-center gap-1.5 rounded border border-white/[0.08] bg-[#0b0d13] px-2 py-1 font-mono text-[11px] text-slate-300">
                   <span className="material-symbols-outlined text-[14px] text-cyan-400">lock</span>
                   Desk secret vault
                 </div>
@@ -783,18 +791,18 @@ export function SettingsKeysDesk() {
                     Slack brief destination and local event subscription prefs (desk-side).
                   </p>
                 </div>
-                <span className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
+                <span className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 font-mono text-[11px] text-cyan-300">
                   {slackKey?.configured ? "Slack set" : "Slack unset"}
                 </span>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
+                <label className="font-mono text-[11px] font-semibold tracking-wider text-on-surface-variant uppercase">
                   Ingress Endpoint (display)
                 </label>
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-[#0b0d13] px-3 py-2 font-mono text-xs">
                   <div className="flex min-w-0 items-center gap-2 truncate">
-                    <span className="rounded border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                    <span className="rounded border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-bold text-emerald-400">
                       POST
                     </span>
                     <span className="truncate text-cyan-300">{local.webhookUrl}</span>
@@ -812,7 +820,7 @@ export function SettingsKeysDesk() {
               {slackKey ? <KeyEditor row={slackKey} /> : null}
 
               <div className="flex flex-col gap-2 pt-1">
-                <span className="font-mono text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
+                <span className="font-mono text-[11px] font-semibold tracking-wider text-on-surface-variant uppercase">
                   Active Event Subscriptions
                 </span>
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -834,7 +842,7 @@ export function SettingsKeysDesk() {
                       />
                       <div className="flex flex-col">
                         <span className="font-mono text-xs font-semibold text-slate-200">{ev.id}</span>
-                        <span className="mt-0.5 text-[10px] text-on-surface-variant">{ev.blurb}</span>
+                        <span className="mt-0.5 text-[11px] text-on-surface-variant">{ev.blurb}</span>
                       </div>
                     </label>
                   ))}
@@ -870,7 +878,7 @@ export function SettingsKeysDesk() {
                     key={row.label}
                     className="rounded-lg border border-white/[0.08] bg-obsidian-base p-3"
                   >
-                    <p className="text-[10px] text-on-surface-variant">{row.label}</p>
+                    <p className="text-[11px] text-on-surface-variant">{row.label}</p>
                     <p className={cn("mt-1 font-mono text-sm font-semibold", row.tone)}>{row.value}</p>
                   </div>
                 ))}
@@ -893,7 +901,7 @@ export function SettingsKeysDesk() {
                     Ad Platform Write Credentials
                   </h2>
                 </div>
-                <span className="font-mono text-[10px] text-on-surface-variant">v20.0 CAPI</span>
+                <span className="font-mono text-[11px] text-on-surface-variant">v20.0 CAPI</span>
               </div>
 
               {/* Meta */}
@@ -905,7 +913,7 @@ export function SettingsKeysDesk() {
                     </div>
                     <div className="leading-tight">
                       <p className="text-xs font-semibold text-white">Meta Marketing API</p>
-                      <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-emerald-400">
+                      <p className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-emerald-400">
                         <span
                           className={cn(
                             "size-1.5 rounded-full",
@@ -922,7 +930,7 @@ export function SettingsKeysDesk() {
                   </div>
                   <span
                     className={cn(
-                      "rounded border px-2 py-0.5 font-mono text-[10px]",
+                      "rounded border px-2 py-0.5 font-mono text-[11px]",
                       runtime?.sources?.meta.verified
                         ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
                         : "border-white/[0.08] bg-surface-container-high text-slate-400"
@@ -935,10 +943,10 @@ export function SettingsKeysDesk() {
                 {metaAccount ? <KeyEditor row={metaAccount} /> : null}
                 <div className="flex items-center justify-between pt-1 text-[11px]">
                   <div className="flex gap-1">
-                    <span className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[9px] text-slate-300">
+                    <span className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-slate-300">
                       ads_management
                     </span>
-                    <span className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[9px] text-slate-300">
+                    <span className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-slate-300">
                       insights
                     </span>
                   </div>
@@ -1004,13 +1012,13 @@ export function SettingsKeysDesk() {
                     IP Whitelist &amp; Enclave Guardrails
                   </h2>
                 </div>
-                <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-400">
+                <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-400">
                   DESK
                 </span>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="font-mono text-[10px] font-semibold tracking-wider text-on-surface-variant uppercase">
+                <label className="font-mono text-[11px] font-semibold tracking-wider text-on-surface-variant uppercase">
                   Authorized IPv4/IPv6 CIDRs
                 </label>
                 {local.cidrs.map((c, i) => (
@@ -1020,7 +1028,7 @@ export function SettingsKeysDesk() {
                   >
                     <div className="font-mono">
                       <p className="text-xs font-semibold text-white">{c.cidr}</p>
-                      <p className="text-[10px] text-on-surface-variant">{c.label}</p>
+                      <p className="text-[11px] text-on-surface-variant">{c.label}</p>
                     </div>
                     <button
                       type="button"
@@ -1064,11 +1072,12 @@ export function SettingsKeysDesk() {
                 <div className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-obsidian-base p-3">
                   <div className="pr-3">
                     <p className="text-xs font-medium text-white">Enforce Mutual TLS (mTLS)</p>
-                    <p className="mt-0.5 text-[10px] text-on-surface-variant">
+                    <p className="mt-0.5 text-[11px] text-on-surface-variant">
                       Desk preference — enforce client certs when edge proxy supports it
                     </p>
                   </div>
                   <Toggle
+                    label="Enforce mutual TLS"
                     enabled={local.mtls}
                     onToggle={() => patchLocal({ ...local, mtls: !local.mtls })}
                   />
@@ -1076,11 +1085,12 @@ export function SettingsKeysDesk() {
                 <div className="flex items-center justify-between rounded-lg border border-white/[0.08] bg-obsidian-base p-3">
                   <div className="pr-3">
                     <p className="text-xs font-medium text-white">Require Hardware WebAuthn / FIDO2</p>
-                    <p className="mt-0.5 text-[10px] text-on-surface-variant">
+                    <p className="mt-0.5 text-[11px] text-on-surface-variant">
                       Prefer hardware prompt before revealing pasted secrets
                     </p>
                   </div>
                   <Toggle
+                    label="Require hardware WebAuthn"
                     enabled={local.webauthn}
                     onToggle={() => patchLocal({ ...local, webauthn: !local.webauthn })}
                   />
@@ -1093,7 +1103,7 @@ export function SettingsKeysDesk() {
                   <p className="text-xs font-medium text-white">Operator session</p>
                   <span
                     className={cn(
-                      "font-mono text-[10px]",
+                      "font-mono text-[11px]",
                       operator.unlocked ? "text-emerald-400" : "text-amber-300"
                     )}
                   >
@@ -1120,7 +1130,7 @@ export function SettingsKeysDesk() {
                     </button>
                   </div>
                 ) : (
-                  <p className="mt-1 text-[10px] text-on-surface-variant">
+                  <p className="mt-1 text-[11px] text-on-surface-variant">
                     HITL writes and Meta sync are allowed on this browser.
                   </p>
                 )}
@@ -1145,18 +1155,18 @@ export function SettingsKeysDesk() {
                   Secrets encrypted at rest on the desk vault
                 </span>
                 <span className="text-slate-600">·</span>
-                <span className="font-mono text-[10px] font-bold text-emerald-400">
+                <span className="font-mono text-[11px] font-bold text-emerald-400">
                   {dirty ? "Unsaved changes" : "Synchronized"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[10px] text-on-surface-variant">
+              <p className="mt-0.5 text-[11px] text-on-surface-variant">
                 Guardrails (CIDR / events) save to this browser. API keys POST to /api/settings/keys.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
             {toast ? (
-              <span className="max-w-xs truncate font-mono text-[10px] text-marketing-amber">
+              <span className="max-w-xs truncate font-mono text-[11px] text-marketing-amber">
                 {toast}
               </span>
             ) : null}

@@ -73,6 +73,28 @@ describe("marketing demo assistant on the demo desk", () => {
     expect(scale.proposal).toMatchObject({ action: "scale_campaign", targets: [{ id: AD_B }] });
   });
 
+  it("answers 'which campaign should I pause and why' with the worst campaign, its spam spend and a confirmable pause", async () => {
+    const snap = await getSnapshot("7d");
+    const r = buildDemoReply("Which campaign should I pause and why?", snap);
+    const ad = snap.campaigns.find((c) => c.campaignId === AD_A)!;
+    expect(r.answer).toContain("Ad A — volume HVAC");
+    expect(r.answer).toContain(`$${ad.metrics.spendOnSpam}`);
+    expect(r.answer).not.toMatch(/I can summarize/);
+    expect(r.proposal).toMatchObject({ action: "pause_campaign", targets: [{ id: AD_A }] });
+    // it is a proposal the risk policy turns into a confirmation, never an executed change
+    const gated = await runWithPolicy(marketingActions, r.proposal!, ctx, { canAutoRun: true });
+    expect("proposal" in gated && gated.reasons.join(" ")).toMatch(/sign-off/i);
+    expect((await campaign(AD_A))?.status).toBe("active");
+  });
+
+  it("does not propose a pause when no campaign leaks spend to spam", async () => {
+    const snap = await getSnapshot("7d");
+    const clean = { ...snap, campaigns: snap.campaigns.map((c) => ({ ...c, metrics: { ...c.metrics, spendOnSpam: 0 } })) };
+    const r = buildDemoReply("Which campaign should I pause?", clean);
+    expect(r.proposal).toBeUndefined();
+    expect(r.answer).toMatch(/would not pause/i);
+  });
+
   it("says so when no campaign matches instead of guessing", async () => {
     const r = buildDemoReply("Pause Ad Z", await getSnapshot("7d"));
     expect(r.proposal).toBeUndefined();

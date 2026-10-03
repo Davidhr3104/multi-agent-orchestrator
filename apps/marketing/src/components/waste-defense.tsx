@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { DeskWasteSummary, StoredCampaign } from "@helix/core";
 import {
   loadDefenseSwitches,
   loadJson,
@@ -13,17 +12,21 @@ import {
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { WasteReportPanel } from "@/components/waste-report-panel";
-
-type Range = "7d" | "30d" | "90d" | "live";
+import { AreaChart, ChartCard, DemoChip, KpiCard as UiKpi } from "@helix/ui";
+import { DeskGate, SpendSplitCard, WasteGaugeCard, WindowTabs, useDemoMode, COLORS } from "@/components/desk-charts";
+import { useDeskSnapshot } from "@/lib/use-desk-snapshot";
+import { dailySpamSpend } from "@/lib/desk-derive";
 
 type QuarantineRule = { name: string; at: string };
 type WasteActionLog = { at: string; label: string };
 
 export function WasteDefenseDesk() {
   const router = useRouter();
-  const [range, setRange] = useState<Range>("live");
-  const [waste, setWaste] = useState<DeskWasteSummary | null>(null);
-  const [campaigns, setCampaigns] = useState<StoredCampaign[]>([]);
+  const { snap, win, setWin, error: loadError, reload, loading } = useDeskSnapshot();
+  const demo = useDemoMode();
+  const waste = snap?.waste ?? null;
+  const campaigns = snap?.campaigns ?? [];
+  const refresh = reload;
   const [switches, setSwitches] = useState<DefenseSwitches>({ pause: true, capi: true, slack: true });
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ msg: string; err?: boolean } | null>(null);
@@ -40,26 +43,16 @@ export function WasteDefenseDesk() {
     saveJson("waste.actions", [{ at: new Date().toISOString(), label }, ...prev].slice(0, 40));
   }
 
-  const refresh = useCallback(async () => {
-    const win = range === "live" ? "7d" : range;
-    const res = await fetch(`/api/campaigns?window=${win}`);
-    const d = (await res.json()) as { waste?: DeskWasteSummary; campaigns?: StoredCampaign[] };
-    setWaste(d.waste ?? null);
-    setCampaigns(d.campaigns ?? []);
-  }, [range]);
-
   useEffect(() => {
     setSwitches(loadDefenseSwitches());
   }, []);
-
-  useEffect(() => {
-    void refresh().catch(() => undefined);
-  }, [refresh]);
 
   const blocked = waste?.spendOnSpam ?? 0;
   const wastePct = waste ? Math.round(waste.wastePct * 1000) / 10 : 0;
   const nSpam = waste?.nSpam ?? 0;
   const costPerHot = waste?.costPerHot ?? null;
+  const ctx = { demo, win, from: snap?.from ?? "", to: snap?.to ?? "" };
+  const spamDays = snap ? dailySpamSpend(snap.campaigns, snap.seriesByCampaign) : [];
   const wasteHigh = wastePct >= 6 || blocked > 0;
 
   function onSwitchChange(key: keyof DefenseSwitches, checked: boolean) {
@@ -70,18 +63,6 @@ export function WasteDefenseDesk() {
       showToast("Auto-pause preference armed — use Disarm Leaking Sets to pause campaigns");
       logAction("Armed auto-pause preference");
     }
-  }
-
-  function simulateVector() {
-    if (!waste) {
-      showToast("No waste summary loaded yet");
-      return;
-    }
-    showToast(
-      `Waste: ${money(waste.spendOnSpam)} spam · ${waste.nSpam} spam leads · ${Math.round(waste.wastePct * 1000) / 10}% ratio` +
-        (waste.costPerHot != null ? ` · ${money(waste.costPerHot)}/hot` : "")
-    );
-    logAction("Simulated threat vector");
   }
 
   async function disarmLeakingSets() {
@@ -96,6 +77,8 @@ export function WasteDefenseDesk() {
       showToast("No leaking campaigns to pause");
       return;
     }
+    const list = leaking.map((c) => `• ${c.name} (${money(c.metrics.spendOnSpam ?? 0, 2)} on spam)`).join("\n");
+    if (!window.confirm(`Pause ${leaking.length} campaign(s) on this desk?\n\n${list}\n\nThis marks them paused locally; nothing is sent to the ad platform.`)) return;
     setBusy(true);
     let ok = 0;
     const errors: string[] = [];
@@ -140,42 +123,6 @@ export function WasteDefenseDesk() {
     showToast(`Saved quarantine rule “${name}”`);
   }
 
-  function pushBannedCidr() {
-    type CidrEntry = { cidr: string; at?: string };
-    const stored = loadJson<CidrEntry[] | string[]>("waste.bannedCidrs", []);
-    const fromQuarantine = loadJson<QuarantineRule[]>("waste.quarantine", []);
-    const defaults = [
-      "185.220.101.0/24",
-      "104.244.72.0/21",
-      "23.129.64.0/24",
-      "199.249.230.0/24",
-      "171.25.193.0/24",
-    ];
-    const lines: string[] = [];
-    if (Array.isArray(stored) && stored.length > 0) {
-      for (const item of stored) {
-        if (typeof item === "string") lines.push(item);
-        else if (item && typeof item === "object" && "cidr" in item) lines.push(String(item.cidr));
-      }
-    }
-    // Pull CIDR-looking quarantine rule names the user added
-    for (const r of fromQuarantine) {
-      const m = r.name.match(/\b\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}\b/);
-      if (m && !lines.includes(m[0])) lines.push(m[0]);
-    }
-    const list = lines.length > 0 ? lines : defaults;
-    const blob = new Blob([list.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `banned-cidrs-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    saveJson("waste.cidrPush", { at: new Date().toISOString(), count: list.length });
-    logAction(`Downloaded ${list.length} banned CIDR(s)`);
-    showToast(`Downloaded ${list.length} banned CIDR(s)`);
-  }
-
   function auditStateMachine() {
     const sw = loadDefenseSwitches();
     const rules = loadJson<QuarantineRule[]>("waste.quarantine", []);
@@ -206,15 +153,11 @@ export function WasteDefenseDesk() {
           <div className="max-w-3xl space-y-1.5">
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="flex items-center gap-1.5 rounded-full border border-alert-rose/30 bg-alert-rose/10 px-2.5 py-0.5">
-                <span className="size-1.5 animate-ping rounded-full bg-alert-rose" />
-                <span className="font-mono text-[10px] font-bold tracking-wider text-alert-rose uppercase">
-                  v4.2 Heuristic Defense Core
+                <span className="size-1.5 rounded-full bg-alert-rose" />
+                <span className="font-mono text-[11px] font-bold tracking-wider text-alert-rose uppercase">
+                  Heuristic spam scoring
                 </span>
               </div>
-              <span className="flex items-center gap-1 font-mono text-[11px] text-tertiary">
-                <span className="material-symbols-outlined text-[14px]">shield_lock</span>
-                Zero-Trust CAPI Firewall Active
-              </span>
               <span className="rounded border border-success-emerald/20 bg-success-emerald/10 px-2 py-0.5 font-mono text-[11px] text-success-emerald">
                 Pause/scale need your sign-off
               </span>
@@ -222,50 +165,15 @@ export function WasteDefenseDesk() {
             <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-on-surface">
               $ on Spam & Ad Waste Monitor
               <span className="rounded border border-[var(--border-hairline)] bg-surface-container px-2 py-0.5 font-mono text-xs font-normal text-on-surface-variant">
-                Real-Time Ingress Hub
+                Spend quality monitor
               </span>
             </h1>
             <p className="max-w-2xl text-xs leading-relaxed text-on-surface-variant">
-              Autonomous shield for disposable domains, Tor/DC scrapers, sub-3s ghost bounces, and
-              click farms — before junk pollutes CRM & CAPI attribution.
+              How much ad spend went to leads the engine classified as spam, per campaign. Pausing is always a human decision.
             </p>
           </div>
           <div className="relative z-10 flex flex-wrap items-center gap-2 self-start xl:self-center">
-            <div className="flex items-center rounded-xl border border-[var(--border-hairline)] bg-surface-container-lowest p-1 shadow-inner">
-              {(["7d", "30d", "90d", "live"] as const).map((id) => {
-                const on = range === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setRange(id)}
-                    className={cn(
-                      "rounded-lg px-2.5 py-1 font-mono text-xs transition-colors",
-                      on
-                        ? "bg-primary-container font-bold text-white shadow-[0_0_10px_rgba(249,115,22,0.4)]"
-                        : "text-on-surface-variant hover:text-on-surface"
-                    )}
-                  >
-                    {id === "live" ? (
-                      <span className="flex items-center gap-1.5">
-                        <span className="size-1.5 animate-pulse rounded-full bg-white" />
-                        1s Stream
-                      </span>
-                    ) : (
-                      id.toUpperCase()
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={simulateVector}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-surface-container px-2.5 text-xs text-on-surface hover:bg-surface-container-high"
-            >
-              <span className="material-symbols-outlined text-[15px] text-tertiary">terminal</span>
-              Simulate Vector
-            </button>
+            <WindowTabs win={win} setWin={setWin} />
             <button
               type="button"
               disabled={busy}
@@ -287,151 +195,29 @@ export function WasteDefenseDesk() {
         </div>
       </div>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="Blocked / Prevented Drain"
-          value={money(blocked, 2)}
-          badge={blocked > 0 ? "Spam spend" : "Clear"}
-          badgeTone={blocked > 0 ? "bad" : "good"}
-          icon="savings"
-          iconTone="orange"
-          footerL={`${campaigns.length} campaigns in window`}
-          footerR={switches.capi ? "CAPI Drop Armed" : "CAPI Drop Off"}
-        >
-          <svg className="mt-3 h-12 w-full overflow-visible" viewBox="0 0 240 50" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="kpiGrad1" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#f97316" stopOpacity="0.45" />
-                <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0,45 Q30,42 60,35 T120,28 T180,18 T240,8 L240,50 L0,50 Z"
-              fill="url(#kpiGrad1)"
-            />
-            <path
-              d="M0,45 Q30,42 60,35 T120,28 T180,18 T240,8"
-              fill="none"
-              stroke="#f97316"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-            <circle cx="240" cy="8" r="3.5" fill="#ffb690" />
-            <circle cx="240" cy="8" r="6" fill="#f97316" opacity="0.75" className="animate-ping" />
-          </svg>
-        </KpiCard>
-
-        <KpiCard
-          title="Disposable & Bot Leads"
-          value={`${nSpam.toLocaleString()} leads`}
-          badge="Spam class"
-          badgeTone={nSpam > 0 ? "bad" : "good"}
-          icon="person_cancel"
-          iconTone="rose"
-          footerL={`Hot leads: ${waste?.nHot ?? 0}`}
-          footerR={`Total: ${waste?.nLeads ?? 0}`}
-        >
-          <div className="mt-3 flex h-12 w-full items-end justify-between gap-1.5 px-1">
-            {[30, 45, 38, 60, 75, 90, 100, 65, 40].map((h, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "w-full rounded-sm",
-                  i < 3 ? "bg-surface-container" : "bg-alert-rose"
-                )}
-                style={{
-                  height: `${h}%`,
-                  opacity: i >= 3 ? 0.4 + (i - 3) * 0.1 : 1,
-                  boxShadow: i === 6 ? "0 0 8px #f43f5e" : undefined,
-                }}
-              />
-            ))}
-          </div>
-        </KpiCard>
-
-        <KpiCard
-          title="Click-Farm / Tor Velocity"
-          value={costPerHot != null ? money(costPerHot, 2) : "—"}
-          badge={costPerHot != null ? "$ / hot" : "No hot CPA"}
-          badgeTone="cyan"
-          icon="radar"
-          iconTone="cyan"
-          footerL={waste?.worstCampaignName ? `Worst: ${waste.worstCampaignName}` : "No worst campaign"}
-          footerR={waste?.worstSpendOnSpam ? money(waste.worstSpendOnSpam, 2) : "—"}
-        >
-          <svg className="mt-3 h-12 w-full overflow-visible" viewBox="0 0 240 50" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="kpiGrad3" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#4cd7f6" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#4cd7f6" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0,38 L40,38 L40,30 L80,30 L80,42 L120,42 L120,15 L160,15 L160,25 L200,25 L200,10 L240,10 L240,50 L0,50 Z"
-              fill="url(#kpiGrad3)"
-            />
-            <path
-              d="M0,38 L40,38 L40,30 L80,30 L80,42 L120,42 L120,15 L160,15 L160,25 L200,25 L200,10 L240,10"
-              fill="none"
-              stroke="#4cd7f6"
-              strokeWidth="2"
-            />
-          </svg>
-        </KpiCard>
-
-        <KpiCard
-          title="Current Waste Ratio"
-          value={`${wastePct}%`}
-          badge="Goal < 6.0%"
-          badgeTone="muted"
-          icon={null}
-          iconTone="good"
-          footerL={waste ? `${money(waste.totalSpend, 0)} total spend` : "No spend window"}
-          footerR={wastePct < 6 ? "Safety Corridor OK" : "Above 6% goal"}
-          valueClass="text-success-emerald"
-          right={
-            <div className="relative flex size-12 items-center justify-center">
-              <svg className="size-12 -rotate-90" viewBox="0 0 36 36">
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3.5"
-                  className="text-surface-container-highest"
-                />
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${Math.min(100, (wastePct / 10) * 100)}, 100`}
-                  className="text-success-emerald"
-                />
-              </svg>
-              <span className="absolute font-mono text-[10px] font-bold text-success-emerald">
-                {wastePct}%
-              </span>
-            </div>
-          }
-        >
-          <div className="mt-3 flex items-center gap-2">
-            <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-surface-container-lowest">
-              <div
-                className="h-full rounded-full bg-success-emerald"
-                style={{ width: `${Math.min(100, wastePct * 10)}%` }}
-              />
-            </div>
-            <span className="font-mono text-[10px] font-semibold text-on-surface-variant">
-              {wastePct}% / 10% max
-            </span>
-          </div>
-        </KpiCard>
-      </div>
+      <DeskGate loading={loading} error={loadError} empty={!loading && !loadError && campaigns.length === 0}>
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <UiKpi label="Spend on spam" value={money(blocked, 2)} hint={`${campaigns.length} campaigns · ${win}`} accent={COLORS.spam} />
+          <UiKpi label="Spam leads" value={nSpam} hint={`${waste?.nHot ?? 0} hot · ${waste?.nLeads ?? 0} scored`} accent={COLORS.spam} />
+          <UiKpi label="Cost per hot lead" value={costPerHot != null ? money(costPerHot, 2) : "—"} hint="all spend ÷ hot leads" accent={COLORS.warm} />
+          <UiKpi label="Worst campaign" value={waste?.worstCampaignName ? waste.worstCampaignName.split(/\s+[—-]\s+/)[0] : "—"} hint={waste?.worstSpendOnSpam ? `${money(waste.worstSpendOnSpam, 2)} on spam` : "none leaking"} accent={COLORS.spam} />
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <WasteGaugeCard campaigns={campaigns} ctx={ctx} />
+          <SpendSplitCard campaigns={campaigns} ctx={ctx} />
+          <ChartCard title="Daily spend on spam" subtitle="Estimate: each campaign's daily spend × its spam rate" demo={ctx.demo} source={`Source: desk snapshot · ${win}. Estimated, not measured per day.`}>
+            <AreaChart points={spamDays.map((d) => ({ label: d.day.slice(5), value: d.spend }))} color={COLORS.spam} unit="$" ariaLabel="Estimated daily spend on spam" />
+          </ChartCard>
+        </div>
+      </DeskGate>
 
       <WasteReportPanel onChanged={() => void refresh().catch(() => undefined)} />
 
+      <details className="rounded-2xl border border-[var(--border-hairline)] bg-surface-container-low p-4">
+        <summary className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-medium text-on-surface">
+          See example: threat radar, IP clusters and defense switches <DemoChip kind="illustrative" />
+        </summary>
+        <div className="mt-4 flex flex-col gap-5">
       <p className="rounded-lg border border-marketing-amber/30 bg-marketing-amber/10 px-3 py-2 text-[11px] text-marketing-amber">
         Illustrative mockups below (timeline, radar, telemetry, IP cluster, defense switches): they show the intended
         product, not your data. Your real numbers are in the KPI cards and the waste report above.
@@ -450,7 +236,7 @@ export function WasteDefenseDesk() {
                   <h2 className="text-base font-bold tracking-tight text-on-surface">
                     Ad Drain & Bot Ingress Timeline
                   </h2>
-                  <span className="rounded border border-marketing-amber/30 bg-marketing-amber/10 px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
+                  <span className="rounded border border-marketing-amber/30 bg-marketing-amber/10 px-2 py-0.5 font-mono text-[11px] text-marketing-amber">
                     ILLUSTRATIVE
                   </span>
                 </div>
@@ -481,13 +267,13 @@ export function WasteDefenseDesk() {
             }}
           >
             <div className="pointer-events-none absolute top-6 left-[54%] z-20 flex flex-col items-center">
-              <div className="rounded border border-white/20 bg-alert-rose px-2 py-1 font-mono text-[10px] font-bold whitespace-nowrap text-white shadow-[0_0_12px_rgba(244,63,94,0.6)]">
+              <div className="rounded border border-white/20 bg-alert-rose px-2 py-1 font-mono text-[11px] font-bold whitespace-nowrap text-white shadow-[0_0_12px_rgba(244,63,94,0.6)]">
                 Bot Spike: 42 yopmail leads/10m
               </div>
               <div className="h-16 w-px bg-gradient-to-b from-alert-rose to-transparent" />
             </div>
             <div className="pointer-events-none absolute top-14 left-[78%] z-20 flex flex-col items-center">
-              <div className="rounded border border-white/20 bg-primary-container px-2 py-0.5 font-mono text-[10px] font-bold whitespace-nowrap text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]">
+              <div className="rounded border border-white/20 bg-primary-container px-2 py-0.5 font-mono text-[11px] font-bold whitespace-nowrap text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]">
                 −$420/hr Throttled
               </div>
               <div className="h-10 w-px bg-gradient-to-b from-primary-container to-transparent" />
@@ -582,7 +368,7 @@ export function WasteDefenseDesk() {
                 <p className="text-[11px] text-marketing-amber">Illustrative breakdown — not your data</p>
               </div>
             </div>
-            <span className="rounded-full border border-[var(--border-hairline)] bg-surface-container px-2 py-0.5 font-mono text-[10px] text-on-surface-variant">
+            <span className="rounded-full border border-[var(--border-hairline)] bg-surface-container px-2 py-0.5 font-mono text-[11px] text-on-surface-variant">
               {nSpam.toLocaleString()} Spam
             </span>
           </div>
@@ -652,7 +438,7 @@ export function WasteDefenseDesk() {
                   </span>
                   <span className="font-mono">
                     <span className="font-bold text-on-surface">{row.pct}%</span>
-                    <span className="text-[10px] text-on-surface-variant"> ({row.n})</span>
+                    <span className="text-[11px] text-on-surface-variant"> ({row.n})</span>
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-lowest">
@@ -677,7 +463,7 @@ export function WasteDefenseDesk() {
                   <h2 className="text-base font-bold tracking-tight text-on-surface">
                     Live Anomaly Telemetry Stream
                   </h2>
-                  <span className="rounded border border-marketing-amber/30 bg-marketing-amber/10 px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
+                  <span className="rounded border border-marketing-amber/30 bg-marketing-amber/10 px-2 py-0.5 font-mono text-[11px] text-marketing-amber">
                     ILLUSTRATIVE
                   </span>
                 </div>
@@ -688,7 +474,7 @@ export function WasteDefenseDesk() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
-                <tr className="border-b border-[var(--border-hairline)] bg-surface-container-lowest font-mono text-[10px] tracking-wider text-on-surface-variant uppercase">
+                <tr className="border-b border-[var(--border-hairline)] bg-surface-container-lowest font-mono text-[11px] tracking-wider text-on-surface-variant uppercase">
                   <th className="rounded-l-lg px-3 py-2.5">Time</th>
                   <th className="px-3 py-2.5">Campaign / UTM</th>
                   <th className="px-3 py-2.5">Platform</th>
@@ -766,7 +552,7 @@ export function WasteDefenseDesk() {
                     <td className="px-3 py-3">
                       <div className="flex flex-col">
                         <span className="font-sans font-bold text-on-surface">{row.camp}</span>
-                        <span className="text-[10px] text-on-surface-variant">{row.utm}</span>
+                        <span className="text-[11px] text-on-surface-variant">{row.utm}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -782,7 +568,7 @@ export function WasteDefenseDesk() {
                     <td className="px-3 py-3">
                       <div className="flex flex-col font-sans">
                         <span className={cn("font-semibold", row.drainC)}>{row.vec}</span>
-                        <span className="font-mono text-[10px] text-on-surface-variant">{row.vecSub}</span>
+                        <span className="font-mono text-[11px] text-on-surface-variant">{row.vecSub}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -792,7 +578,7 @@ export function WasteDefenseDesk() {
                     </td>
                     <td className={cn("px-3 py-3 text-right font-bold", row.drainC)}>{row.drain}</td>
                     <td className="px-3 py-3 text-right">
-                      <span className={cn("rounded px-2 py-0.5 text-[10px] font-bold", row.actC)}>
+                      <span className={cn("rounded px-2 py-0.5 text-[11px] font-bold", row.actC)}>
                         {row.act}
                       </span>
                     </td>
@@ -815,7 +601,7 @@ export function WasteDefenseDesk() {
                 <p className="text-[11px] text-on-surface-variant">Scraping subnets & proxy nodes</p>
               </div>
             </div>
-            <span className="font-mono text-[10px] text-marketing-amber">ILLUSTRATIVE</span>
+            <span className="font-mono text-[11px] text-marketing-amber">ILLUSTRATIVE</span>
           </div>
           <div className="relative my-2 flex h-52 items-center justify-center overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-obsidian-base/70">
             <svg className="h-full w-full" viewBox="0 0 300 200">
@@ -860,20 +646,6 @@ export function WasteDefenseDesk() {
               <span className="text-on-surface-variant">Quarantined Subnets</span>
               <span className="font-bold text-on-surface">14 CIDRs</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-on-surface-variant">Cloudflare WAF</span>
-              <span className="flex items-center gap-1 font-bold text-success-emerald">
-                <span className="size-1.5 rounded-full bg-success-emerald" /> In Sync
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={pushBannedCidr}
-              className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-surface-container py-1.5 font-sans text-xs font-semibold text-primary hover:bg-surface-container-high"
-            >
-              <span className="material-symbols-outlined text-[15px]">security_update_warning</span>
-              Push Banned CIDR to Edge WAF
-            </button>
           </div>
         </div>
       </div>
@@ -890,7 +662,7 @@ export function WasteDefenseDesk() {
                 <h2 className="text-base font-bold tracking-tight text-on-surface">
                   Autonomous Defense Switches & Safeguard Ledger
                 </h2>
-                <span className="flex items-center gap-1 rounded border border-success-emerald/30 bg-success-emerald/10 px-2 py-0.5 font-mono text-[10px] font-bold text-success-emerald">
+                <span className="flex items-center gap-1 rounded border border-success-emerald/30 bg-success-emerald/10 px-2 py-0.5 font-mono text-[11px] font-bold text-success-emerald">
                   <span className="size-1.5 animate-pulse rounded-full bg-success-emerald" />
                   HEURISTIC CIRCUIT ARMED
                 </span>
@@ -916,7 +688,7 @@ export function WasteDefenseDesk() {
               title: "CAPI Conversion Discard",
               desc: "Do not transmit conversion if Score ≤ 35",
               meta: "Threshold: Score ≤ 35",
-              status: "Drop Active",
+              status: "Preference only",
             },
             {
               key: "slack" as const,
@@ -946,7 +718,7 @@ export function WasteDefenseDesk() {
                   <div className="relative h-5 w-9 rounded-full bg-surface-container-highest shadow-inner after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-primary-container peer-checked:after:translate-x-full" />
                 </label>
               </div>
-              <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2 font-mono text-[10px] text-on-surface-variant">
+              <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2 font-mono text-[11px] text-on-surface-variant">
                 <span>{s.meta}</span>
                 <span className={cn("font-bold", s.statusTone ?? "text-success-emerald")}>
                   {s.status}
@@ -966,7 +738,7 @@ export function WasteDefenseDesk() {
                 <span className="font-mono text-xs font-bold text-on-surface">
                   120m Two-Way Rollback State Machine Armed
                 </span>
-                <span className="rounded bg-success-emerald/10 px-1.5 font-mono text-[10px] text-success-emerald">
+                <span className="rounded bg-success-emerald/10 px-1.5 font-mono text-[11px] text-success-emerald">
                   Zero Data Loss
                 </span>
               </div>
@@ -986,6 +758,9 @@ export function WasteDefenseDesk() {
         </div>
       </div>
 
+        </div>
+      </details>
+
       <div
         className={cn(
           "fixed right-6 bottom-6 z-50 flex max-w-md items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-surface-container-high px-4 py-2.5 text-xs text-on-surface shadow-2xl transition-all duration-200",
@@ -998,85 +773,6 @@ export function WasteDefenseDesk() {
           <span className="material-symbols-outlined shrink-0 text-[18px] text-success-emerald">check_circle</span>
         )}
         <span>{toast?.msg ?? "Ready"}</span>
-      </div>
-    </div>
-  );
-}
-
-function KpiCard({
-  title,
-  value,
-  badge,
-  badgeTone,
-  icon,
-  iconTone,
-  footerL,
-  footerR,
-  children,
-  right,
-  valueClass,
-}: {
-  title: string;
-  value: string;
-  badge: string;
-  badgeTone: "good" | "bad" | "cyan" | "muted";
-  icon: string | null;
-  iconTone: "orange" | "rose" | "cyan" | "good";
-  footerL: string;
-  footerR: string;
-  children?: ReactNode;
-  right?: ReactNode;
-  valueClass?: string;
-}) {
-  const badgeMap = {
-    good: "text-success-emerald bg-success-emerald/10 border-success-emerald/30",
-    bad: "text-alert-rose bg-alert-rose/10 border-alert-rose/30",
-    cyan: "text-tertiary bg-tertiary/10 border-tertiary/30",
-    muted: "text-on-surface-variant bg-surface-container border-transparent",
-  };
-  const iconMap = {
-    orange: "bg-primary-container/15 border-primary-container/30 text-primary shadow-[0_0_12px_rgba(249,115,22,0.2)]",
-    rose: "bg-alert-rose/15 border-alert-rose/30 text-alert-rose shadow-[0_0_12px_rgba(244,63,94,0.2)]",
-    cyan: "bg-tertiary/15 border-tertiary/30 text-tertiary shadow-[0_0_12px_rgba(76,215,246,0.2)]",
-    good: "bg-success-emerald/15 border-success-emerald/30 text-success-emerald",
-  };
-  return (
-    <div className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-surface-container-low p-4 shadow-sm transition-all hover:border-primary-container/40">
-      <div className="flex items-start justify-between">
-        <div>
-          <span className="font-mono text-[11px] font-semibold tracking-wider text-on-surface-variant uppercase">
-            {title}
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className={cn("text-2xl font-bold tracking-tight text-on-surface", valueClass)}>
-              {value}
-            </span>
-            <span className={cn("rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold", badgeMap[badgeTone])}>
-              {badge}
-            </span>
-          </div>
-        </div>
-        {right ??
-          (icon ? (
-            <div className={cn("flex size-9 items-center justify-center rounded-xl border", iconMap[iconTone])}>
-              <span className="material-symbols-outlined text-[20px]">{icon}</span>
-            </div>
-          ) : null)}
-      </div>
-      {children}
-      <div className="mt-2 flex items-center justify-between border-t border-[var(--border-hairline)] pt-2 font-mono text-[11px] text-on-surface-variant">
-        <span>{footerL}</span>
-        <span
-          className={cn(
-            "font-bold",
-            badgeTone === "good" && "text-success-emerald",
-            badgeTone === "bad" && "text-alert-rose",
-            badgeTone === "cyan" && "text-tertiary",
-            badgeTone === "muted" && "text-primary"
-          )}
-        >
-          {footerR}
-        </span>
       </div>
     </div>
   );

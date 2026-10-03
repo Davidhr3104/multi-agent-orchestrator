@@ -52,3 +52,9 @@ export function saveArmedRule(id: string, armed: boolean) {
   map[id] = armed;
   saveJson("automations.armed", map);
 }
+
+/** The analysis window chosen on any page ("7d" by default); every page reads the same one. */
+export function deskWindow(): "7d" | "30d" | "90d" {
+  const w = loadJson<string>("window", "7d");
+  return w === "30d" || w === "90d" ? w : "7d";
+}

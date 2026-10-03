@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type PointerEvent } from "react";
 import type { StoredCampaign } from "@helix/core";
-import { compactCount, median, money, recLabel, recTone } from "@/lib/format";
+import { compactCount, median, money, recTone } from "@/lib/format";
+import { actionLabel, scoreText } from "@/lib/desk-derive";
 
 const LEFT = 60;
 const RIGHT = 680;
@@ -53,8 +54,10 @@ export function ScatterPlot({
 
   const { maxSpend, midSpend, ticks } = useMemo(() => {
     const spends = campaigns.map((c) => c.spend);
-    const rawMax = spends.length === 0 ? 2600 : Math.max(...spends);
-    const maxSpend = Math.max(2600, Math.ceil(rawMax / 100) * 100);
+    // axis follows the data (no fixed $2,600 floor that squeezes small desks into the left edge)
+    const rawMax = spends.length === 0 ? 400 : Math.max(...spends) * 1.15;
+    const step = rawMax <= 500 ? 100 : rawMax <= 2500 ? 500 : 1000;
+    const maxSpend = Math.max(100, Math.ceil(rawMax / step) * step);
     return {
       maxSpend,
       midSpend: median(spends),
@@ -76,7 +79,7 @@ export function ScatterPlot({
   const midX = spendToX(midSpend, maxSpend);
 
   return (
-    <div className="relative h-64 w-full select-none rounded-lg border border-white/[0.06] bg-[#08090d] p-3">
+    <div className="relative h-72 w-full select-none rounded-lg border border-white/[0.06] bg-[#08090d] p-3">
       <svg className="h-full w-full" viewBox="0 0 700 240" onPointerLeave={() => setTip(null)}>
         <defs>
           <linearGradient id="scaleZone" x1="0%" x2="0%" y1="0%" y2="100%">
@@ -90,11 +93,11 @@ export function ScatterPlot({
         </defs>
         <rect fill="url(#scaleZone)" height="55" width="620" x="60" y="15" />
         <rect fill="url(#drainZone)" height="55" width="465" x="215" y="155" />
-        <text fill="rgba(255,255,255,0.06)" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" x="68" y="32">
+        <text fill="rgba(255,255,255,0.4)" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" letterSpacing="0.04em" x="68" y="32">
           OVER-PERFORMING · SCALE
         </text>
         <text
-          fill="rgba(255,255,255,0.06)"
+          fill="rgba(255,255,255,0.4)"
           fontFamily="Inter, sans-serif"
           fontSize="11"
           fontWeight="600"
@@ -104,11 +107,11 @@ export function ScatterPlot({
         >
           HEALTHY AT SCALE
         </text>
-        <text fill="rgba(255,255,255,0.06)" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" x="68" y="200">
+        <text fill="rgba(255,255,255,0.4)" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" letterSpacing="0.04em" x="68" y="200">
           LOW SIGNAL · WATCH
         </text>
         <text
-          fill="rgba(255,255,255,0.06)"
+          fill="rgba(255,255,255,0.4)"
           fontFamily="Inter, sans-serif"
           fontSize="11"
           fontWeight="600"
@@ -128,28 +131,28 @@ export function ScatterPlot({
         <line stroke="rgba(255,255,255,0.05)" x1="370" x2="370" y1="15" y2="210" />
         <line stroke="rgba(255,255,255,0.05)" x1="525" x2="525" y1="15" y2="210" />
         <line stroke="rgba(255,255,255,0.05)" x1="680" x2="680" y1="15" y2="210" />
-        <text fill="#9CA3AF" fontFamily="JetBrains Mono, monospace" fontSize="10" textAnchor="end" x="52" y="24">
+        <text fill="#9CA3AF" fontFamily="JetBrains Mono, monospace" fontSize="11" textAnchor="end" x="52" y="24">
           100
         </text>
-        <text fill="#9CA3AF" fontFamily="JetBrains Mono, monospace" fontSize="10" textAnchor="end" x="52" y="74">
+        <text fill="#9CA3AF" fontFamily="JetBrains Mono, monospace" fontSize="11" textAnchor="end" x="52" y="74">
           70
         </text>
-        <text fill="#6B7280" fontFamily="JetBrains Mono, monospace" fontSize="10" textAnchor="end" x="52" y="119">
+        <text fill="#6B7280" fontFamily="JetBrains Mono, monospace" fontSize="11" textAnchor="end" x="52" y="119">
           50
         </text>
-        <text fill="#9CA3AF" fontFamily="JetBrains Mono, monospace" fontSize="10" textAnchor="end" x="52" y="159">
+        <text fill="#9CA3AF" fontFamily="JetBrains Mono, monospace" fontSize="11" textAnchor="end" x="52" y="159">
           35
         </text>
-        <text fill="#6B7280" fontFamily="JetBrains Mono, monospace" fontSize="10" textAnchor="end" x="52" y="213">
+        <text fill="#6B7280" fontFamily="JetBrains Mono, monospace" fontSize="11" textAnchor="end" x="52" y="213">
           0
         </text>
-        <text fill="#3BAF7E" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="500" textAnchor="end" x="670" y="66">
+        <text fill="#3BAF7E" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="500" textAnchor="end" x="670" y="66">
           scale ≥ 70
         </text>
-        <text fill="#D9605F" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="500" textAnchor="end" x="670" y="151">
+        <text fill="#D9605F" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="500" textAnchor="end" x="670" y="151">
           pause ≤ 35
         </text>
-        <text fill="#9CA3AF" fontFamily="Inter, sans-serif" fontSize="10" textAnchor="middle" x={midX} y="12">
+        <text fill="#9CA3AF" fontFamily="Inter, sans-serif" fontSize="11" textAnchor="middle" x={midX} y="12">
           median spend ({money(midSpend)})
         </text>
         {ticks.map((tick, i) => (
@@ -157,7 +160,7 @@ export function ScatterPlot({
             key={tick}
             fill={i === 0 || i === ticks.length - 1 ? "#9CA3AF" : "#6B7280"}
             fontFamily="JetBrains Mono, monospace"
-            fontSize="10"
+            fontSize="11"
             textAnchor={i === 0 ? "start" : i === ticks.length - 1 ? "end" : "middle"}
             x={spendToX(tick, maxSpend)}
             y="226"
@@ -181,6 +184,20 @@ export function ScatterPlot({
             >
               <circle cx="0" cy="0" fill={tone.hex} fillOpacity="0.9" r={r} stroke={tone.stroke} strokeWidth="1.5" />
               <circle cx="0" cy="0" fill="transparent" r={r + 10} />
+              <text
+                fill="#E5E7EB"
+                fontFamily="Inter, sans-serif"
+                fontSize="11"
+                fontWeight="600"
+                textAnchor={x > RIGHT - 110 ? "end" : "start"}
+                x={x > RIGHT - 110 ? -(r + 6) : r + 6}
+                y={y < 40 ? 14 : -(r + 4)}
+                paintOrder="stroke"
+                stroke="#08090d"
+                strokeWidth="3"
+              >
+                {c.name.split(/\s+[—-]\s+/)[0]} · {scoreText(c)}
+              </text>
             </g>
           );
         })}
@@ -192,8 +209,8 @@ export function ScatterPlot({
         >
           <div className="mb-1.5 flex items-center gap-2 border-b border-white/10 pb-1.5 font-medium">
             <span>{tip.c.name}</span>
-            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px]" style={{ color: recTone(tip.c.action).hex }}>
-              {recLabel(tip.c)}
+            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px]" style={{ color: recTone(tip.c.action).hex }}>
+              {actionLabel(tip.c)}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-3 text-[11px] text-[#9CA3AF]">
@@ -201,7 +218,7 @@ export function ScatterPlot({
               Spend: <span className="font-mono font-medium text-white">{money(tip.c.spend)}</span>
             </div>
             <div>
-              Score: <span className="font-mono font-medium text-white">{tip.c.metrics.avgScore.toFixed(2)}</span>
+              Score: <span className="font-mono font-medium text-white">{scoreText(tip.c)}</span>
             </div>
             <div>
               Forms: <span className="font-mono font-medium text-white">{compactCount(tip.c.metrics.formLeads)}</span>

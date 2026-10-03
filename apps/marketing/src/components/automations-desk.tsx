@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { StoredCampaign } from "@helix/core";
-import { loadArmedRules, saveArmedRule, saveJson } from "@/lib/desk-prefs";
+import { DemoChip } from "@helix/ui";
+import { RULES as DESK_RULES, ruleMatches, type RuleId } from "@/lib/desk-derive";
+import { deskWindow, loadArmedRules, saveArmedRule, saveJson } from "@/lib/desk-prefs";
 import { cn } from "@/lib/utils";
 
 type RuleKind = "all" | "spend" | "kill" | "bid" | "audience";
@@ -26,21 +28,21 @@ const RULES: Rule[] = [
   {
     id: "WR-0881-BUDGET",
     kind: "spend",
-    title: "Scale Budget on Score ≥ 75 & Cheap CAC",
+    title: "Scale budget on high score and cheap hot leads",
     platforms: ["meta", "google"],
     status: "active",
-    statusLabel: "Active",
+    statusLabel: "Simulation",
     accent: "#f97316",
     ifParts: [
-      { label: "Avg score", value: "≥ 75" },
-      { label: "Cost / hot", value: "≤ $42" },
+      { label: "Avg score", value: `≥ ${DESK_RULES.scaleScore}` },
+      { label: "Cost / hot", value: `< $${DESK_RULES.costPerHot}` },
     ],
     thenParts: [
-      { label: "Scale budget", value: "+15%" },
+      { label: "Scale budget", value: `+${Math.round(DESK_RULES.scaleStep * 100)}%` },
       { label: "Max increment", value: "$800/day" },
     ],
-    mandate: "< $400 Auto / > $400 HITL",
-    lastTrigger: "14 mins ago · TOFU-Lookalike-US-Tier1",
+    mandate: "Every budget change needs HITL sign-off",
+    lastTrigger: "never (simulation only)",
     armed: true,
   },
   {
@@ -49,7 +51,7 @@ const RULES: Rule[] = [
     title: "Instant Auto-Pause on Bot / Tor Anomaly Spike",
     platforms: ["all"],
     status: "kill",
-    statusLabel: "Autonomous Kill",
+    statusLabel: "Kill switch · simulation",
     accent: "#f43f5e",
     ifParts: [
       { label: "Bot / disposable", value: "≥ 35%" },
@@ -59,8 +61,8 @@ const RULES: Rule[] = [
       { label: "Kill switch", value: "Pause creative" },
       { label: "Alert", value: "#growth-alerts" },
     ],
-    mandate: "Autonomous Instant Kill · Slack dispatch",
-    lastTrigger: "2h ago · Blocked $620 ad waste",
+    mandate: "Proposes a pause · HITL confirms before anything is paused",
+    lastTrigger: "never (simulation only)",
     armed: true,
   },
   {
@@ -80,7 +82,7 @@ const RULES: Rule[] = [
       { label: "Or", value: "Pause Spark" },
     ],
     mandate: "Sandbox · Pending TikTok Direct Write OAuth",
-    lastTrigger: "Yesterday · Simulated",
+    lastTrigger: "never (simulation only)",
     armed: true,
   },
   {
@@ -89,7 +91,7 @@ const RULES: Rule[] = [
     title: "Sync High-Intent Leads to Lookalike Seed",
     platforms: ["meta"],
     status: "streaming",
-    statusLabel: "Streaming Sync",
+    statusLabel: "Not wired",
     accent: "#4cd7f6",
     ifParts: [
       { label: "Score", value: "≥ 85" },
@@ -99,49 +101,24 @@ const RULES: Rule[] = [
       { label: "CAPI event", value: "High-Value" },
       { label: "Value weight", value: "3.5×" },
     ],
-    mandate: "SHA-256 hashed real-time write",
-    lastTrigger: "Synced 312 VIP contacts today",
+    mandate: "Not wired: needs an enterprise-domain flag the desk does not store",
+    lastTrigger: "never (simulation only)",
     armed: true,
   },
 ];
 
-const WRITE_SERIES = [18, 22, 19, 28, 31, 26, 34, 38, 42, 36, 40, 44, 48, 52];
-
-function Sparkline({
-  values,
-  color,
-  fill,
-}: {
-  values: number[];
-  color: string;
-  fill?: string;
-}) {
-  const { line, area } = useMemo(() => {
-    const max = Math.max(...values, 1);
-    const min = Math.min(...values, 0);
-    const span = Math.max(1, max - min);
-    const pts = values.map((v, i) => {
-      const x = 2 + (i / Math.max(1, values.length - 1)) * 96;
-      const y = 28 - ((v - min) / span) * 22;
-      return [x, y] as const;
-    });
-    const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]} ${p[1]}`).join(" ");
-    const areaPath = `${linePath} L98 30 L2 30 Z`;
-    return { line: linePath, area: areaPath };
-  }, [values]);
-
-  return (
-    <svg viewBox="0 0 100 32" className="h-8 w-full" aria-hidden>
-      {fill ? <path d={area} fill={fill} /> : null}
-      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
+/** Which rules the desk can evaluate today. The other two need data (dwell time, enterprise-domain flag) the desk does not store. */
+const PREVIEW: Record<string, RuleId | null> = {
+  "WR-0881-BUDGET": "scale",
+  "WR-0219-KILL": "spam",
+  "WR-0442-BID": null,
+  "WR-0902-SYNC": null,
+};
 
 function PlatformChip({ p }: { p: Rule["platforms"][number] }) {
   if (p === "all") {
     return (
-      <span className="rounded border border-[var(--border-hairline)] bg-surface-bright px-2 py-0.5 font-mono text-[10px] text-on-surface">
+      <span className="rounded border border-[var(--border-hairline)] bg-surface-bright px-2 py-0.5 font-mono text-[11px] text-on-surface">
         All Platforms
       </span>
     );
@@ -149,7 +126,7 @@ function PlatformChip({ p }: { p: Rule["platforms"][number] }) {
   if (p === "meta") {
     return (
       <span
-        className="inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[10px]"
+        className="inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px]"
         style={{
           background: "rgba(24,119,242,0.2)",
           borderColor: "rgba(24,119,242,0.4)",
@@ -163,14 +140,14 @@ function PlatformChip({ p }: { p: Rule["platforms"][number] }) {
   }
   if (p === "google") {
     return (
-      <span className="inline-flex items-center gap-1 rounded border border-primary-container/40 bg-primary-container/20 px-2 py-0.5 font-mono text-[10px] text-primary">
+      <span className="inline-flex items-center gap-1 rounded border border-primary-container/40 bg-primary-container/20 px-2 py-0.5 font-mono text-[11px] text-primary">
         <span className="size-1.5 rounded-full bg-primary-container" />
         Google Ads
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-[10px] text-on-surface">
+    <span className="inline-flex items-center gap-1 rounded border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-[11px] text-on-surface">
       <span className="size-1.5 rounded-full bg-white" />
       TikTok Ads
     </span>
@@ -187,17 +164,17 @@ function StatusChip({ rule }: { rule: Rule }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[10px] font-medium",
+        "inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium",
         map[rule.status]
       )}
     >
       <span
         className={cn(
           "size-1.5 rounded-full",
-          rule.status === "active" && "animate-pulse bg-success-emerald",
+          rule.status === "active" && "bg-success-emerald",
           rule.status === "kill" && "bg-alert-rose",
           rule.status === "hitl" && "bg-marketing-amber",
-          rule.status === "streaming" && "animate-pulse bg-tertiary"
+          rule.status === "streaming" && "bg-tertiary"
         )}
       />
       {rule.statusLabel}
@@ -213,12 +190,12 @@ function LogicFlow({ rule }: { rule: Rule }) {
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex items-center gap-2">
             <span
-              className="rounded px-1.5 py-0.5 font-mono text-[10px] font-bold"
+              className="rounded px-1.5 py-0.5 font-mono text-[11px] font-bold"
               style={{ background: `${rule.accent}22`, color: rule.accent }}
             >
               IF
             </span>
-            <span className="font-mono text-[10px] text-outline">conditions</span>
+            <span className="font-mono text-[11px] text-outline">conditions</span>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             {rule.ifParts.map((p) => (
@@ -226,7 +203,7 @@ function LogicFlow({ rule }: { rule: Rule }) {
                 key={p.label}
                 className="rounded-md border border-[var(--border-hairline)] bg-surface-container px-2 py-1.5"
               >
-                <div className="font-mono text-[9px] text-outline uppercase">{p.label}</div>
+                <div className="font-mono text-[11px] text-outline uppercase">{p.label}</div>
                 <div className="text-[12px] font-semibold text-on-surface">{p.value}</div>
               </div>
             ))}
@@ -245,10 +222,10 @@ function LogicFlow({ rule }: { rule: Rule }) {
 
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-success-emerald/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-success-emerald">
+            <span className="rounded bg-success-emerald/15 px-1.5 py-0.5 font-mono text-[11px] font-bold text-success-emerald">
               THEN
             </span>
-            <span className="font-mono text-[10px] text-outline">write action</span>
+            <span className="font-mono text-[11px] text-outline">write action</span>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             {rule.thenParts.map((p) => (
@@ -256,7 +233,7 @@ function LogicFlow({ rule }: { rule: Rule }) {
                 key={p.label}
                 className="rounded-md border border-success-emerald/20 bg-success-emerald/5 px-2 py-1.5"
               >
-                <div className="font-mono text-[9px] text-outline uppercase">{p.label}</div>
+                <div className="font-mono text-[11px] text-outline uppercase">{p.label}</div>
                 <div className="text-[12px] font-semibold text-success-emerald">{p.value}</div>
               </div>
             ))}
@@ -340,13 +317,13 @@ export function AutomationsDesk() {
   const CAPI_PAYLOAD = `{
   "action": "ADSET_BUDGET_UPDATE",
   "campaign_id": "meta_act_88291047",
-  "budget_delta": "+15.0%",
+  "budget_delta": "+${(DESK_RULES.scaleStep * 100).toFixed(1)}%",
   "hitl_mandate": "BYPASS_TIER1_SAFE",
   "safety_check": "PASSED_CHECKSUM"
 }`;
 
   useEffect(() => {
-    void fetch("/api/campaigns?window=30d")
+    void fetch(`/api/campaigns?window=${deskWindow()}`)
       .then((r) => r.json())
       .then((d: { campaigns?: StoredCampaign[] }) => setCampaigns(d.campaigns ?? []))
       .catch(() => undefined);
@@ -365,18 +342,14 @@ export function AutomationsDesk() {
   async function simulateRule(rule: Rule) {
     setBusy(true);
     try {
-      const matches = campaigns.filter((c) => {
-        if (!armed[rule.id]) return false;
-        if (rule.kind === "spend") return c.metrics.avgScore >= 75 && (c.metrics.costPerHot ?? 999) <= 42;
-        if (rule.kind === "kill") return c.metrics.spamRate >= 0.35 || c.metrics.spendOnSpam > 0;
-        if (rule.kind === "bid") return c.platform === "other" || c.needsReview;
-        if (rule.kind === "audience") return c.metrics.avgScore >= 85;
-        return c.needsReview;
-      });
+      const kind = PREVIEW[rule.id] ?? null;
+      const matches = armed[rule.id] && kind ? ruleMatches(kind, campaigns) : [];
       showToast(
-        armed[rule.id]
-          ? `Sim ${rule.id}: ${matches.length} campaign(s) match thresholds (no ads write)`
-          : `Rule ${rule.id} is disarmed — arm it first`
+        !armed[rule.id]
+          ? `Rule ${rule.id} is disarmed — arm it first`
+          : kind
+            ? `Sim ${rule.id}: ${matches.length} campaign(s) match thresholds (no ads write)`
+            : `Sim ${rule.id}: cannot be evaluated, the desk has no data for this condition`
       );
       saveJson("automations.lastSim", {
         ruleId: rule.id,
@@ -467,7 +440,7 @@ export function AutomationsDesk() {
                 v4.2 Algorithmic Core
               </span>
               <span className="inline-flex items-center gap-1 rounded border border-success-emerald/30 bg-success-emerald/10 px-2.5 py-0.5 font-mono text-[11px] text-success-emerald">
-                <span className="size-1.5 animate-ping rounded-full bg-success-emerald" />
+                <span className="size-1.5 rounded-full bg-success-emerald" />
                 {armedCount} armed · prefs saved locally
               </span>
               <span className="inline-flex items-center gap-1 rounded border border-marketing-amber/40 bg-marketing-amber/10 px-2.5 py-0.5 font-mono text-[11px] text-marketing-amber">
@@ -476,7 +449,7 @@ export function AutomationsDesk() {
             </div>
             <p className="max-w-4xl text-[13px] text-on-surface-variant">
               Arm/disarm persists in this browser. Simulate evaluates thresholds against live desk
-              campaigns ({campaigns.length} in 30d). HITL still confirms Meta writes.
+              campaigns ({campaigns.length} in the selected window). HITL still confirms Meta writes.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -503,90 +476,30 @@ export function AutomationsDesk() {
         </div>
       </section>
 
-      {/* Visual KPIs */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="flex flex-col justify-between rounded-xl border border-[var(--border-hairline)] bg-surface-container p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs text-outline">
-              <span className="material-symbols-outlined text-[16px] text-primary">verified</span>
-              Autonomous Write Cap
-            </span>
-            <span className="rounded bg-primary-container/20 px-1.5 py-0.5 font-mono text-[10px] text-primary">
-              Tier 1
-            </span>
-          </div>
-          <div className="text-2xl font-bold tracking-tight text-on-surface">
-            $400 <span className="text-xs font-normal text-outline">/ action</span>
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
-            <div className="h-full w-[40%] rounded-full bg-primary-container" />
-          </div>
-          <p className="mt-1.5 font-mono text-[10px] text-outline">&gt;$400 mandates HITL</p>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl border border-[var(--border-hairline)] bg-surface-container p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs text-outline">
-              <span className="material-symbols-outlined text-[16px] text-success-emerald">send</span>
-              24h Automated Actions
-            </span>
-            <span className="rounded bg-success-emerald/10 px-1.5 py-0.5 font-mono text-[10px] text-success-emerald">
-              +18.4%
-            </span>
-          </div>
-          <div className="text-2xl font-bold tracking-tight text-on-surface">
-            142 <span className="text-xs font-normal text-outline">writes</span>
-          </div>
-          <Sparkline values={WRITE_SERIES} color="#10b981" fill="rgba(16,185,129,0.12)" />
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl border border-[var(--border-hairline)] bg-surface-container p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs text-outline">
-              <span className="material-symbols-outlined text-[16px] text-marketing-amber">
-                health_and_safety
-              </span>
-              Circuit Breaker
-            </span>
-            <span className="flex items-center gap-1 font-mono text-[10px] text-success-emerald">
-              <span className="size-1.5 rounded-full bg-success-emerald" /> Armed
-            </span>
-          </div>
-          <div className="text-xl font-bold tracking-tight text-on-surface">Armed & Nominal</div>
-          <div className="mt-2">
-            <div className="mb-1 flex justify-between font-mono text-[9px] text-outline">
-              <span>Anomaly buffer</span>
-              <span>24 / 35%</span>
+      {/* What each rule would match today: computed from the desk snapshot */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Rule previews">
+        {RULES.map((r) => {
+          const kind = PREVIEW[r.id];
+          const hits = kind ? ruleMatches(kind, campaigns) : null;
+          return (
+            <div key={r.id} className="flex flex-col justify-between rounded-xl border border-[var(--border-hairline)] bg-surface-container p-4">
+              <span className="text-xs text-outline">{r.title}</span>
+              {hits ? (
+                <>
+                  <div className="mt-2 text-2xl font-bold tracking-tight text-on-surface">
+                    {hits.length} <span className="text-xs font-normal text-outline">of {campaigns.length} campaigns meet it today</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-on-surface-variant">{hits.length ? hits.map((c) => c.name.split(/\s+[—-]\s+/)[0]).join(", ") : "None right now"}</p>
+                </>
+              ) : (
+                <>
+                  <div className="mt-2 text-sm font-medium text-on-surface-variant">Cannot be evaluated: the desk has no data for this condition.</div>
+                  <p className="mt-1"><DemoChip kind="illustrative" /></p>
+                </>
+              )}
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-container-high">
-              <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-primary-container to-success-emerald" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl border border-[var(--border-hairline)] bg-surface-container p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs text-outline">
-              <span className="material-symbols-outlined text-[16px] text-tertiary">speed</span>
-              API Write Latency
-            </span>
-            <span className="rounded bg-tertiary/10 px-1.5 py-0.5 font-mono text-[10px] text-tertiary">
-              p99: 44ms
-            </span>
-          </div>
-          <div className="text-2xl font-bold tracking-tight text-on-surface">
-            28ms <span className="text-xs font-normal text-outline">avg</span>
-          </div>
-          <div className="mt-2 flex items-end gap-1">
-            {[22, 28, 19, 31, 24, 27, 18, 33, 25, 29, 22, 26].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 rounded-sm bg-tertiary/80"
-                style={{ height: `${h}px`, opacity: 0.45 + (i % 5) * 0.1 }}
-              />
-            ))}
-          </div>
-        </div>
+          );
+        })}
       </section>
 
       {/* Filters */}
@@ -598,7 +511,7 @@ export function AutomationsDesk() {
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                "rounded-lg px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+                "min-h-10 rounded-lg px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
                 tab === t.id
                   ? "bg-primary-container font-semibold text-on-primary-container shadow-sm"
                   : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -660,7 +573,7 @@ export function AutomationsDesk() {
                       {rule.platforms.map((p) => (
                         <PlatformChip key={`${rule.id}-${p}`} p={p} />
                       ))}
-                      <span className="rounded border border-[var(--border-hairline)] bg-surface-container-high px-1.5 py-0.5 font-mono text-[10px] text-outline">
+                      <span className="rounded border border-[var(--border-hairline)] bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-outline">
                         {rule.id}
                       </span>
                       <StatusChip rule={rule} />
@@ -730,7 +643,7 @@ export function AutomationsDesk() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-on-surface">Rule Simulator</h3>
-                    <span className="rounded border border-primary-container/40 bg-primary-container/20 px-1.5 font-mono text-[10px] text-primary">
+                    <span className="rounded border border-primary-container/40 bg-primary-container/20 px-1.5 font-mono text-[11px] text-primary">
                       {selectedRule.id.split("-").slice(0, 2).join("-")}
                     </span>
                   </div>
@@ -738,13 +651,16 @@ export function AutomationsDesk() {
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 rounded border border-success-emerald/20 bg-success-emerald/10 px-2 py-0.5 font-mono text-[11px] text-success-emerald">
-                <span className="size-1.5 rounded-full bg-success-emerald" /> Verified Dry-Run
+                <span className="size-1.5 rounded-full bg-success-emerald" /> Dry-run only
               </span>
             </div>
 
             <div className="space-y-5 p-5">
+              <details className="rounded-lg border border-[var(--border-hairline)] p-3">
+                <summary className="flex min-h-10 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">See example: execution and impact preview <DemoChip kind="illustrative" /></summary>
+              <div className="mt-3 space-y-5">
               <div className="space-y-2">
-                <p className="font-mono text-[10px] font-semibold tracking-wider text-outline uppercase">
+                <p className="font-mono text-[11px] font-semibold tracking-wider text-outline uppercase">
                   Target Campaign Scope
                 </p>
                 <div className="space-y-2 rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-3">
@@ -770,7 +686,7 @@ export function AutomationsDesk() {
                     <div className="absolute inset-y-0 left-0 w-[70%] bg-[#1877F2]/40" />
                     <div className="absolute inset-y-0 left-[70%] w-[12%] bg-success-emerald" />
                   </div>
-                  <div className="flex justify-between font-mono text-[9px] text-outline">
+                  <div className="flex justify-between font-mono text-[11px] text-outline">
                     <span>Current $1.6k</span>
                     <span className="text-success-emerald">+$240 proposed</span>
                   </div>
@@ -779,46 +695,46 @@ export function AutomationsDesk() {
 
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <p className="font-mono text-[10px] font-semibold tracking-wider text-outline uppercase">
+                  <p className="font-mono text-[11px] font-semibold tracking-wider text-outline uppercase">
                     7-Day Monte Carlo Impact
                   </p>
-                  <span className="font-mono text-[10px] text-primary">n=5,000 runs</span>
+                  <span className="font-mono text-[11px] text-primary">n=5,000 runs</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <ConfidenceRing pct={92.4} />
                   <div className="min-w-0 flex-1">
                     <ImpactBars />
-                    <p className="mt-1 font-mono text-[9px] text-outline">
+                    <p className="mt-1 font-mono text-[11px] text-outline">
                       Distribution across spend · CAC · ROAS · leads
                     </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-2.5">
-                    <span className="font-mono text-[10px] text-outline">Spend Lift</span>
+                    <span className="font-mono text-[11px] text-outline">Spend Lift</span>
                     <p className="font-mono text-sm font-bold text-on-surface">+$2,450</p>
                   </div>
                   <div className="rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-2.5">
-                    <span className="font-mono text-[10px] text-outline">Projected CAC</span>
+                    <span className="font-mono text-[11px] text-outline">Projected CAC</span>
                     <p className="font-mono text-sm font-bold text-success-emerald">
-                      $38.10 <span className="text-[10px] font-normal text-outline">(−9%)</span>
+                      $38.10 <span className="text-[11px] font-normal text-outline">(−9%)</span>
                     </p>
                   </div>
                   <div className="rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-2.5">
-                    <span className="font-mono text-[10px] text-outline">Est. ROAS Lift</span>
+                    <span className="font-mono text-[11px] text-outline">Est. ROAS Lift</span>
                     <p className="font-mono text-sm font-bold text-on-surface">
-                      3.8× <span className="text-[10px] font-normal text-success-emerald">(+0.4×)</span>
+                      3.8× <span className="text-[11px] font-normal text-success-emerald">(+0.4×)</span>
                     </p>
                   </div>
                   <div className="rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-2.5">
-                    <span className="font-mono text-[10px] text-outline">Hot Leads</span>
+                    <span className="font-mono text-[11px] text-outline">Hot Leads</span>
                     <p className="font-mono text-sm font-bold text-primary">+34 Leads</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="font-mono text-[10px] font-semibold tracking-wider text-outline uppercase">
+                <p className="font-mono text-[11px] font-semibold tracking-wider text-outline uppercase">
                   Autonomous Safety Checks
                 </p>
                 <div className="space-y-1.5">
@@ -837,7 +753,7 @@ export function AutomationsDesk() {
                         </span>
                         <span className="text-on-surface-variant">{label}</span>
                       </div>
-                      <span className="font-mono text-[10px] text-outline">{meta}</span>
+                      <span className="font-mono text-[11px] text-outline">{meta}</span>
                     </div>
                   ))}
                 </div>
@@ -845,13 +761,13 @@ export function AutomationsDesk() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="font-mono text-[10px] font-semibold tracking-wider text-outline uppercase">
+                  <p className="font-mono text-[11px] font-semibold tracking-wider text-outline uppercase">
                     Meta Graph CAPI Write Payload
                   </p>
                   <button
                     type="button"
                     onClick={() => void copyCapiPayload()}
-                    className="flex items-center gap-1 font-mono text-[10px] text-primary hover:underline"
+                    className="flex items-center gap-1 font-mono text-[11px] text-primary hover:underline"
                   >
                     <span className="material-symbols-outlined text-[12px]">content_copy</span> Copy
                   </button>
@@ -867,7 +783,7 @@ export function AutomationsDesk() {
                   <span className="text-tertiary">&quot;meta_act_88291047&quot;</span>,{"\n  "}
                   <span className="text-primary-container">&quot;budget_delta&quot;</span>
                   {": "}
-                  <span className="text-success-emerald">&quot;+15.0%&quot;</span>,{"\n  "}
+                  <span className="text-success-emerald">&quot;+{(DESK_RULES.scaleStep * 100).toFixed(1)}%&quot;</span>,{"\n  "}
                   <span className="text-primary-container">&quot;hitl_mandate&quot;</span>
                   {": "}
                   <span className="text-marketing-amber">&quot;BYPASS_TIER1_SAFE&quot;</span>,{"\n  "}
@@ -879,12 +795,15 @@ export function AutomationsDesk() {
                 </pre>
               </div>
 
+              </div>
+              </details>
+
               <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void simulateRule(selectedRule)}
-                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-surface-container-high text-xs font-semibold text-on-surface hover:bg-surface-bright disabled:opacity-50"
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-surface-container-high text-xs font-semibold text-on-surface hover:bg-surface-bright disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[15px] text-marketing-amber">
                     play_arrow
@@ -906,13 +825,6 @@ export function AutomationsDesk() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-surface-container px-3.5 py-3 text-xs text-on-surface-variant">
-            <div className="flex items-center gap-2.5">
-              <span className="size-2 rounded-full bg-success-emerald" />
-              Deterministic Rule Dispatcher: <strong className="text-on-surface">Socket Active</strong>
-            </div>
-            <span className="font-mono text-[10px] text-outline">Heartbeat: 400ms</span>
-          </div>
         </div>
       </section>
     </div>

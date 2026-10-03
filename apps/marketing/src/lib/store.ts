@@ -33,6 +33,7 @@ import {
   supabaseProbeDesk,
 } from "@/lib/supabase-desk";
 import { marketingDataFile } from "@/lib/desk-files";
+import { dailyLeadSeries, type LeadDay } from "@/lib/desk-derive";
 import { isGoogleAdsConfigured } from "@/lib/google-ads";
 import { isTikTokAdsConfigured } from "@/lib/tiktok-ads";
 
@@ -202,6 +203,10 @@ export type DeskSnapshot = {
   leads: AttributedLead[];
   unmatched: SpendEvent[];
   series: { day: string; spend: number }[];
+  /** Daily spend of each joined campaign (same window), keyed by campaignId. */
+  seriesByCampaign: Record<string, { day: string; spend: number }[]>;
+  /** Daily lead counts derived from lead timestamps (all / spam / hot). */
+  leadSeries: LeadDay[];
   waste: DeskWasteSummary;
 };
 
@@ -249,6 +254,21 @@ function snapshotFrom(desk: DeskState, window: MarketingWindow): DeskSnapshot {
     leads: windowLeads,
     unmatched,
     series: dailySpendSeries(desk.spend, from, to),
+    seriesByCampaign: Object.fromEntries(
+      campaigns.map((c) => [
+        c.campaignId,
+        dailySpendSeries(
+          desk.spend.filter((e) => e.campaignId === c.campaignId),
+          from,
+          to
+        ),
+      ])
+    ),
+    leadSeries: dailyLeadSeries(
+      windowLeads.filter((l) => campaigns.some((c) => c.campaignId === l.campaignId)),
+      from,
+      to
+    ),
     waste: summarizeDeskWaste(campaigns),
   };
 }

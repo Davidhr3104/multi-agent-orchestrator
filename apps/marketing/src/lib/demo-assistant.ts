@@ -88,6 +88,24 @@ function command(q: string, snap: DeskSnapshot): DemoReply | null {
   return { answer: `${say} ${c.name}.`, command: true, proposal: { action, summary: `${say} ${c.name}.`, targets: target } };
 }
 
+/** "Which campaign should I pause and why?" — names the campaign leaking the most spend and proposes pausing it (a person still confirms). */
+function pauseAdvice(snap: DeskSnapshot): DemoReply {
+  const leaking = snap.campaigns.filter((c) => (c.metrics.spendOnSpam ?? 0) > 0);
+  if (leaking.length === 0) {
+    return { answer: `I would not pause anything right now: none of the ${snap.campaigns.length} campaigns has spend attributed to spam leads in this window.` };
+  }
+  const pick = [...leaking].sort((a, b) => Number(b.action === "pause") - Number(a.action === "pause") || (b.metrics.spendOnSpam ?? 0) - (a.metrics.spendOnSpam ?? 0))[0];
+  const m = pick.metrics;
+  const pct = Math.round(spamShare(pick) * 100);
+  const thin = m.nLeads < 8;
+  const engine =
+    pick.action === "pause"
+      ? "The scoring engine also recommends pausing it."
+      : `The scoring engine's own call is "${pick.action}"${pick.needsReview ? " (needs review)" : ""}${thin ? ` because only ${m.nLeads} leads were scored, which is thin evidence` : ""}, so this is your decision.`;
+  const answer = `Pause ${pick.name}. ${money(m.spendOnSpam ?? 0)} of its ${money(pick.spend)} (${pct}%) went to spam leads, the most on the desk (${money(snap.waste.spendOnSpam)} across all campaigns). It has ${m.nLeads} scored leads: ${m.nSpam} spam, ${m.nHot} hot${m.nHot === 0 ? ", so nothing to protect" : ""}. ${engine}`;
+  return { answer, command: true, proposal: { action: "pause_campaign", summary: `Pausing ${pick.name}.`, targets: [{ id: pick.campaignId, label: pick.name }] } };
+}
+
 const HELP =
   'I can summarize your spend, show where money is wasted on spam leads, name the worst campaign and suggest which to scale. You can also tell me what to do — "Keep Ad D", "Pause Ad A", "Scale Ad B" — and I only stop to ask when a change reaches the ad platform.';
 
@@ -98,6 +116,7 @@ export function buildDemoReply(question: string, snap: DeskSnapshot): DemoReply 
   const cmd = command(q, snap);
   if (cmd) return cmd;
 
+  if (/(which|what|should|any|who).*\b(pause|stop|cut|kill)\b|\b(pause|stop|cut|kill)\b.*\b(which|why)\b/.test(q)) return pauseAdvice(snap);
   if (/wast|spam|leak|losing/.test(q)) return { answer: waste(snap) };
   if (/worst|bad|underperform/.test(q)) return { answer: worst(snap) };
   if (/scale|grow|best|winner|invest/.test(q)) return { answer: scaleCandidates(snap) };

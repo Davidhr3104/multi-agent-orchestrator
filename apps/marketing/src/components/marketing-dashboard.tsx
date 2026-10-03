@@ -14,6 +14,9 @@ import { AskAiCard } from "@/components/ask-ai-card";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import { ScatterPlot } from "@/components/scatter-plot";
+import { CostPerHotCard, FunnelCard, SpendSplitCard, TierDonutCard, useDemoMode } from "@/components/desk-charts";
+import { useDeskWindow } from "@/lib/use-desk-snapshot";
+import { joinedLeads, scoreText, totals } from "@/lib/desk-derive";
 import { SAMPLE_CSV } from "@/lib/sample-csv";
 import {
   compactCount,
@@ -81,7 +84,8 @@ export function MarketingDashboard() {
   const [note, setNote] = useState("");
   const [hideEmpty, setHideEmpty] = useState(false);
   const [ingestOpen, setIngestOpen] = useState(true);
-  const [range, setRange] = useState<Range>("7d");
+  const [range, setRange] = useDeskWindow();
+  const demo = useDemoMode();
   const [unmatched, setUnmatched] = useState<SpendEvent[]>([]);
   const [series, setSeries] = useState<{ day: string; spend: number }[]>([]);
   const [bounds, setBounds] = useState<{ from: string; to: string } | null>(null);
@@ -185,20 +189,20 @@ export function MarketingDashboard() {
   }, []);
 
   const metrics = useMemo(() => {
-    const spend = campaigns.reduce((s, c) => s + c.spend, 0);
-    const scores = campaigns.map((c) => c.metrics.avgScore);
-    const avg =
-      campaigns.length === 0 ? 0 : Math.round(campaigns.reduce((s, c) => s + c.metrics.avgScore, 0) / campaigns.length);
-    const hotCost = campaigns.map((c) => c.metrics.costPerHot).filter((n): n is number => n != null);
-    const costPerHot = hotCost.length === 0 ? null : hotCost.reduce((s, n) => s + n, 0) / hotCost.length;
+    const t = totals(campaigns);
+    // average only over campaigns that have at least one non-spam lead: an all-spam campaign has no score, not a score of 0
+    const scored = campaigns.filter((c) => c.metrics.nLeads - c.metrics.nSpam > 0).map((c) => c.metrics.avgScore);
+    const avg = scored.length === 0 ? null : Math.round(scored.reduce((s, n) => s + n, 0) / scored.length);
     const review = campaigns.filter((c) => c.needsReview);
     return {
-      spend,
+      spend: t.spend,
       avg,
-      medianScore: median(scores),
-      costPerHot,
+      scoredCount: scored.length,
+      medianScore: median(scored),
+      costPerHot: t.costPerHot,
+      hot: t.hot,
       review: review.length,
-      reviewNames: review.map((c) => c.name.replace(/^Ad\s+/i, "Ad ")).join(", ") || "—",
+      reviewNames: review.map((c) => c.name.split(/\s+[—-]\s+/)[0]).join(", ") || "—",
     };
   }, [campaigns]);
 
@@ -223,6 +227,7 @@ export function MarketingDashboard() {
 
   const spendSpark = sparkPath(series.map((s) => s.spend));
   const costSpark = sparkPath(campaigns.map((c) => c.metrics.costPerHot ?? 0));
+  const ctx = { demo, win: range, from: bounds?.from ?? "", to: bounds?.to ?? "" };
   const unmatchedIds = new Set(unmatched.map((u) => u.campaignId)).size;
 
   async function ingest(e?: FormEvent) {
@@ -330,7 +335,8 @@ export function MarketingDashboard() {
 
   return (
     <div className="w-full pb-8">
-      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
+        <h1 className="sr-only">Performance Engine: spend, lead quality and campaign decisions</h1>
         <div className="flex flex-col items-start justify-between gap-3 rounded-xl bg-surface-container-low p-3 shadow-sm md:flex-row md:items-center">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-container/15">
@@ -357,12 +363,12 @@ export function MarketingDashboard() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2 self-end md:self-auto">
-            <div className="flex items-center gap-2 rounded-full bg-surface-container px-2.5 py-1 font-mono text-[10px]">
+            <div className="flex items-center gap-2 rounded-full bg-surface-container px-2.5 py-1 font-mono text-[11px]">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-tertiary opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-tertiary" />
+                {demo ? null : <span className="absolute inline-flex size-full animate-ping rounded-full bg-tertiary opacity-75" />}
+                <span className={cn("relative inline-flex size-2 rounded-full", demo ? "bg-outline" : "bg-tertiary")} />
               </span>
-              <span className="font-medium text-on-surface">Live Pipeline</span>
+              <span className="font-medium text-on-surface">{demo ? "Demo pipeline" : "Pipeline"}</span>
               <span className="text-tertiary">{metrics.review} in HITL</span>
             </div>
             <button
@@ -461,18 +467,18 @@ export function MarketingDashboard() {
             badge="Index 0–100"
             value={
               <>
-                {metrics.avg}
-                <span className="font-sans text-xs font-normal text-outline">/100</span>
+                {metrics.avg ?? "—"}
+                {metrics.avg != null ? <span className="font-sans text-xs font-normal text-outline">/100</span> : null}
               </>
             }
-            left="Unweighted avg"
-            right={`Median ${Math.round(metrics.medianScore)}`}
+            left={metrics.avg == null ? "No non-spam lead yet" : `Avg of ${metrics.scoredCount} campaign${metrics.scoredCount === 1 ? "" : "s"} with non-spam leads`}
+            right={metrics.avg == null ? "" : `Median ${Math.round(metrics.medianScore)}`}
             chart={
               <div className="flex w-20 flex-col gap-1">
                 <div className="h-1.5 w-full overflow-hidden rounded-full border border-[var(--border-hairline)] bg-surface-container-lowest">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${metrics.avg}%` }} />
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${metrics.avg ?? 0}%` }} />
                 </div>
-                <span className="text-right text-[10px] text-outline">Median {Math.round(metrics.medianScore)}</span>
+                <span className="text-right text-[11px] text-outline">{metrics.avg == null ? "—" : `Median ${Math.round(metrics.medianScore)}`}</span>
               </div>
             }
           />
@@ -483,7 +489,6 @@ export function MarketingDashboard() {
             value={
               <>
                 {metrics.costPerHot == null ? "—" : money(Math.round(metrics.costPerHot))}
-                {metrics.costPerHot != null ? <span className="text-xs font-normal text-outline">.00</span> : null}
               </>
             }
             left={
@@ -491,7 +496,7 @@ export function MarketingDashboard() {
                 ? "No hot-lead cost yet"
                 : `${metrics.costPerHot < 80 ? "↓" : "↑"} vs $80 scale rule`
             }
-            right="Mean w/ hot leads"
+            right={`all spend ÷ ${metrics.hot} hot`}
             leftClass={metrics.costPerHot != null && metrics.costPerHot < 80 ? "text-on-surface-variant" : "text-outline"}
             chart={
               <svg className="h-7 w-20" fill="none" viewBox="0 0 70 24">
@@ -521,12 +526,19 @@ export function MarketingDashboard() {
                     style={{ width: `${campaigns.length === 0 ? 0 : (metrics.review / campaigns.length) * 100}%` }}
                   />
                 </div>
-                <span className="text-right text-[10px] text-marketing-amber">
+                <span className="text-right text-[11px] text-marketing-amber">
                   {campaigns.length === 0 ? "0" : Math.round((metrics.review / campaigns.length) * 100)}% in queue
                 </span>
               </div>
             }
           />
+        </div>
+
+        <div data-tour="marketing-charts" className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SpendSplitCard campaigns={campaigns} ctx={ctx} />
+          <CostPerHotCard campaigns={campaigns} ctx={ctx} />
+          <FunnelCard campaigns={campaigns} ctx={ctx} />
+          <TierDonutCard leads={joinedLeads(leads, campaigns)} ctx={ctx} />
         </div>
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-10">
@@ -536,9 +548,9 @@ export function MarketingDashboard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <ScatterChart className="size-[18px] text-on-surface-variant" />
-                    <h2 className="text-sm font-semibold text-on-surface">Spend vs Lead Quality (LIVE Correlation)</h2>
+                    <h2 className="text-sm font-semibold text-on-surface">Spend vs Lead Quality</h2>
                     <span className="rounded-full bg-surface-container-highest/40 px-2 py-0.5 text-xs font-medium text-on-surface-variant">
-                      Live signal
+                      {demo ? "Demo data" : "Desk data"}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-outline">
@@ -713,6 +725,7 @@ export function MarketingDashboard() {
                   <span className="font-semibold text-primary">POST</span> /api/campaigns/ingest
                 </code>
                 <button
+                  aria-label="Copy ingest endpoint"
                   className="p-1 text-outline hover:text-on-surface"
                   onClick={() => {
                     void navigator.clipboard.writeText("POST /api/campaigns/ingest").then(
@@ -736,7 +749,7 @@ export function MarketingDashboard() {
                       <span className="size-2 rounded-full bg-white/20" />
                       <span className="ml-1 font-mono text-[11px] text-on-surface-variant">campaigns_schema.csv</span>
                     </span>
-                    <span className="font-mono text-[10px]">UTF-8</span>
+                    <span className="font-mono text-[11px]">UTF-8</span>
                   </div>
                   <textarea
                     className="h-28 w-full resize-none bg-transparent font-mono text-xs leading-relaxed text-on-surface-variant outline-none focus:text-on-surface"
@@ -762,7 +775,7 @@ export function MarketingDashboard() {
                     <span className="mt-1.5 text-xs font-medium text-on-surface-variant group-hover:text-on-surface">
                       Drop CSV or browse
                     </span>
-                    <span className="text-[10px] text-outline">UTF-8 comma-delimited</span>
+                    <span className="text-[11px] text-outline">UTF-8 comma-delimited</span>
                     <input accept=".csv,text/csv" className="hidden" onChange={onPick} type="file" />
                   </label>
                   <div className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-surface-container-lowest px-3 py-1.5 text-xs">
@@ -844,7 +857,7 @@ function KpiCard({
         </div>
         <span
           className={cn(
-            "rounded-full bg-surface-container-highest px-2 py-0.5 font-mono text-[10px] font-medium text-on-surface-variant",
+            "rounded-full bg-surface-container-highest px-2 py-0.5 font-mono text-[11px] font-medium text-on-surface-variant",
             badgeClass
           )}
         >
@@ -855,7 +868,7 @@ function KpiCard({
         <div className="text-[32px] leading-10 font-semibold tracking-tight text-on-surface">{value}</div>
         {chart}
       </div>
-      <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2 font-mono text-[10px] text-outline">
+      <div className="flex items-center justify-between border-t border-[var(--border-hairline)] pt-2 font-mono text-[11px] text-outline">
         <span className={leftClass}>{left}</span>
         <span className="truncate pl-2">{right}</span>
       </div>
@@ -916,7 +929,7 @@ function CampaignBlock({
                 </a>
                 <span
                   className={cn(
-                    "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                    "rounded-full px-1.5 py-0.5 text-[11px] font-medium",
                     c.platform === "meta"
                       ? "bg-blue-500/15 text-blue-300"
                       : c.platform === "google"
@@ -937,7 +950,7 @@ function CampaignBlock({
         <td className="px-4 py-3 text-right font-mono text-on-surface">{c.metrics.formLeads}</td>
         <td className="px-4 py-3 text-center">
           <span className={cn("rounded-full px-2 py-0.5 font-mono font-medium", tone.bg, tone.text)}>
-            {c.metrics.avgScore.toFixed(2)}
+            {scoreText(c)}
           </span>
         </td>
         {hideHot ? null : (
@@ -954,7 +967,7 @@ function CampaignBlock({
         <td className="px-4 py-3 text-center">
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+              "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium",
               tone.bg,
               tone.text,
               tone.border
@@ -966,7 +979,7 @@ function CampaignBlock({
         </td>
         <td className="px-4 py-3 text-right">
           <button
-            className="inline-flex items-center gap-1 font-medium text-on-surface-variant hover:text-on-surface"
+            className="inline-flex min-h-10 items-center gap-1 px-1 font-medium text-on-surface-variant hover:text-on-surface"
             onClick={(e) => {
               e.stopPropagation();
               onToggle();

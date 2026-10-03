@@ -148,7 +148,7 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
                 <>
                   <span
                     className={cn(
-                      "rounded border px-2 py-0.5 font-mono text-[10px] font-bold",
+                      "rounded border px-2 py-0.5 font-mono text-[11px] font-bold",
                       report.engine === "claude"
                         ? "border-tertiary/30 bg-tertiary/10 text-tertiary"
                         : "border-[var(--border-hairline)] bg-surface-container text-on-surface-variant"
@@ -158,7 +158,7 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
                   </span>
                   <span
                     className={cn(
-                      "rounded border px-2 py-0.5 font-mono text-[10px] font-bold",
+                      "rounded border px-2 py-0.5 font-mono text-[11px] font-bold",
                       report.dataKind === "demo"
                         ? "border-marketing-amber/30 bg-marketing-amber/10 text-marketing-amber"
                         : "border-success-emerald/30 bg-success-emerald/10 text-success-emerald"
@@ -223,7 +223,7 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
               ["Not judged (no leads)", money(m.unjudgedSpend, 2)],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-[var(--border-hairline)] bg-surface-container p-3">
-                <p className="text-[10px] text-on-surface-variant uppercase">{label}</p>
+                <p className="text-[11px] text-on-surface-variant uppercase">{label}</p>
                 <p className="mt-1 text-sm font-bold text-on-surface">{value}</p>
               </div>
             ))}
@@ -231,7 +231,7 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
 
           {m.bySource.length ? (
             <div className="flex flex-col gap-1.5">
-              <p className="font-mono text-[10px] text-on-surface-variant uppercase">Spend on spam by platform ({m.from} → {m.to})</p>
+              <p className="font-mono text-[11px] text-on-surface-variant uppercase">Spend on spam by platform ({m.from} → {m.to})</p>
               {m.bySource.map((s) => (
                 <div key={s.source} className="flex items-center justify-between rounded-lg bg-surface-container px-3 py-2 text-xs">
                   <span className="font-semibold text-on-surface">
@@ -259,11 +259,11 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
                 figures above.
               </p>
             ) : null}
-            <p className="text-[10px] text-on-surface-variant">{report.engineNote}</p>
+            <p className="text-[11px] text-on-surface-variant">{report.engineNote}</p>
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="font-mono text-[10px] text-on-surface-variant uppercase">Proposals — each needs your confirmation</p>
+            <p className="font-mono text-[11px] text-on-surface-variant uppercase">Proposals — each needs your confirmation</p>
             {report.proposals.length === 0 ? (
               <p className="text-xs text-on-surface-variant">No pause or scale proposals in this window.</p>
             ) : (
@@ -294,7 +294,7 @@ export function WasteReportPanel({ onChanged }: { onChanged?: () => void }) {
       )}
 
       {usage ? (
-        <p className="border-t border-[var(--border-hairline)] pt-2 font-mono text-[10px] text-on-surface-variant">
+        <p className="border-t border-[var(--border-hairline)] pt-2 font-mono text-[11px] text-on-surface-variant">
           AI cost (estimated): ${usage.estimatedUsd.toFixed(4)} across {usage.calls} Claude call(s) · {usage.inputTokens.toLocaleString()} in /{" "}
           {usage.outputTokens.toLocaleString()} out tokens · estimate at ${usage.pricing.inputPerMillion}/${usage.pricing.outputPerMillion} per
           million tokens, not an invoice. Counts waste reports only.

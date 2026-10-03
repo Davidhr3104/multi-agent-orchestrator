@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HOW_TO_USE_MARKETING } from "@helix/help";
 import { EngineShell } from "@/components/engine-shell";
+import { FlowCard } from "@/components/desk-charts";
 
 export default function HelpPage() {
   const guide = HOW_TO_USE_MARKETING;
@@ -16,6 +17,7 @@ export default function HelpPage() {
             Take the tour
           </Link>
         </div>
+        <FlowCard />
         <ol className="flex flex-col gap-3">
           {guide.steps.map((step) => (
             <li

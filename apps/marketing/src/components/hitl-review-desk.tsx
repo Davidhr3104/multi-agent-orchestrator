@@ -1,8 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CampaignAction, StoredCampaign } from "@helix/core";
 import { isSnoozed, snoozeId } from "@/lib/desk-prefs";
+import { useDeskWindow } from "@/lib/use-desk-snapshot";
+import { recommendedSpend } from "@/lib/desk-derive";
+import { DemoChip } from "@helix/ui";
+import { ReviewCharts, useDemoMode } from "@/components/desk-charts";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -24,16 +28,9 @@ type Candidate = {
 
 function mapCampaign(c: StoredCampaign): Candidate {
   const current = Math.max(0, Math.round(c.spend));
-  const recommended =
-    c.action === "scale"
-      ? Math.round(current * 1.35) || Math.round(current + 50)
-      : c.action === "pause"
-        ? 0
-        : current;
-  const conf = Math.min(
-    98,
-    Math.max(55, Math.round(c.confidence * 100) || 70 + Math.round(c.metrics.avgScore / 4))
-  );
+  const recommended = recommendedSpend(c);
+  // confidence exactly as the engine reports it: no floor, no cap
+  const conf = Math.round(c.confidence * 1000) / 10;
   return {
     id: c.id,
     campaignId: c.campaignId,
@@ -68,7 +65,7 @@ function mapCampaign(c: StoredCampaign): Candidate {
 function PlatformPill({ platform }: { platform: Candidate["platform"] }) {
   if (platform === "meta") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[#3131c0]/40 px-2 py-0.5 font-mono text-[10px] font-bold text-[#c0c1ff]">
+      <span className="inline-flex items-center gap-1 rounded-full bg-[#3131c0]/40 px-2 py-0.5 font-mono text-[11px] font-bold text-[#c0c1ff]">
         <span className="size-1.5 rounded-full bg-[#c0c1ff]" />
         Meta Ads
       </span>
@@ -76,14 +73,14 @@ function PlatformPill({ platform }: { platform: Candidate["platform"] }) {
   }
   if (platform === "google") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-primary-container/20 px-2 py-0.5 font-mono text-[10px] font-bold text-marketing-amber">
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary-container/20 px-2 py-0.5 font-mono text-[11px] font-bold text-marketing-amber">
         <span className="size-1.5 rounded-full bg-primary-container" />
         Google Ads
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-highest px-2 py-0.5 font-mono text-[10px] font-bold text-on-surface">
+    <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-highest px-2 py-0.5 font-mono text-[11px] font-bold text-on-surface">
       <span className="size-1.5 rounded-full bg-on-surface" />
       Other
     </span>
@@ -96,13 +93,13 @@ function TrajectoryChart({ liftPct }: { liftPct: number }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <span className="text-[16px] font-semibold text-on-surface">
-            Spend & ROAS Trajectory Simulator
+            Spend trajectory sketch <DemoChip kind="illustrative" />
           </span>
-          <p className="font-mono text-[10px] text-outline">
-            Illustrative projection · target lift ~{liftPct.toFixed(0)}% vs baseline
+          <p className="font-mono text-[11px] text-outline">
+            Not a forecast: a sketch of the intended change · lift ~{liftPct.toFixed(0)}% vs baseline
           </p>
         </div>
-        <div className="flex items-center gap-4 font-mono text-[10px]">
+        <div className="flex items-center gap-4 font-mono text-[11px]">
           <span className="flex items-center gap-1.5 text-on-surface-variant">
             <span className="h-0.5 w-3 border-b border-dashed border-outline" /> Baseline
           </span>
@@ -169,7 +166,7 @@ function TrajectoryChart({ liftPct }: { liftPct: number }) {
           <circle cx="310" cy="125" r="5" fill="#f97316" stroke="#fff" strokeWidth="2" />
           <circle cx="560" cy="35" r="4.5" fill="#10b981" stroke="#fff" strokeWidth="2" />
         </svg>
-        <div className="flex items-center justify-between px-4 pt-1 font-mono text-[10px] text-outline">
+        <div className="flex items-center justify-between px-4 pt-1 font-mono text-[11px] text-outline">
           <span>Day −7</span>
           <span className="font-semibold text-primary-container">T-0 Execution</span>
           <span className="font-semibold text-success-emerald">Day +7</span>
@@ -181,6 +178,8 @@ function TrajectoryChart({ liftPct }: { liftPct: number }) {
 
 export function HitlReviewDesk() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [win] = useDeskWindow();
+  const demo = useDemoMode();
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [budget, setBudget] = useState(0);
@@ -202,15 +201,19 @@ export function HitlReviewDesk() {
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const [campRes, syncRes] = await Promise.all([
-        fetch("/api/campaigns?window=30d"),
+        fetch(`/api/campaigns?window=${win}`),
         fetch("/api/ads/sync"),
       ]);
       const d = (await campRes.json()) as { campaigns?: StoredCampaign[] };
       const s = (await syncRes.json()) as { metaConfigured?: boolean };
+      // the window can change while a request is in flight; only the latest one may write state
+      if (seq !== loadSeq.current) return;
       setMetaReady(Boolean(s.metaConfigured));
       const mapped = (d.campaigns ?? [])
         .filter((c) => c.needsReview && !isSnoozed(c.id))
@@ -226,7 +229,7 @@ export function HitlReviewDesk() {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, win]);
 
   useEffect(() => {
     void load();
@@ -425,7 +428,7 @@ export function HitlReviewDesk() {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase">
+        <div className="flex items-center gap-2 font-mono text-[11px] tracking-wider uppercase">
           <span className="text-outline">Control Plane</span>
           <span className="text-outline">/</span>
           <span className="text-on-surface-variant">HITL Queue</span>
@@ -433,13 +436,13 @@ export function HitlReviewDesk() {
           <span className="font-semibold text-primary">{candidates.length} pending</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#161824] px-2.5 py-1 font-mono text-[10px] text-marketing-amber shadow-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#161824] px-2.5 py-1 font-mono text-[11px] text-marketing-amber shadow-sm">
             <span className="size-1.5 animate-ping rounded-full bg-marketing-amber" />
             {candidates.length > 0 ? "Review Mandate Active" : "Queue Clear"}
           </span>
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[10px]",
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px]",
               sandboxMode
                 ? "bg-tertiary/15 text-tertiary"
                 : "bg-surface-container-high text-on-surface-variant"
@@ -513,7 +516,7 @@ export function HitlReviewDesk() {
           <span className="text-[32px] leading-10 font-semibold text-on-surface">
             {loading ? "…" : candidates.length}
           </span>
-          <div className="mt-2 font-mono text-[10px] text-outline">needsReview · 30d window</div>
+          <div className="mt-2 font-mono text-[11px] text-outline">needsReview · {win} window</div>
         </div>
         <div className="relative overflow-hidden rounded-lg bg-obsidian-raised p-3 shadow-sm">
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-success-emerald via-tertiary to-transparent opacity-70" />
@@ -523,7 +526,7 @@ export function HitlReviewDesk() {
           <span className="text-[32px] leading-10 font-semibold text-on-surface">
             {selected ? `${delta >= 0 ? "+" : ""}${money(delta)}` : "—"}
           </span>
-          <div className="mt-2 font-mono text-[10px] text-outline">
+          <div className="mt-2 font-mono text-[11px] text-outline">
             {selected ? `${deltaPct}% vs current floor` : "Select a candidate"}
           </div>
         </div>
@@ -535,7 +538,7 @@ export function HitlReviewDesk() {
           <span className="text-[32px] leading-10 font-semibold text-on-surface">
             {risk.toFixed(2)}
           </span>
-          <div className="mt-2 font-mono text-[10px] text-outline">pause-weighted / queue</div>
+          <div className="mt-2 font-mono text-[11px] text-outline">pause-weighted / queue</div>
         </div>
         <div className="relative overflow-hidden rounded-lg bg-obsidian-raised p-3 shadow-sm">
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-tertiary via-[#00a9c5] to-transparent opacity-60" />
@@ -543,11 +546,13 @@ export function HitlReviewDesk() {
           <span className="text-[32px] leading-10 font-semibold text-on-surface">
             {metaReady ? "Yes" : "No"}
           </span>
-          <div className="mt-2 font-mono text-[10px] text-outline">
+          <div className="mt-2 font-mono text-[11px] text-outline">
             {metaReady ? "Insights + write keys present" : "Configure in Settings"}
           </div>
         </div>
       </div>
+
+      <ReviewCharts campaigns={candidates.map((c) => c.real)} ctx={{ demo, win, from: "", to: "" }} />
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
         <div className="flex flex-col gap-4 lg:col-span-5">
@@ -560,7 +565,7 @@ export function HitlReviewDesk() {
               <button
                 type="button"
                 onClick={() => void load()}
-                className="font-mono text-[10px] text-tertiary hover:underline"
+                className="font-mono text-[11px] text-tertiary hover:underline"
               >
                 Refresh
               </button>
@@ -578,7 +583,7 @@ export function HitlReviewDesk() {
                   type="button"
                   onClick={() => setFilter(f.id)}
                   className={cn(
-                    "shrink-0 rounded-full px-2.5 py-1 font-mono text-[10px] transition-colors",
+                    "shrink-0 rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors",
                     filter === f.id
                       ? "bg-primary-container font-semibold text-on-primary-container shadow-sm"
                       : "bg-surface-container-high text-on-surface-variant hover:bg-surface-bright"
@@ -598,7 +603,7 @@ export function HitlReviewDesk() {
             ) : null}
             {!loading && visible.length === 0 ? (
               <div className="rounded-lg bg-obsidian-raised p-6 text-center text-sm text-on-surface-variant">
-                Queue clear — no campaigns need review in the 30d window.
+                Queue clear — no campaigns need review in the {win} window.
                 <div className="mt-3">
                   <a href="/" className="text-primary-container hover:underline">
                     ← Performance Engine
@@ -626,11 +631,11 @@ export function HitlReviewDesk() {
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <PlatformPill platform={c.platform} />
-                      <span className="font-mono text-[10px] text-outline">#{c.campaignId}</span>
+                      <span className="font-mono text-[11px] text-outline">#{c.campaignId}</span>
                     </div>
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold",
+                        "rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold",
                         c.confidence >= 90
                           ? "bg-success-emerald/15 text-success-emerald"
                           : "bg-marketing-amber/15 text-marketing-amber"
@@ -641,7 +646,7 @@ export function HitlReviewDesk() {
                   </div>
                   <h3 className="mt-1 mb-1 text-[16px] font-semibold text-on-surface">{c.title}</h3>
                   <p className="mb-3 line-clamp-2 text-[11px] text-on-surface-variant">{c.blurb}</p>
-                  <div className="flex items-center justify-between rounded bg-surface-container-lowest p-2 font-mono text-[10px]">
+                  <div className="flex items-center justify-between rounded bg-surface-container-lowest p-2 font-mono text-[11px]">
                     <div>
                       <span className="block text-outline">Current / Rec.</span>
                       <span className="font-semibold text-on-surface">
@@ -674,12 +679,12 @@ export function HitlReviewDesk() {
               <div className="space-y-2 bg-surface-container-low p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-primary-container/20 px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider text-marketing-amber">
+                    <span className="rounded bg-primary-container/20 px-2 py-0.5 font-mono text-[11px] font-bold tracking-wider text-marketing-amber">
                       RECOMMENDED · {selected.kind.toUpperCase()}
                     </span>
-                    <span className="font-mono text-[10px] text-outline">#{selected.campaignId}</span>
+                    <span className="font-mono text-[11px] text-outline">#{selected.campaignId}</span>
                   </div>
-                  <span className="font-mono text-[10px] font-semibold text-success-emerald">
+                  <span className="font-mono text-[11px] font-semibold text-success-emerald">
                     {selected.confidence.toFixed(1)}% confidence
                   </span>
                 </div>
@@ -699,13 +704,13 @@ export function HitlReviewDesk() {
                 {simResult ? (
                   <div className="mt-3 rounded-lg border border-tertiary/30 bg-tertiary/10 px-3 py-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] font-bold tracking-wider text-tertiary uppercase">
+                      <span className="font-mono text-[11px] font-bold tracking-wider text-tertiary uppercase">
                         Simulation result
                       </span>
                       <button
                         type="button"
                         onClick={() => setSimResult(null)}
-                        className="font-mono text-[10px] text-outline hover:text-on-surface"
+                        className="font-mono text-[11px] text-outline hover:text-on-surface"
                       >
                         Dismiss
                       </button>
@@ -732,7 +737,7 @@ export function HitlReviewDesk() {
                       <span className="text-[16px] font-semibold text-on-surface">
                         Human Override Budget Adjuster
                       </span>
-                      <p className="font-mono text-[10px] text-outline">
+                      <p className="font-mono text-[11px] text-outline">
                         Recorded in HITL note · Meta scale uses engine +20% when writable
                       </p>
                     </div>
@@ -742,7 +747,7 @@ export function HitlReviewDesk() {
                       </span>
                       <span
                         className={cn(
-                          "block font-mono text-[10px] font-medium",
+                          "block font-mono text-[11px] font-medium",
                           delta >= 0 ? "text-success-emerald" : "text-alert-rose"
                         )}
                       >
@@ -760,7 +765,7 @@ export function HitlReviewDesk() {
                     onChange={(e) => setBudget(Number(e.target.value))}
                     className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-surface-container-highest accent-primary-container"
                   />
-                  <div className="flex justify-between font-mono text-[10px] text-outline">
+                  <div className="flex justify-between font-mono text-[11px] text-outline">
                     <span>{money(floor)} (current)</span>
                     <span className="text-marketing-amber">{money(selected.recommended)} (AI)</span>
                     <span>
@@ -780,7 +785,7 @@ export function HitlReviewDesk() {
                   >
                     <span className="material-symbols-outlined text-[18px]">close</span>
                     Reject
-                    <span className="ml-1 rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[10px] text-outline">
+                    <span className="ml-1 rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-outline">
                       R
                     </span>
                   </button>
@@ -805,7 +810,7 @@ export function HitlReviewDesk() {
                   >
                     <span className="material-symbols-outlined text-[18px] text-tertiary">science</span>
                     Sandbox
-                    <span className="ml-1 rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[10px] text-outline">
+                    <span className="ml-1 rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-outline">
                       S
                     </span>
                   </button>
@@ -823,14 +828,14 @@ export function HitlReviewDesk() {
                       : sandboxMode
                         ? "Approve (Local)"
                         : `Approve & Push${selected.platform === "meta" ? " to Meta" : ""}`}
-                    <span className="ml-1 rounded bg-on-primary-container/20 px-1.5 py-0.5 font-mono text-[10px]">
+                    <span className="ml-1 rounded bg-on-primary-container/20 px-1.5 py-0.5 font-mono text-[11px]">
                       A
                     </span>
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between bg-obsidian-base px-5 py-2 font-mono text-[10px] text-outline">
+              <div className="flex items-center justify-between bg-obsidian-base px-5 py-2 font-mono text-[11px] text-outline">
                 <div className="flex flex-wrap items-center gap-4">
                   <span>
                     <strong className="text-on-surface">A</strong> Approve

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
+import { deskWindow } from "@/lib/desk-prefs";
 
 type Nav =
   | "engine"
@@ -143,7 +144,7 @@ export function EngineShell({
     let cancelled = false;
     void Promise.all([
       fetch("/api/status").then((r) => r.json()),
-      fetch("/api/campaigns?window=30d").then((r) => r.json()),
+      fetch(`/api/campaigns?window=${deskWindow()}`).then((r) => r.json()),
     ])
       .then(([status, desk]) => {
         if (cancelled) return;
@@ -213,7 +214,7 @@ export function EngineShell({
       window.location.href = "/";
       return;
     }
-    void fetch("/api/campaigns?window=90d")
+    void fetch(`/api/campaigns?window=${deskWindow()}`)
       .then((r) => r.json())
       .then((d: { campaigns?: { campaignId: string; name: string }[]; unmatched?: { campaignId: string; name?: string }[] }) => {
         const hit = (d.campaigns ?? []).find(
@@ -250,7 +251,7 @@ export function EngineShell({
       label: "$ on Spam & Ad Waste",
       icon: "shield_with_heart",
       badge: wasteBadge ? (
-        <span className="rounded-full bg-alert-rose/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-alert-rose">
+        <span className="rounded-full bg-alert-rose/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-alert-rose">
           {wasteBadge}
         </span>
       ) : undefined,
@@ -263,7 +264,7 @@ export function EngineShell({
       icon: "fact_check",
       badge:
         reviewPending > 0 ? (
-          <span className="rounded-full bg-marketing-amber/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-marketing-amber">
+          <span className="rounded-full bg-marketing-amber/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-marketing-amber">
             {reviewPending} pending
           </span>
         ) : undefined,
@@ -283,7 +284,7 @@ export function EngineShell({
   function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
     return (
       <div className="space-y-1">
-        <div className="px-2 font-mono text-[10px] font-medium tracking-wider text-outline uppercase">
+        <div className="px-2 font-mono text-[11px] font-medium tracking-wider text-outline uppercase">
           {title}
         </div>
         <nav className="space-y-0.5">
@@ -343,12 +344,12 @@ export function EngineShell({
           />
           <div className="flex items-center gap-1.5">
             <span className="text-[16px] font-semibold tracking-tight text-on-surface">Helix</span>
-            <span className="rounded-full bg-primary-container/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-marketing-amber uppercase">
+            <span className="rounded-full bg-primary-container/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wider text-marketing-amber uppercase">
               Marketing
             </span>
           </div>
         </div>
-        <span className="font-mono text-[10px] text-outline">v2.4</span>
+        <span className="font-mono text-[11px] text-outline">v2.4</span>
       </div>
 
       <div className="px-5 pb-3">
@@ -357,7 +358,7 @@ export function EngineShell({
             <span className="block truncate text-[11px] font-medium text-on-surface">
               Production Workspace
             </span>
-            <span className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] text-success-emerald">
+            <span className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-success-emerald">
               <span className="size-1.5 rounded-full bg-success-emerald" />
               {activeSyncs} active sync{activeSyncs === 1 ? "" : "s"}
             </span>
@@ -370,7 +371,7 @@ export function EngineShell({
         <NavGroup title="Overview" items={overview} />
 
         <div className="space-y-1">
-          <div className="px-2 font-mono text-[10px] font-medium tracking-wider text-outline uppercase">
+          <div className="px-2 font-mono text-[11px] font-medium tracking-wider text-outline uppercase">
             Connectors & Platforms
           </div>
           <nav className="space-y-0.5">
@@ -386,7 +387,7 @@ export function EngineShell({
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span className={cn("size-1.5 rounded-full", statusDot(c.status))} />
-                  <span className="font-mono text-[10px] text-on-surface-variant">
+                  <span className="font-mono text-[11px] text-on-surface-variant">
                     {statusLabel(c.status)}
                   </span>
                 </div>
@@ -411,7 +412,7 @@ export function EngineShell({
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1 font-mono text-[10px] text-success-emerald">
+        <div className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-success-emerald">
           <span className="size-1.5 rounded-full bg-success-emerald" />
           ready
         </div>
@@ -457,7 +458,7 @@ export function EngineShell({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              <span className="absolute right-2 rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[10px] text-outline">
+              <span className="absolute right-2 rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[11px] text-outline">
                 ↵
               </span>
             </form>
@@ -469,7 +470,7 @@ export function EngineShell({
                   liveConnectors.length ? "bg-success-emerald" : "bg-outline"
                 )}
               />
-              <span className="font-mono text-[10px] text-on-surface">{headerLive}</span>
+              <span className="font-mono text-[11px] text-on-surface">{headerLive}</span>
             </div>
 
             <button

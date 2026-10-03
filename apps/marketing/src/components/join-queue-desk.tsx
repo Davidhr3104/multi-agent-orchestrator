@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AttributedLead, CampaignRemap, SpendEvent, StoredCampaign } from "@helix/core";
-import { loadJson, saveJson } from "@/lib/desk-prefs";
+import { deskWindow, loadJson, saveJson } from "@/lib/desk-prefs";
 import { money } from "@/lib/format";
+import { DemoChip, KpiCard as UiKpi } from "@helix/ui";
+import { groupUnmatched } from "@/lib/desk-derive";
 import { cn } from "@/lib/utils";
 
 type Tab = "pending" | "matched" | "regex" | "dead";
@@ -16,127 +18,6 @@ const WAREHOUSES: { name: WarehouseName; icon: string; ic: string }[] = [
   { name: "BigQuery", icon: "database", ic: "text-primary-container" },
   { name: "ClickHouse", icon: "bolt", ic: "text-marketing-amber" },
 ];
-
-const WEIGHTS = [
-  { id: "click", label: "Click Timestamp Proximity", pct: 40, color: "#f97316" },
-  { id: "cookie", label: "Deterministic Cookie ID", pct: 45, color: "#fb923c" },
-  { id: "ip", label: "IP / Subnet Fallback", pct: 15, color: "#4cd7f6" },
-] as const;
-
-/** Donut + stacked arc for heuristic reallocation weights */
-function HeuristicWeightsVisual() {
-  const [hover, setHover] = useState<string | null>(null);
-  const R = 54;
-  const CX = 70;
-  const CY = 70;
-  const C = 2 * Math.PI * R;
-
-  const arcs = useMemo(() => {
-    let offset = 0;
-    return WEIGHTS.map((w) => {
-      const len = (w.pct / 100) * C;
-      const item = { ...w, dash: len, gap: C - len, offset };
-      offset += len;
-      return item;
-    });
-  }, []);
-
-  return (
-    <div className="space-y-3 rounded-xl bg-surface-container p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-[16px] font-medium text-on-surface">Heuristic Weights</span>
-        <span className="font-mono text-[10px] text-marketing-amber">Linear Decay · Reallocation</span>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="relative shrink-0">
-          <svg viewBox="0 0 140 140" className="size-36 -rotate-90">
-            <circle cx={CX} cy={CY} r={R} fill="none" stroke="#0d0e13" strokeWidth="18" />
-            {arcs.map((a) => {
-              const dim = hover && hover !== a.id;
-              return (
-                <circle
-                  key={a.id}
-                  cx={CX}
-                  cy={CY}
-                  r={R}
-                  fill="none"
-                  stroke={a.color}
-                  strokeWidth={hover === a.id ? 22 : 16}
-                  strokeDasharray={`${a.dash} ${a.gap}`}
-                  strokeDashoffset={-a.offset}
-                  strokeLinecap="butt"
-                  opacity={dim ? 0.25 : 1}
-                  className="cursor-pointer transition-all duration-200"
-                  onMouseEnter={() => setHover(a.id)}
-                  onMouseLeave={() => setHover(null)}
-                />
-              );
-            })}
-          </svg>
-          <div className="absolute inset-0 flex rotate-0 flex-col items-center justify-center">
-            <span className="font-mono text-[11px] text-outline">Σ weights</span>
-            <span className="text-lg font-bold text-on-surface">100%</span>
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-2">
-          {WEIGHTS.map((w) => {
-            const on = !hover || hover === w.id;
-            return (
-              <button
-                key={w.id}
-                type="button"
-                className={cn(
-                  "w-full rounded-lg border border-[var(--border-hairline)] bg-obsidian-base p-2 text-left transition-opacity",
-                  on ? "opacity-100" : "opacity-35"
-                )}
-                onMouseEnter={() => setHover(w.id)}
-                onMouseLeave={() => setHover(null)}
-              >
-                <div className="mb-1 flex items-center justify-between font-mono text-[10px]">
-                  <span className="flex items-center gap-1.5 text-on-surface-variant">
-                    <span className="size-2 rounded-full" style={{ background: w.color }} />
-                    {w.label}
-                  </span>
-                  <span className="font-bold text-on-surface">{w.pct}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-lowest">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${w.pct}%`, background: w.color }}
-                  />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Stacked allocation strip */}
-      <div className="space-y-1">
-        <div className="font-mono text-[9px] tracking-wider text-outline uppercase">
-          Touchpoint reallocation mix
-        </div>
-        <div className="flex h-3 overflow-hidden rounded-full border border-[var(--border-hairline)]">
-          {WEIGHTS.map((w) => (
-            <div
-              key={w.id}
-              className="h-full transition-all"
-              style={{
-                width: `${w.pct}%`,
-                background: w.color,
-                opacity: hover && hover !== w.id ? 0.3 : 1,
-              }}
-              onMouseEnter={() => setHover(w.id)}
-              onMouseLeave={() => setHover(null)}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function looksLikeTikTok(row: Pick<SpendEvent, "platform" | "campaignId" | "name">): boolean {
   const hay = `${row.campaignId} ${row.name}`.toLowerCase();
@@ -166,24 +47,6 @@ function matchesChannelFilter(
     ch.label.toLowerCase().includes("tiktok") ||
     (row.platform === "other" && looksLikeTikTok(row))
   );
-}
-
-function scoreFromSpend(spend: number): { score: number; conf: string; confTone: "ok" | "warn" | "bad" } {
-  if (spend <= 0) return { score: 0, conf: "unjoined", confTone: "bad" };
-  const score = Math.min(99, Math.max(20, Math.round(40 + Math.log10(spend + 1) * 18)));
-  if (score >= 75) return { score, conf: `${(score / 100 * 98).toFixed(1)}% Confirmed`, confTone: "ok" };
-  if (score >= 55) return { score, conf: `${(score / 100 * 90).toFixed(1)}% Ambiguous`, confTone: "warn" };
-  return { score, conf: "unjoined", confTone: "bad" };
-}
-
-function formatTs(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso.slice(0, 8) || "—";
-    return d.toLocaleTimeString(undefined, { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  } catch {
-    return "—";
-  }
 }
 
 function looseMatch(a: string, b: string): boolean {
@@ -219,7 +82,7 @@ export function JoinQueueDesk() {
 
   const refresh = useCallback(async () => {
     const [deskRes, remapRes] = await Promise.all([
-      fetch("/api/campaigns?window=90d"),
+      fetch(`/api/campaigns?window=${deskWindow()}`),
       fetch("/api/leads/remap"),
     ]);
     const desk = (await deskRes.json()) as {
@@ -256,6 +119,22 @@ export function JoinQueueDesk() {
       return hay.includes(q);
     });
   }, [unmatched, filterQ, channelFilter]);
+
+  const groups = useMemo(() => groupUnmatched(filtered), [filtered]);
+  const joinedSpend = campaigns.reduce((s, c) => s + c.spend, 0);
+  const orphanShare = orphanSpend + joinedSpend > 0 ? orphanSpend / (orphanSpend + joinedSpend) : 0;
+
+  function toggleGroup(ids: string[]) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const all = ids.every((i) => next.has(i));
+      for (const i of ids) {
+        if (all) next.delete(i);
+        else next.add(i);
+      }
+      return next;
+    });
+  }
 
   function selectWarehouse(name: WarehouseName) {
     setWarehouse(name);
@@ -459,15 +338,6 @@ export function JoinQueueDesk() {
     showToast(`Exported ${rows.length} row(s)`);
   }
 
-  function toggleRow(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   function toggleAllFiltered() {
     if (allFilteredSelected) {
       setSelectedIds((prev) => {
@@ -488,11 +358,11 @@ export function JoinQueueDesk() {
     pending: orphanIds,
     matched: remaps.length,
     regex: remaps.length,
-    dead: Math.max(0, orphanIds > 0 ? Math.min(orphanIds, remaps.length) : 0),
+    dead: orphanIds,
   };
 
   return (
-    <div className="relative flex w-full flex-col pb-16">
+    <div className="relative flex w-full flex-col overflow-x-clip pb-16">
       <div className="pointer-events-none absolute -top-12 left-1/4 -z-10 h-48 w-96 rounded-full bg-primary-container/10 blur-[100px]" />
       <div className="pointer-events-none absolute top-24 right-10 -z-10 h-44 w-72 rounded-full bg-[#1877F2]/15 blur-[90px]" />
 
@@ -511,25 +381,19 @@ export function JoinQueueDesk() {
       <section className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
         <div className="max-w-3xl space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded bg-primary-container/15 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-marketing-amber uppercase">
+            <span className="rounded bg-primary-container/15 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wider text-marketing-amber uppercase">
               v4.2 Heuristic Ingestion
             </span>
-            <span className="flex items-center gap-1.5 rounded bg-surface-container px-2 py-0.5 font-mono text-[10px] text-tertiary">
-              <span className="size-1.5 animate-ping rounded-full bg-tertiary" />
-              Live Stream #108
-            </span>
-            <span className="font-mono text-[10px] text-outline">HASH: e82f_reconcile</span>
           </div>
           <h1 className="text-[32px] leading-10 font-semibold tracking-tight text-on-surface">
             Join Queue & UTM Mapper
           </h1>
           <p className="text-[13px] leading-5 text-on-surface-variant">
-            Deterministic UTM normalization, unjoined ad impressions queue, and synthetic touchpoint
-            reconciliation
+            Spend that has no scored leads yet, grouped by campaign. Map each one to the lead campaign it belongs to
             {orphanIds > 0 ? (
               <>
                 {" "}
-                · <span className="text-marketing-amber">{orphanIds} live orphans</span> (
+                · <span className="text-marketing-amber">{orphanIds} campaign{orphanIds === 1 ? "" : "s"} without leads</span> (
                 {money(orphanSpend)})
               </>
             ) : null}
@@ -567,120 +431,15 @@ export function JoinQueueDesk() {
         </div>
       </section>
 
-      {/* KPIs */}
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="flex flex-col justify-between rounded-xl bg-obsidian-raised p-3 shadow-sm transition-colors hover:bg-[#161824]">
-          <div className="mb-2 flex items-center justify-between text-on-surface-variant">
-            <span className="text-[11px] font-medium">Unjoined Lead Queue</span>
-            <span className="material-symbols-outlined text-[18px] text-marketing-amber">hourglass_top</span>
-          </div>
-          <div className="text-[32px] leading-10 font-semibold tracking-tight text-on-surface">
-            {orphanIds.toLocaleString()}
-          </div>
-          <div className="flex justify-between font-mono text-[10px]">
-            <span className="text-marketing-amber">{unmatched.length} spend events</span>
-            <span className="text-outline">{remaps.length} remaps</span>
-          </div>
-          <div className="mt-3 flex h-7 items-end gap-1 pt-1">
-            {[30, 45, 35, 60, 80, 100, 75, 50, 90, 65].map((h, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "w-full rounded-t-sm",
-                  i >= 4 && i !== 7 ? "bg-primary-container" : "bg-surface-container-highest"
-                )}
-                style={{ height: `${h}%`, opacity: i === 5 ? 1 : 0.6 + (i % 3) * 0.1 }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl bg-obsidian-raised p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between text-on-surface-variant">
-            <span className="text-[11px] font-medium">Deterministic Match Rate</span>
-            <span className="material-symbols-outlined text-[18px] text-success-emerald">verified</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[32px] leading-10 font-semibold tracking-tight text-on-surface">
-                {remaps.length > 0 ? remaps.length : "—"}
-              </div>
-              <div className="flex items-center gap-1 font-mono text-[10px] text-success-emerald">
-                <span className="material-symbols-outlined text-[14px]">link</span>
-                remaps stored
-              </div>
-            </div>
-            <div className="relative flex size-12 shrink-0 items-center justify-center">
-              <svg className="size-full -rotate-90" viewBox="0 0 36 36">
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3.5"
-                  className="text-surface-container-highest"
-                />
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${Math.min(100, remaps.length * 8)}, 100`}
-                  className="text-success-emerald"
-                />
-              </svg>
-              <span className="absolute font-mono text-[10px] text-on-surface">{remaps.length || "—"}</span>
-            </div>
-          </div>
-          <div className="mt-3 font-mono text-[10px] text-outline">From GET /api/leads/remap</div>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl bg-obsidian-raised p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between text-on-surface-variant">
-            <span className="text-[11px] font-medium">Orphaned Ad Spend</span>
-            <span className="material-symbols-outlined text-[18px] text-alert-rose">money_off</span>
-          </div>
-          <div className="text-[32px] leading-10 font-semibold tracking-tight text-alert-rose">
-            {money(orphanSpend)}
-          </div>
-          <div className="font-mono text-[10px] text-on-surface-variant">
-            {orphanIds} unmapped campaigns
-          </div>
-          <div className="mt-3 flex h-7 items-center">
-            <svg className="h-full w-full overflow-visible" viewBox="0 0 100 24" preserveAspectRatio="none">
-              <polyline
-                fill="none"
-                points="0,20 20,20 20,15 45,15 45,8 70,8 70,12 100,4"
-                stroke="#f43f5e"
-                strokeWidth="2"
-              />
-              <circle cx="100" cy="4" r="3" fill="#f43f5e" />
-            </svg>
-          </div>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl bg-obsidian-raised p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between text-on-surface-variant">
-            <span className="text-[11px] font-medium">Mean Join Latency</span>
-            <span className="material-symbols-outlined text-[18px] text-tertiary">speed</span>
-          </div>
-          <div className="flex items-baseline gap-1.5 text-[32px] leading-10 font-semibold tracking-tight text-on-surface">
-            —
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-outline">
-              No telemetry
-            </span>
-          </div>
-          <div className="mt-3 flex justify-between font-mono text-[10px] text-outline">
-            <span>p99: —</span>
-            <span>{busy ? "Working…" : "Idle"}</span>
-          </div>
-        </div>
+      {/* KPIs: all from the desk snapshot */}
+      <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <UiKpi label="Campaigns without leads" value={orphanIds} hint={orphanIds === 0 ? "Everything is joined" : `${unmatched.length} spend events`} accent="#f59e0b" />
+        <UiKpi label="Orphaned ad spend" value={money(orphanSpend)} hint={`${Math.round(orphanShare * 100)}% of all spend in this window`} accent="#f87171" />
+        <UiKpi label="Remaps stored" value={remaps.length > 0 ? remaps.length : "—"} hint={remaps.length > 0 ? "from GET /api/leads/remap" : "No remaps yet: resolve a match to create one"} accent="#34d399" />
       </section>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
-        <section className="flex flex-col gap-3 lg:col-span-8">
+        <section className="flex min-w-0 flex-col gap-3 lg:col-span-12">
           <div className="flex flex-col overflow-hidden rounded-xl bg-obsidian-raised shadow-md">
             <div className="flex flex-wrap items-center justify-between gap-2 bg-obsidian-base px-3 pt-2">
               <div className="flex items-center gap-1 overflow-x-auto">
@@ -706,7 +465,7 @@ export function JoinQueueDesk() {
                     {t.label}
                     <span
                       className={cn(
-                        "rounded-full px-1.5 font-mono text-[10px]",
+                        "rounded-full px-1.5 font-mono text-[11px]",
                         "hot" in t && t.hot && tab === t.id
                           ? "bg-primary-container text-on-primary-container"
                           : "dead" in t && t.dead
@@ -719,7 +478,6 @@ export function JoinQueueDesk() {
                   </button>
                 ))}
               </div>
-              <span className="pb-2 font-mono text-[10px] text-outline">Auto-sync: 5s</span>
             </div>
 
             <div className="flex flex-col justify-between gap-2 p-3 md:flex-row md:items-center">
@@ -752,7 +510,7 @@ export function JoinQueueDesk() {
                         setChannelFilter((prev) => (prev === f.filter ? null : f.filter))
                       }
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px]",
+                        "flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px]",
                         on
                           ? "bg-primary-container/25 font-semibold text-on-surface ring-1 ring-primary-container/50"
                           : "bg-surface-container text-on-surface hover:bg-surface-container-high"
@@ -769,7 +527,7 @@ export function JoinQueueDesk() {
                     setFilterQ("");
                     setChannelFilter(null);
                   }}
-                  className="flex items-center gap-1 rounded-full bg-surface-container-low px-2.5 py-1 font-mono text-[10px] text-tertiary hover:bg-surface-container"
+                  className="flex items-center gap-1 rounded-full bg-surface-container-low px-2.5 py-1 font-mono text-[11px] text-tertiary hover:bg-surface-container"
                 >
                   <span className="material-symbols-outlined text-[12px]">filter_alt_off</span>
                   Clear
@@ -778,9 +536,9 @@ export function JoinQueueDesk() {
             </div>
 
             <div className="w-full overflow-x-auto">
-              <table className="w-full border-collapse text-left text-[12px]">
+              <table className="w-full min-w-[820px] border-collapse text-left text-[12px]">
                 <thead>
-                  <tr className="h-9 bg-obsidian-base font-mono text-[10px] tracking-wider text-outline uppercase">
+                  <tr className="h-9 bg-obsidian-base font-mono text-[11px] tracking-wider text-outline uppercase">
                     <th className="w-8 px-3 py-2">
                       <input
                         type="checkbox"
@@ -790,13 +548,13 @@ export function JoinQueueDesk() {
                         disabled={tab !== "pending" || filtered.length === 0}
                       />
                     </th>
-                    <th className="px-2 py-2">Timestamp</th>
+                    <th className="px-2 py-2">Campaign</th>
                     <th className="px-2 py-2">Channel</th>
-                    <th className="px-2 py-2">Raw UTM</th>
-                    <th className="px-2 py-2">Normalized</th>
-                    <th className="px-2 py-2 text-right">Score</th>
-                    <th className="px-2 py-2">Confidence</th>
-                    <th className="px-3 py-2 text-right">Action</th>
+                    <th className="px-2 py-2 text-right">Events</th>
+                    <th className="px-2 py-2">Dates</th>
+                    <th className="px-2 py-2 text-right">Spend</th>
+                    <th className="min-w-[140px] px-2 py-2">Share of orphan spend</th>
+                    <th className="sticky right-0 bg-obsidian-base px-3 py-2 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.6)]">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -812,31 +570,28 @@ export function JoinQueueDesk() {
                           <td className="px-3 py-2">
                             <input type="checkbox" className="accent-primary-container" disabled />
                           </td>
-                          <td className="px-2 py-2 font-mono whitespace-nowrap text-outline">—</td>
+                          <td className="max-w-[260px] px-2 py-2 font-mono text-[11px]">
+                            <div className="truncate text-on-surface-variant">{r.spendCampaignId}</div>
+                            <div className="truncate text-marketing-amber">→ {r.leadCampaignId}</div>
+                          </td>
                           <td className="px-2 py-2 whitespace-nowrap">
                             <span className="inline-flex items-center gap-1.5 rounded bg-surface-container-low px-2 py-0.5">
                               <span className="size-1.5 rounded-full bg-success-emerald" />
                               <span className="font-medium text-on-surface">Remap</span>
                             </span>
                           </td>
-                          <td className="max-w-[200px] truncate px-2 py-2 font-mono text-on-surface-variant">
-                            {r.spendCampaignId}
-                          </td>
+                          <td className="px-2 py-2 text-right font-mono text-outline">—</td>
+                          <td className="px-2 py-2 font-mono text-outline">—</td>
+                          <td className="px-2 py-2 text-right font-mono text-outline">—</td>
                           <td className="px-2 py-2 whitespace-nowrap">
-                            <span className="rounded bg-surface-container px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
-                              {r.leadCampaignId}
-                            </span>
-                          </td>
-                          <td className="px-2 py-2 text-right font-mono font-medium text-on-surface">—</td>
-                          <td className="px-2 py-2 whitespace-nowrap">
-                            <span className="flex items-center gap-1 font-mono text-[10px] text-success-emerald">
+                            <span className="flex items-center gap-1 font-mono text-[11px] text-success-emerald">
                               <span className="material-symbols-outlined text-[13px]">check_circle</span>
                               Joined
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-right whitespace-nowrap">
-                            <span className="rounded bg-success-emerald/15 px-2 py-1 font-mono text-[10px] text-success-emerald">
-                              Auto-Joined
+                          <td className="sticky right-0 bg-inherit px-3 py-2 text-right whitespace-nowrap">
+                            <span className="rounded bg-success-emerald/15 px-2 py-1 font-mono text-[11px] text-success-emerald">
+                              Remapped
                             </span>
                           </td>
                         </tr>
@@ -870,29 +625,24 @@ export function JoinQueueDesk() {
                   ) : null}
 
                   {tab === "pending"
-                    ? filtered.map((row, i) => {
+                    ? groups.map((g, i) => {
+                        const row = filtered.find((r) => r.campaignId === g.campaignId)!;
                         const ch = channelLabel(row);
-                        const { score, conf, confTone } = scoreFromSpend(row.spend ?? 0);
-                        const raw = `${row.campaignId} ${row.name}`.trim();
-                        const action = confTone === "bad" ? "manual" : "resolve";
+                        const bg = i % 2 === 0 ? "bg-obsidian-raised" : "bg-obsidian-base";
                         return (
-                          <tr
-                            key={row.id}
-                            className={cn(
-                              "h-11 transition-colors hover:bg-[#161824]",
-                              i % 2 === 0 ? "bg-obsidian-raised" : "bg-obsidian-base"
-                            )}
-                          >
+                          <tr key={g.campaignId} className={cn("h-12 transition-colors hover:bg-[#161824]", bg)}>
                             <td className="px-3 py-2">
                               <input
                                 type="checkbox"
-                                className="accent-primary-container"
-                                checked={selectedIds.has(row.id)}
-                                onChange={() => toggleRow(row.id)}
+                                aria-label={`Select ${g.name}`}
+                                className="size-4 accent-primary-container"
+                                checked={g.ids.every((id) => selectedIds.has(id))}
+                                onChange={() => toggleGroup(g.ids)}
                               />
                             </td>
-                            <td className="px-2 py-2 font-mono whitespace-nowrap text-outline">
-                              {formatTs(row.occurredAt)}
+                            <td className="px-2 py-2">
+                              <div className="font-medium text-on-surface">{g.name || g.campaignId}</div>
+                              <div className="font-mono text-[11px] text-outline">{g.campaignId}</div>
                             </td>
                             <td className="px-2 py-2 whitespace-nowrap">
                               <span className="inline-flex items-center gap-1.5 rounded bg-surface-container-low px-2 py-0.5">
@@ -900,69 +650,28 @@ export function JoinQueueDesk() {
                                 <span className="font-medium text-on-surface">{ch.label}</span>
                               </span>
                             </td>
-                            <td
-                              className="max-w-[200px] truncate px-2 py-2 font-mono text-on-surface-variant"
-                              title={raw}
-                            >
-                              {raw}
+                            <td className="px-2 py-2 text-right font-mono font-semibold text-on-surface">{g.events > 1 ? `×${g.events}` : "1"}</td>
+                            <td className="px-2 py-2 font-mono whitespace-nowrap text-outline">
+                              {g.firstDay === g.lastDay ? g.firstDay : `${g.firstDay.slice(5)} → ${g.lastDay.slice(5)}`}
                             </td>
-                            <td className="px-2 py-2 whitespace-nowrap">
-                              <span className="rounded bg-surface-container px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
-                                {row.campaignId}
-                              </span>
+                            <td className="px-2 py-2 text-right font-mono font-medium text-on-surface">{money(g.spend, 2)}</td>
+                            <td className="px-2 py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container-high">
+                                  <div className="h-full rounded-full bg-alert-rose" style={{ width: `${Math.round(g.share * 100)}%` }} />
+                                </div>
+                                <span className="w-9 text-right font-mono text-[11px] text-on-surface-variant">{Math.round(g.share * 100)}%</span>
+                              </div>
                             </td>
-                            <td
-                              className={cn(
-                                "px-2 py-2 text-right font-mono font-medium",
-                                score < 50
-                                  ? "text-alert-rose"
-                                  : score < 70
-                                    ? "text-marketing-amber"
-                                    : "text-on-surface"
-                              )}
-                            >
-                              {score}
-                              <span className="font-light text-outline">/100</span>
-                            </td>
-                            <td className="px-2 py-2 whitespace-nowrap">
-                              <span
-                                className={cn(
-                                  "flex items-center gap-1 font-mono text-[10px]",
-                                  confTone === "ok" && "text-success-emerald",
-                                  confTone === "warn" && "text-marketing-amber",
-                                  confTone === "bad" && "text-outline"
-                                )}
+                            <td className={cn("sticky right-0 px-3 py-2 text-right whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.6)]", bg)}>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void resolveMatch(row, false)}
+                                className="min-h-10 rounded bg-primary-container px-3 font-mono text-[11px] font-bold text-on-primary-container hover:bg-marketing-amber disabled:opacity-50 sm:min-h-8"
                               >
-                                <span className="material-symbols-outlined text-[13px]">
-                                  {confTone === "ok"
-                                    ? "check_circle"
-                                    : confTone === "warn"
-                                      ? "help_center"
-                                      : "warning"}
-                                </span>
-                                {conf}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-right whitespace-nowrap">
-                              {action === "resolve" ? (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void resolveMatch(row, false)}
-                                  className="rounded bg-primary-container px-2.5 py-1 font-mono text-[10px] font-bold text-on-primary-container hover:bg-marketing-amber disabled:opacity-50"
-                                >
-                                  Resolve Match
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void resolveMatch(row, true)}
-                                  className="rounded bg-surface-container-high px-2.5 py-1 font-mono text-[10px] font-medium text-on-surface hover:bg-surface-container-highest disabled:opacity-50"
-                                >
-                                  Manual Override
-                                </button>
-                              )}
+                                {g.events > 1 ? `Resolve all ${g.events}` : "Resolve match"}
+                              </button>
                             </td>
                           </tr>
                         );
@@ -974,68 +683,47 @@ export function JoinQueueDesk() {
 
             <div className="flex flex-col items-center justify-between gap-3 bg-obsidian-base p-3 sm:flex-row">
               <div className="flex items-center gap-2">
-                <span className="rounded bg-primary-container/20 px-2 py-0.5 font-mono text-[10px] font-semibold text-marketing-amber">
+                <span className="rounded bg-primary-container/20 px-2 py-0.5 font-mono text-[11px] font-semibold text-marketing-amber">
                   {selectedIds.size} items selected
                 </span>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void batchResolve()}
-                  className="rounded bg-surface-container px-3 py-1 font-mono text-[10px] text-on-surface hover:bg-surface-container-high disabled:opacity-50"
+                  className="rounded bg-surface-container px-3 py-1 font-mono text-[11px] text-on-surface hover:bg-surface-container-high disabled:opacity-50"
                 >
                   Batch Resolve
                 </button>
                 <button
                   type="button"
                   onClick={exportCsv}
-                  className="flex items-center gap-1 rounded bg-surface-container px-3 py-1 font-mono text-[10px] text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                  className="flex items-center gap-1 rounded bg-surface-container px-3 py-1 font-mono text-[11px] text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined text-[14px]">download</span>
                   Export CSV
                 </button>
               </div>
-              <div className="flex items-center gap-1 font-mono text-[10px] text-on-surface-variant">
+              <div className="flex items-center gap-1 font-mono text-[11px] text-on-surface-variant">
                 <span className="text-on-surface">
-                  {filtered.length === 0 ? "0" : `1–${filtered.length}`}
+                  {groups.length === 0 ? "0" : `${groups.length} campaigns · ${filtered.length}`}
                 </span>{" "}
                 of <span className="text-on-surface">{tab === "pending" ? unmatched.length : remaps.length}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-3 rounded-xl bg-obsidian-raised p-3 shadow-sm md:flex-row">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-tertiary/10 text-tertiary">
-                <span className="material-symbols-outlined text-[20px]">account_tree</span>
-              </div>
-              <div>
-                <div className="text-[16px] font-medium text-on-surface">Join Engine Telemetry Loop</div>
-                <div className="text-[11px] text-on-surface-variant">
-                  Hash ring repartitioning across 8 shards
-                </div>
-              </div>
-            </div>
-            <div className="flex w-full items-center justify-end gap-3 md:w-auto">
-              <div className="text-right">
-                <span className="block font-mono text-[10px] text-outline">BUFFER UTILIZATION</span>
-                <span className="font-mono text-[16px] text-on-surface">1.2 GB / 8 GB</span>
-              </div>
-              <div className="h-2 w-24 overflow-hidden rounded-full bg-surface-container-high">
-                <div className="h-full w-[15%] rounded-full bg-tertiary" />
-              </div>
-            </div>
-          </div>
         </section>
 
         {/* Right rail */}
-        <section className="flex flex-col gap-3 lg:col-span-4">
-          <div className="space-y-4 rounded-xl bg-obsidian-raised p-5 shadow-md">
+        <details className="group lg:col-span-12">
+          <summary className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-obsidian-raised px-4 text-sm font-medium text-on-surface">Advanced: UTM parser and warehouse <DemoChip kind="illustrative" /></summary>
+          <div className="mt-3 space-y-4 rounded-xl bg-obsidian-raised p-5 shadow-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] text-marketing-amber">psychology</span>
                 <h2 className="text-[16px] font-semibold text-on-surface">UTM Heuristic Parser</h2>
               </div>
-              <span className="rounded bg-surface-container px-2 py-0.5 font-mono text-[10px] text-tertiary">
+              <span className="rounded bg-surface-container px-2 py-0.5 font-mono text-[11px] text-tertiary">
                 v4.2-spec
               </span>
             </div>
@@ -1044,7 +732,7 @@ export function JoinQueueDesk() {
             </p>
 
             <div className="space-y-1.5">
-              <div className="flex justify-between font-mono text-[10px]">
+              <div className="flex justify-between font-mono text-[11px]">
                 <span className="font-semibold tracking-wider text-outline uppercase">Parser Pattern</span>
                 <span className="text-marketing-amber">Strict Mode</span>
               </div>
@@ -1062,9 +750,8 @@ export function JoinQueueDesk() {
             </div>
 
             <div className="space-y-2 rounded-lg bg-obsidian-base p-3">
-              <div className="flex justify-between font-mono text-[10px] text-outline">
-                <span>CAPTURED SLUGS</span>
-                <span className="text-success-emerald">3/3 Matched</span>
+              <div className="flex justify-between font-mono text-[11px] text-outline">
+                <span>EXAMPLE SLUGS (not from your data)</span>
               </div>
               {[
                 ["network", "meta", "text-marketing-amber"],
@@ -1073,7 +760,7 @@ export function JoinQueueDesk() {
               ].map(([k, v, c]) => (
                 <div
                   key={k}
-                  className="flex items-center justify-between rounded bg-surface-container px-2 py-1 font-mono text-[10px]"
+                  className="flex items-center justify-between rounded bg-surface-container px-2 py-1 font-mono text-[11px]"
                 >
                   <span className="text-outline">{k}</span>
                   <span className={cn("font-semibold", c)}>{v}</span>
@@ -1082,11 +769,10 @@ export function JoinQueueDesk() {
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex justify-between font-mono text-[10px]">
+              <div className="flex justify-between font-mono text-[11px]">
                 <span className="font-semibold tracking-wider text-outline uppercase">
                   Ingestion Warehouse
                 </span>
-                <span className="text-success-emerald">Synced 1m ago</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {WAREHOUSES.map((w) => {
@@ -1097,7 +783,7 @@ export function JoinQueueDesk() {
                       type="button"
                       onClick={() => selectWarehouse(w.name)}
                       className={cn(
-                        "flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 font-mono text-[10px]",
+                        "flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 font-mono text-[11px]",
                         on
                           ? "bg-surface-container-high font-semibold text-on-surface shadow-sm ring-1 ring-primary-container/40"
                           : "bg-surface-container text-on-surface-variant hover:text-on-surface"
@@ -1110,8 +796,6 @@ export function JoinQueueDesk() {
                 })}
               </div>
             </div>
-
-            <HeuristicWeightsVisual />
 
             <div className="flex flex-col gap-2 pt-1">
               <button
@@ -1133,19 +817,7 @@ export function JoinQueueDesk() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl bg-obsidian-raised p-3 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="size-2.5 animate-pulse rounded-full bg-success-emerald" />
-              <div>
-                <div className="text-[11px] font-medium text-on-surface">Ingestion Daemon #12</div>
-                <div className="font-mono text-[10px] text-outline">
-                  Throughput: {unmatched.length} unmatched · {remaps.length} remaps
-                </div>
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-[18px] text-outline">dns</span>
-          </div>
-        </section>
+        </details>
       </div>
 
       <div
