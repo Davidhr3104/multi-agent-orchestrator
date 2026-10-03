@@ -8,10 +8,19 @@ import { cn } from "@/lib/utils";
 type KeyField = { name: string; label: string; hint: string; stub?: boolean };
 type KeyRow = KeyField & { configured: boolean; masked: string | null };
 
+type SourceInfo = {
+  configured: boolean;
+  verified: boolean;
+  missing: string[];
+  lastOkAt: string | null;
+  lastError: string | null;
+};
+
 type RuntimeStatus = {
   meta: boolean;
   google: boolean;
   tiktok?: boolean;
+  sources?: { meta: SourceInfo; google: SourceInfo; tiktok: SourceInfo };
   csv: boolean;
   store?: string;
   unmatched?: number;
@@ -140,6 +149,81 @@ function MetricCard({
   );
 }
 
+function ReadOnlySourceCard({
+  name,
+  dot,
+  info,
+  envNames,
+  busy,
+  onTest,
+  children,
+}: {
+  name: string;
+  dot: string;
+  info: SourceInfo | undefined;
+  envNames: string[];
+  busy: boolean;
+  onTest: () => void;
+  children?: ReactNode;
+}) {
+  const state = info?.verified ? "verified" : info?.configured ? (info.lastError ? "error" : "unverified") : "off";
+  const line = {
+    verified: `Spend read verified ${info?.lastOkAt ? new Date(info.lastOkAt).toLocaleString() : ""}`,
+    error: `Read failed: ${info?.lastError ?? ""}`,
+    unverified: "Credentials set — not verified until a read succeeds",
+    off: "Token only — reads nothing until all credentials are set",
+  }[state];
+  const badge = { verified: "READ OK", error: "ERROR", unverified: "NOT VERIFIED", off: "TOKEN ONLY" }[state];
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg border border-white/[0.08] bg-obsidian-base p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-6 items-center justify-center rounded-md border border-white/[0.12] bg-surface-container-high">
+            <span className={cn("size-2.5 rounded-full", dot)} />
+          </div>
+          <div className="leading-tight">
+            <p className="text-xs font-semibold text-white">{name}</p>
+            <p
+              className={cn(
+                "mt-0.5 font-mono text-[10px]",
+                state === "verified" ? "text-emerald-400" : state === "error" ? "text-rose-400" : "text-on-surface-variant"
+              )}
+            >
+              {line}
+            </p>
+          </div>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded border px-2 py-0.5 font-mono text-[10px]",
+            state === "verified"
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+              : "border-amber-500/20 bg-amber-500/10 text-amber-300"
+          )}
+        >
+          {badge}
+        </span>
+      </div>
+      <p className="text-[10px] leading-relaxed text-on-surface-variant">
+        Read-only spend (campaign spend, clicks, conversions). Helix never writes to this platform. Set as server
+        environment variables: <span className="font-mono text-slate-300">{envNames.join(", ")}</span>
+        {info?.missing.length ? ` · Missing: ${info.missing.join(", ")}` : ""}
+      </p>
+      {children}
+      {info?.configured ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onTest}
+          className="self-end text-[11px] font-medium text-marketing-amber hover:underline disabled:opacity-50"
+        >
+          {busy ? "Reading…" : "Test read (7d)"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function SettingsKeysDesk() {
   const [tab, setTab] = useState<TabId>("keys");
   const [keys, setKeys] = useState<KeyRow[]>(() =>
@@ -256,12 +340,26 @@ export function SettingsKeysDesk() {
     flash(action === "demo" ? "Demo catalog loaded." : "Desk cleared (local only).");
   }
 
+  async function testSourceRead(source: "google" | "tiktok") {
+    setBusy(`${source}-ping`);
+    const res = await fetch("/api/ads/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ window: "7d", source }),
+    });
+    setBusy(null);
+    const data = (await res.json().catch(() => ({}))) as { error?: string; imported?: number };
+    const name = source === "google" ? "Google Ads" : "TikTok Ads";
+    flash(res.ok ? `${name} read OK · ${data.imported ?? 0} spend rows.` : (data.error ?? `${name} read failed.`));
+    void loadRuntime();
+  }
+
   async function testMetaPing() {
     setBusy("meta-ping");
     const res = await fetch("/api/ads/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ window: "7d" }),
+      body: JSON.stringify({ window: "7d", source: "meta" }),
     });
     setBusy(null);
     const data = (await res.json()) as {
@@ -526,7 +624,7 @@ export function SettingsKeysDesk() {
               <span className="text-sm text-on-surface-variant"> / 3</span>
             </span>
             <span className="font-mono text-xs font-semibold text-cyan-400">
-              {runtime?.meta ? "LIVE" : "PARTIAL"}
+              {runtime?.sources?.meta.verified || runtime?.google || runtime?.tiktok ? "LIVE" : "CSV ONLY"}
             </span>
           </div>
           <div className="flex flex-col gap-1.5 pt-3">
@@ -534,13 +632,15 @@ export function SettingsKeysDesk() {
               <div
                 className="h-full rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"
                 style={{
-                  width: `${(([runtime?.meta, runtime?.csv, false].filter(Boolean).length) / 3) * 100}%`,
+                  width: `${(([runtime?.sources?.meta.verified, runtime?.csv, runtime?.google, runtime?.tiktok].filter(Boolean).length) / 4) * 100}%`,
                 }}
               />
             </div>
             <div className="flex justify-between font-mono text-[10px] text-on-surface-variant">
               <span>CSV always on</span>
-              <span>Google stub</span>
+              <span>
+                Google {runtime?.google ? "read OK" : "token only"} · TikTok {runtime?.tiktok ? "read OK" : "token only"}
+              </span>
             </div>
           </div>
         </MetricCard>
@@ -748,14 +848,23 @@ export function SettingsKeysDesk() {
               <h2 className="text-sm font-bold text-white">Rate Limits &amp; Quotas</h2>
               <p className="mt-1 text-[11px] text-on-surface-variant">
                 Meta Insights pulls use your ad account rate limits. CSV ingest has no hard quota on
-                this desk. Google Ads remains stub this sprint.
+                this desk. Google Ads and TikTok Ads are read-only and count only after a successful read.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {[
                   { label: "Meta Insights", value: runtime?.meta ? "Enabled" : "Needs token", tone: runtime?.meta ? "text-emerald-400" : "text-amber-300" },
                   { label: "HITL write-back", value: runtime?.metaWrites ? "ads_management" : "Read-only / off", tone: runtime?.metaWrites ? "text-emerald-400" : "text-slate-400" },
                   { label: "CSV / JSON ingest", value: "Always on", tone: "text-cyan-400" },
-                  { label: "Google Ads API", value: "Stub — use CSV", tone: "text-amber-300" },
+                  {
+                    label: "Google Ads API (read-only)",
+                    value: runtime?.sources?.google.verified ? "Read OK" : runtime?.sources?.google.configured ? "Not verified" : "Token only — use CSV",
+                    tone: runtime?.sources?.google.verified ? "text-emerald-400" : "text-amber-300",
+                  },
+                  {
+                    label: "TikTok Ads API (read-only)",
+                    value: runtime?.sources?.tiktok.verified ? "Read OK" : runtime?.sources?.tiktok.configured ? "Not verified" : "Token only — use CSV",
+                    tone: runtime?.sources?.tiktok.verified ? "text-emerald-400" : "text-amber-300",
+                  },
                 ].map((row) => (
                   <div
                     key={row.label}
@@ -803,19 +912,23 @@ export function SettingsKeysDesk() {
                             runtime?.meta ? "bg-emerald-400" : "bg-slate-500"
                           )}
                         />
-                        {runtime?.meta ? "System User Token Active" : "Not configured"}
+                        {runtime?.sources?.meta.verified
+                          ? "Read verified"
+                          : runtime?.meta
+                            ? "Keys saved — not verified (run Test Ping)"
+                            : "Not configured"}
                       </p>
                     </div>
                   </div>
                   <span
                     className={cn(
                       "rounded border px-2 py-0.5 font-mono text-[10px]",
-                      runtime?.meta
+                      runtime?.sources?.meta.verified
                         ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
                         : "border-white/[0.08] bg-surface-container-high text-slate-400"
                     )}
                   >
-                    {runtime?.meta ? "LIVE" : "OFF"}
+                    {runtime?.sources?.meta.verified ? "LIVE" : runtime?.meta ? "KEYS SAVED" : "OFF"}
                   </span>
                 </div>
                 {metaToken ? <KeyEditor row={metaToken} /> : null}
@@ -850,44 +963,32 @@ export function SettingsKeysDesk() {
                 </div>
               </div>
 
-              {/* Google */}
-              <div className="flex flex-col gap-2.5 rounded-lg border border-white/[0.08] bg-obsidian-base p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex size-6 items-center justify-center rounded-md border border-primary-container/40 bg-primary-container/20">
-                      <span className="size-2.5 rounded-full bg-primary-container shadow-[0_0_6px_#f97316]" />
-                    </div>
-                    <div className="leading-tight">
-                      <p className="text-xs font-semibold text-white">Google Ads API</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-on-surface-variant">
-                        Stub this sprint — use CSV ingest
-                      </p>
-                    </div>
-                  </div>
-                  <span className="rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-300">
-                    STUB
-                  </span>
-                </div>
+              <ReadOnlySourceCard
+                name="Google Ads API"
+                dot="bg-primary-container"
+                info={runtime?.sources?.google}
+                envNames={[
+                  "GOOGLE_ADS_DEVELOPER_TOKEN",
+                  "GOOGLE_ADS_CLIENT_ID",
+                  "GOOGLE_ADS_CLIENT_SECRET",
+                  "GOOGLE_ADS_REFRESH_TOKEN",
+                  "GOOGLE_ADS_CUSTOMER_ID",
+                  "GOOGLE_ADS_LOGIN_CUSTOMER_ID (MCC only)",
+                ]}
+                busy={busy === "google-ping"}
+                onTest={() => void testSourceRead("google")}
+              >
                 {googleTok ? <KeyEditor row={googleTok} /> : null}
-              </div>
+              </ReadOnlySourceCard>
 
-              {/* TikTok visual */}
-              <div className="flex flex-col gap-2.5 rounded-lg border border-white/[0.08] bg-obsidian-base p-3.5 opacity-80">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex size-6 items-center justify-center rounded-md border border-slate-700 bg-slate-800">
-                      <span className="size-2.5 rounded-full bg-slate-200" />
-                    </div>
-                    <div className="leading-tight">
-                      <p className="text-xs font-semibold text-white">TikTok Business API</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-cyan-400">Coming soon</p>
-                    </div>
-                  </div>
-                  <span className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] text-cyan-300">
-                    ROADMAP
-                  </span>
-                </div>
-              </div>
+              <ReadOnlySourceCard
+                name="TikTok Business API"
+                dot="bg-slate-200"
+                info={runtime?.sources?.tiktok}
+                envNames={["TIKTOK_ADS_ACCESS_TOKEN", "TIKTOK_ADS_ADVERTISER_ID"]}
+                busy={busy === "tiktok-ping"}
+                onTest={() => void testSourceRead("tiktok")}
+              />
             </section>
           )}
 

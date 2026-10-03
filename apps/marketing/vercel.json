@@ -3,5 +3,8 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=helix-marketing",
   "outputDirectory": "apps/marketing/.next",
-  "crons": [{ "path": "/api/daily-brief", "schedule": "0 14 * * *" }]
+  "crons": [
+    { "path": "/api/cron/marketing-refresh", "schedule": "0 13 * * *" },
+    { "path": "/api/daily-brief", "schedule": "0 14 * * *" }
+  ]
 }

@@ -71,7 +71,7 @@ function toSpendRow(e: SpendEvent) {
 }
 
 function fromSpendRow(row: Record<string, unknown>): SpendEvent {
-  const platform = row.platform === "google" || row.platform === "other" ? row.platform : "meta";
+  const platform = row.platform === "google" || row.platform === "tiktok" || row.platform === "other" ? row.platform : "meta";
   return {
     id: String(row.id),
     campaignId: String(row.campaign_id),

@@ -103,7 +103,7 @@ function crumbFor(active: Nav) {
 
 function statusLabel(s: ConnectorStatus) {
   if (s === "active") return "Live";
-  if (s === "connected") return "Connected";
+  if (s === "connected") return "Keys saved";
   return "Offline";
 }
 
@@ -147,11 +147,13 @@ export function EngineShell({
     ])
       .then(([status, desk]) => {
         if (cancelled) return;
+        // "Live" only after a real read succeeded; keys alone show as "Keys saved".
         const meta = Boolean(status.meta);
+        const metaVerified = Boolean(status.metaVerified);
         const google = Boolean(status.google);
         const tiktok = Boolean(status.tiktok);
         setConnectors([
-          { id: "meta", label: "Meta Ads", href: "/settings", status: meta ? "active" : "offline" },
+          { id: "meta", label: "Meta Ads", href: "/settings", status: metaVerified ? "active" : meta ? "connected" : "offline" },
           {
             id: "google",
             label: "Google Ads",
@@ -162,10 +164,10 @@ export function EngineShell({
             id: "tiktok",
             label: "TikTok Ads",
             href: "/settings",
-            status: tiktok ? "connected" : "offline",
+            status: tiktok ? "active" : "offline",
           },
         ]);
-        setActiveSyncs([meta, google, tiktok].filter(Boolean).length);
+        setActiveSyncs([metaVerified, google, tiktok].filter(Boolean).length);
 
         const waste = desk.waste as { spendOnSpam?: number } | undefined;
         if (waste?.spendOnSpam && waste.spendOnSpam > 0) {
@@ -317,7 +319,7 @@ export function EngineShell({
     return <TikTokMark />;
   }
 
-  const liveConnectors = connectors.filter((c) => c.status !== "offline");
+  const liveConnectors = connectors.filter((c) => c.status === "active");
   const headerLive =
     liveConnectors.length === 0
       ? "No platforms live"

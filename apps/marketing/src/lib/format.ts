@@ -22,6 +22,7 @@ export function median(values: number[]) {
 export function platformLabel(platform: AdPlatform) {
   if (platform === "meta") return "Meta";
   if (platform === "google") return "Google";
+  if (platform === "tiktok") return "TikTok";
   return "Other";
 }
 

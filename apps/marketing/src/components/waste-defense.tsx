@@ -12,6 +12,7 @@ import {
 } from "@/lib/desk-prefs";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { WasteReportPanel } from "@/components/waste-report-panel";
 
 type Range = "7d" | "30d" | "90d" | "live";
 
@@ -215,7 +216,7 @@ export function WasteDefenseDesk() {
                 Zero-Trust CAPI Firewall Active
               </span>
               <span className="rounded border border-success-emerald/20 bg-success-emerald/10 px-2 py-0.5 font-mono text-[11px] text-success-emerald">
-                Auto-Mitigation: Armed
+                Pause/scale need your sign-off
               </span>
             </div>
             <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-on-surface">
@@ -429,6 +430,13 @@ export function WasteDefenseDesk() {
         </KpiCard>
       </div>
 
+      <WasteReportPanel onChanged={() => void refresh().catch(() => undefined)} />
+
+      <p className="rounded-lg border border-marketing-amber/30 bg-marketing-amber/10 px-3 py-2 text-[11px] text-marketing-amber">
+        Illustrative mockups below (timeline, radar, telemetry, IP cluster, defense switches): they show the intended
+        product, not your data. Your real numbers are in the KPI cards and the waste report above.
+      </p>
+
       {/* Timeline + Radar */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <div className="relative flex flex-col overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-surface-container-low p-5 shadow-sm lg:col-span-8">
@@ -442,9 +450,8 @@ export function WasteDefenseDesk() {
                   <h2 className="text-base font-bold tracking-tight text-on-surface">
                     Ad Drain & Bot Ingress Timeline
                   </h2>
-                  <span className="flex items-center gap-1 rounded border border-primary-container/30 bg-primary-container/20 px-2 py-0.5 font-mono text-[10px] text-primary">
-                    <span className="size-1.5 animate-pulse rounded-full bg-primary-container" />
-                    LIVE PULSE
+                  <span className="rounded border border-marketing-amber/30 bg-marketing-amber/10 px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
+                    ILLUSTRATIVE
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant">
@@ -572,7 +579,7 @@ export function WasteDefenseDesk() {
               </div>
               <div>
                 <h2 className="text-base font-bold tracking-tight text-on-surface">Threat Vector Radar</h2>
-                <p className="text-[11px] text-on-surface-variant">Geometric heuristic classification</p>
+                <p className="text-[11px] text-marketing-amber">Illustrative breakdown — not your data</p>
               </div>
             </div>
             <span className="rounded-full border border-[var(--border-hairline)] bg-surface-container px-2 py-0.5 font-mono text-[10px] text-on-surface-variant">
@@ -657,111 +664,6 @@ export function WasteDefenseDesk() {
         </div>
       </div>
 
-      {/* Platform partition */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border-hairline)] bg-surface-container-low p-5 shadow-sm">
-        <div className="flex flex-col justify-between gap-3 border-b border-[var(--border-hairline)] pb-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-surface-container text-primary">
-              <span className="material-symbols-outlined text-[18px]">splitscreen</span>
-            </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight text-on-surface">
-                Platform Ad Drain Partition
-              </h2>
-              <p className="text-xs text-on-surface-variant">
-                Wasted ad capital prevented per network · Total{" "}
-                <strong className="text-alert-rose">{money(blocked, 2)}</strong>
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex h-3 gap-0.5 overflow-hidden rounded-full border border-[var(--border-hairline)] bg-surface-container-lowest p-0.5">
-          <div className="h-full rounded-l-full bg-[#1877f2] shadow-[0_0_8px_#1877f2]" style={{ width: "48%" }} />
-          <div className="h-full bg-white" style={{ width: "28%" }} />
-          <div className="h-full rounded-r-full bg-[#f97316] shadow-[0_0_8px_#f97316]" style={{ width: "24%" }} />
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {[
-            {
-              name: "Meta Ads",
-              mark: "f",
-              markBg: "bg-[#1877f2]",
-              loss: "−$8,420.00",
-              pct: "48%",
-              bots: "1,120",
-              attack: "Instant lead forms",
-              kill: "2 Adsets",
-              killTone: "text-alert-rose",
-              hover: "hover:border-[#1877f2]/50",
-            },
-            {
-              name: "TikTok Ads",
-              mark: "▶",
-              markBg: "bg-white text-black",
-              loss: "−$3,940.80",
-              pct: "28%",
-              bots: "690",
-              attack: "Fast dwell < 1.8s proxy",
-              kill: "Bid Cut −40%",
-              killTone: "text-marketing-amber",
-              hover: "hover:border-white/50",
-            },
-            {
-              name: "Google Ads",
-              mark: "G",
-              markBg: "bg-gradient-to-tr from-primary-container to-marketing-amber",
-              loss: "−$1,880.00",
-              pct: "24%",
-              bots: "384",
-              attack: "Scraper loops & broad",
-              kill: "IP Blacklist CIDR",
-              killTone: "text-tertiary",
-              hover: "hover:border-[#f97316]/50",
-            },
-          ].map((p) => (
-            <div
-              key={p.name}
-              className={cn(
-                "flex flex-col justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-surface-container p-4 transition-all",
-                p.hover
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "flex size-6 items-center justify-center rounded-md text-[13px] font-bold text-white shadow-sm",
-                      p.markBg
-                    )}
-                  >
-                    {p.mark}
-                  </div>
-                  <span className="text-sm font-bold text-on-surface">{p.name}</span>
-                </div>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <span className="font-mono text-xl font-bold text-alert-rose">{p.loss}</span>
-                <span className="font-mono text-xs text-on-surface-variant">{p.pct} of total</span>
-              </div>
-              <div className="flex flex-col gap-1 border-t border-[var(--border-hairline)] pt-2 font-mono text-[11px] text-on-surface-variant">
-                <div className="flex justify-between">
-                  <span>Bots Isolated</span>
-                  <span className="font-bold text-on-surface">{p.bots}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Primary Attack</span>
-                  <span className="max-w-[140px] truncate font-semibold text-primary">{p.attack}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Kill-Switches</span>
-                  <span className={cn("font-bold", p.killTone)}>{p.kill}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Telemetry + IP graph */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border-hairline)] bg-surface-container-low p-5 shadow-sm lg:col-span-8">
@@ -775,8 +677,8 @@ export function WasteDefenseDesk() {
                   <h2 className="text-base font-bold tracking-tight text-on-surface">
                     Live Anomaly Telemetry Stream
                   </h2>
-                  <span className="rounded border border-success-emerald/30 bg-success-emerald/10 px-2 py-0.5 font-mono text-[10px] text-success-emerald">
-                    Ingesting 44 req/sec
+                  <span className="rounded border border-marketing-amber/30 bg-marketing-amber/10 px-2 py-0.5 font-mono text-[10px] text-marketing-amber">
+                    ILLUSTRATIVE
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant">UTM + conversion gate heuristics</p>
@@ -913,7 +815,7 @@ export function WasteDefenseDesk() {
                 <p className="text-[11px] text-on-surface-variant">Scraping subnets & proxy nodes</p>
               </div>
             </div>
-            <span className="animate-pulse font-mono text-[10px] text-alert-rose">4 Nodes Active</span>
+            <span className="font-mono text-[10px] text-marketing-amber">ILLUSTRATIVE</span>
           </div>
           <div className="relative my-2 flex h-52 items-center justify-center overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-obsidian-base/70">
             <svg className="h-full w-full" viewBox="0 0 300 200">
@@ -1007,7 +909,7 @@ export function WasteDefenseDesk() {
               title: "Instant Auto-Pause on Bot Spike",
               desc: "Pauses adset if waste exceeds 35% in a rolling 15-min bucket",
               meta: "Threshold: 35% / 15m",
-              status: "Armed (0 delays)",
+              status: "Preference only — never auto-pauses",
             },
             {
               key: "capi" as const,
@@ -1021,8 +923,8 @@ export function WasteDefenseDesk() {
               title: "Slack #growth-security Hook",
               desc: "Real-time webhook with forensic payload",
               meta: "Channel: #growth-sec",
-              status: "2.4k sent today",
-              statusTone: "text-tertiary",
+              status: "Preference only",
+              statusTone: "text-on-surface-variant",
             },
           ].map((s) => (
             <div

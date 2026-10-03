@@ -32,6 +32,9 @@ import {
   marketingGate,
   supabaseProbeDesk,
 } from "@/lib/supabase-desk";
+import { marketingDataFile } from "@/lib/desk-files";
+import { isGoogleAdsConfigured } from "@/lib/google-ads";
+import { isTikTokAdsConfigured } from "@/lib/tiktok-ads";
 
 type DeskState = {
   spend: SpendEvent[];
@@ -66,12 +69,7 @@ function getDesk(): DeskState {
 }
 
 function dataPath(): string {
-  if (process.env.VERCEL) return "/tmp/helix-marketing-desk.json";
-  const cwd = process.cwd();
-  if (cwd.replace(/\\/g, "/").endsWith("/marketing")) {
-    return path.join(cwd, ".data", "desk.json");
-  }
-  return path.join(cwd, "apps", "marketing", ".data", "desk.json");
+  return marketingDataFile("desk.json");
 }
 
 function loadFile(): FileShape | null {
@@ -109,9 +107,13 @@ function seedDesk(desk: DeskState) {
   desk.leads = seeded.leads;
 }
 
-/** Meta credentials are what turns this desk live. */
+/** Ad-platform credentials (Meta, Google Ads or TikTok Ads) are what turn this desk live. */
 function metaConnected(): boolean {
-  return Boolean(getSecret("META_ACCESS_TOKEN") && getSecret("META_AD_ACCOUNT_ID"));
+  return (
+    Boolean(getSecret("META_ACCESS_TOKEN") && getSecret("META_AD_ACCOUNT_ID")) ||
+    isGoogleAdsConfigured() ||
+    isTikTokAdsConfigured()
+  );
 }
 
 export function currentDeskMode(): "demo" | "live" {
@@ -270,6 +272,41 @@ export async function ingestSpend(rows: SpendRowInput[]): Promise<DeskSnapshot> 
   return snapshotFrom(desk, "7d");
 }
 
+/**
+ * Spend read from an ad platform API. Ids are deterministic per source/campaign/day, so the daily
+ * re-sync of an overlapping window replaces rows instead of double-counting spend.
+ */
+export async function upsertSourceSpend(source: string, rows: SpendRowInput[]): Promise<DeskSnapshot> {
+  const desk = await hydrate();
+  if (currentDeskMode() === "demo") {
+    throw new Error("Desk is in demo mode — real spend is never mixed with demo data.");
+  }
+  const today = utcDay();
+  const byId = new Map<string, SpendEvent>();
+  for (const row of rows) {
+    const day = (row.occurredAt ?? today).slice(0, 10);
+    const id = `api-${source}-${row.campaignId}-${day}`;
+    const prev = byId.get(id);
+    byId.set(
+      id,
+      prev
+        ? {
+            ...prev,
+            spend: Math.round((prev.spend + row.spend) * 100) / 100,
+            clicks: (prev.clicks ?? 0) + (row.clicks ?? 0),
+            impressions: (prev.impressions ?? 0) + (row.impressions ?? 0),
+            formLeads: (prev.formLeads ?? 0) + (row.formLeads ?? 0),
+          }
+        : { ...row, id, occurredAt: day }
+    );
+  }
+  const events = [...byId.values()];
+  desk.spend = [...desk.spend.filter((e) => !byId.has(e.id)), ...events];
+  saveFile(desk);
+  await supabaseSaveSpend(events);
+  return snapshotFrom(desk, "7d");
+}
+
 export async function reviewCampaign(
   id: string,
   action: CampaignAction,
@@ -316,7 +353,7 @@ export async function deskStatus(): Promise<DeskModeStatus> {
 export async function loadDemoCatalog(): Promise<DeskModeStatus> {
   const desk = await hydrate();
   if (currentDeskMode() !== "demo") {
-    throw new Error("Demo data is only available before Meta Ads is connected.");
+    throw new Error("Demo data is only available before an ad platform (Meta, Google Ads or TikTok Ads) is connected.");
   }
   seedDesk(desk);
   desk.decisions = new Map();
