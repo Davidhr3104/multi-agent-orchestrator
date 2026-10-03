@@ -92,6 +92,13 @@ export type TriageResult = {
   leadIntent: boolean;
 };
 
+export function routeFor(category: ThreadCategory, leadIntent: boolean): string {
+  if (category === "spam") return "Spam";
+  if (category === "fyi") return "Archive";
+  if (category === "meeting") return "EA Desk";
+  return leadIntent ? "Helix for Leads" : "Sales · Deveku";
+}
+
 export function triageHeuristic(input: {
   fromName: string;
   fromEmail: string;
@@ -112,16 +119,7 @@ export function triageHeuristic(input: {
     sentiment,
     prior: input.prior,
   });
-  const routeTo =
-    category === "spam"
-      ? "Spam"
-      : category === "fyi"
-        ? "Archive"
-        : category === "meeting"
-          ? "EA Desk"
-          : leadIntent
-            ? "Helix for Leads"
-            : "Sales · Deveku";
+  const routeTo = routeFor(category, leadIntent);
   const needsReview = category !== "spam" && category !== "fyi";
   const reasoning = [
     `Category: ${category.replace(/_/g, " ")}`,

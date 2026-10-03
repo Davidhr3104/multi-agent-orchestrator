@@ -21,6 +21,9 @@ type Executed = {
   undoable?: boolean;
 };
 type Suggestion = { label: string; detail: string; recommended?: boolean; action: { action: string; targetIds: string[]; params?: Params } };
+type AgentStepView = { tool: string; summary: string; status: "executed" | "failed" | "denied"; error?: string; reasons?: string[] };
+type AgentPending = { tool: string; summary: string; reasons: string[]; preview?: { to: string; text: string }; state: string | null };
+type AgentInfo = { steps: AgentStepView[]; truncated: boolean; pending?: AgentPending };
 type ServerReply = {
   answer: string;
   engine: Engine;
@@ -29,6 +32,7 @@ type ServerReply = {
   reasons?: string[];
   executed?: Executed;
   suggestions?: Suggestion[];
+  agent?: AgentInfo;
 };
 type Turn = {
   role: "user" | "assistant";
@@ -42,6 +46,9 @@ type Turn = {
   undone?: boolean;
   suggestions?: Suggestion[];
   selectedSuggestion?: string;
+  agent?: AgentInfo;
+  agentStatus?: "pending" | "approved" | "declined" | "failed";
+  agentError?: string;
 };
 type SavedSession = { id: string; startedAt: string; preview: string; turns: Turn[] };
 
@@ -136,6 +143,7 @@ export function AskAiDrawer({
   const [sessions, setSessions] = useState<SavedSession[]>([]);
   const [isDemo, setIsDemo] = useState(false);
   const [runningDemo, setRunningDemo] = useState(false);
+  const [usage, setUsage] = useState<{ calls: number; inputTokens: number; outputTokens: number; estimatedUsd: number } | null>(null);
   const turnsRef = useRef<Turn[]>(turns);
   const lastInitial = useRef<string | undefined>(undefined);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -161,6 +169,14 @@ export function AskAiDrawer({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [turns, busy]);
+
+  useEffect(() => {
+    if (!open || busy) return;
+    fetch("/api/ai-usage")
+      .then((r) => r.json())
+      .then((d: { calls: number; inputTokens: number; outputTokens: number; estimatedUsd: number }) => setUsage(d))
+      .catch(() => setUsage(null));
+  }, [open, busy]);
 
   async function ask(text: string) {
     const trimmed = text.trim();
@@ -197,12 +213,46 @@ export function AskAiDrawer({
           proposalStatus: data.proposal ? "pending" : undefined,
           executed: data.executed,
           suggestions: data.suggestions,
+          agent: data.agent,
+          agentStatus: data.agent?.pending ? "pending" : undefined,
         },
       ]);
       if (data.executed?.done.length) announce(data.executed.announce, data.executed.done);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ask AI request failed");
       commit(next.slice(0, -1));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decideAgent(i: number, approved: boolean) {
+    const pending = turnsRef.current[i]?.agent?.pending;
+    if (!pending?.state || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/ask-ai/agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: pending.state, approved }),
+      });
+      const data = (await res.json()) as ServerReply & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `Ask Helix failed (${res.status})`);
+      patch(i, { agentStatus: approved ? "approved" : "declined" });
+      commit([
+        ...turnsRef.current,
+        {
+          role: "assistant",
+          content: data.answer,
+          executed: data.executed,
+          agent: data.agent,
+          agentStatus: data.agent?.pending ? "pending" : undefined,
+        },
+      ]);
+      if (data.executed?.done.length) announce(data.executed.announce, data.executed.done);
+      window.dispatchEvent(new CustomEvent("helix:desk-refresh"));
+    } catch (err) {
+      patch(i, { agentStatus: "failed", agentError: err instanceof Error ? err.message : "Ask Helix failed" });
     } finally {
       setBusy(false);
     }
@@ -423,6 +473,52 @@ export function AskAiDrawer({
                 {t.content}
               </div>
 
+              {t.agent?.steps.length ? (
+                <ul className={`space-y-0.5 rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2 text-[11px]`}>
+                  {t.agent.steps.map((s, k) => (
+                    <li key={k} className={s.status === "executed" ? "text-slate-300" : s.status === "denied" ? "text-amber-300" : "text-rose-400"}>
+                      {s.status === "executed" ? "✓" : s.status === "denied" ? "⊘" : "✕"} {s.summary}
+                      {s.error ? ` — ${s.error}` : s.status === "denied" && s.reasons?.length ? ` — ${s.reasons.join("; ")}` : ""}
+                    </li>
+                  ))}
+                  {t.agent.truncated ? <li className="text-amber-300">Stopped at the step limit before finishing.</li> : null}
+                </ul>
+              ) : null}
+
+              {t.agent?.pending ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <p className="mb-1 text-xs font-semibold text-amber-200">
+                    {t.agentStatus === "approved" ? "Approved" : t.agentStatus === "declined" ? "Declined" : t.agentStatus === "failed" ? "Could not apply" : "Needs your OK"}
+                  </p>
+                  <p className="mb-1 text-xs text-slate-300">{t.agent.pending.summary}</p>
+                  {t.agent.pending.reasons.length && t.agentStatus === "pending" ? (
+                    <p className="mb-2 text-[11px] text-amber-100/70">{t.agent.pending.reasons.join(" · ")}</p>
+                  ) : null}
+                  {t.agent.pending.preview ? (
+                    <div className={`mb-2 rounded-md border ${border} bg-[var(--ai-bg)] p-2 text-[11px] text-slate-300`}>
+                      <p className="mb-1 text-slate-500">To: {t.agent.pending.preview.to}</p>
+                      <p className="whitespace-pre-line">{t.agent.pending.preview.text || "(empty draft)"}</p>
+                    </div>
+                  ) : null}
+                  {t.agentStatus === "pending" ? (
+                    t.agent.pending.state ? (
+                      <div className="flex gap-2">
+                        <button type="button" disabled={busy} onClick={() => void decideAgent(i, true)} className="rounded-md bg-amber-500 px-3 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-amber-400 disabled:opacity-50">
+                          {t.agent.pending.tool === "send_reply" || t.agent.pending.tool === "send_message" ? "Approve & send" : "Approve"}
+                        </button>
+                        <button type="button" disabled={busy} onClick={() => void decideAgent(i, false)} className={`rounded-md border ${border} px-3 py-1 text-[11px] text-slate-300 hover:bg-[var(--ai-accent-soft)] disabled:opacity-50`}>
+                          Decline
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-rose-400">The server cannot sign this confirmation, so it cannot be approved here.</p>
+                    )
+                  ) : t.agentStatus === "failed" ? (
+                    <p className="text-[11px] font-medium text-rose-400">{t.agentError}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
               {t.executed ? (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <p className="mb-1 text-xs font-semibold text-emerald-200">{t.undone ? "Undone" : t.executed.done.length ? "Done automatically" : "Could not apply"}</p>
@@ -536,7 +632,12 @@ export function AskAiDrawer({
             </button>
           </form>
 
-          <p className="pb-3 text-[10px] text-slate-500">Helix AI can make mistakes. Review the information before acting.</p>
+          <p className="pb-3 text-[10px] text-slate-500">
+            Helix AI can make mistakes. Review the information before acting.
+            {usage && usage.calls > 0
+              ? ` Claude usage on this server (estimated): ${usage.calls} calls · ${(usage.inputTokens + usage.outputTokens).toLocaleString()} tokens · ~$${usage.estimatedUsd.toFixed(usage.estimatedUsd < 0.1 ? 3 : 2)}.`
+              : ""}
+          </p>
         </div>
       </SheetContent>
     </Sheet>

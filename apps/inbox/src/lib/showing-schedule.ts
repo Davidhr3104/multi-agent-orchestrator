@@ -278,7 +278,7 @@ function eventFor(input: {
 
 export type AgendaMeeting = {
   id: string;
-  source: "desk" | "calendly";
+  source: "desk" | "calendly" | "google";
   title: string;
   start: string;
   end: string;

@@ -11,7 +11,27 @@ const HOUR_END = 19;
 
 type Payload = {
   events?: AgendaMeeting[];
+  demo?: boolean;
   calendly?: { connected: boolean; name: string | null; schedulingUrl: string | null; error: string | null };
+  google?: { connected: boolean; error: string | null; needsReconnect: boolean; timeZone: string | null; count: number };
+};
+
+const SOURCE_LABEL: Record<AgendaMeeting["source"], string> = {
+  google: "Google Calendar",
+  calendly: "Calendly",
+  desk: "Helix (propuesta del desk)",
+};
+
+const SOURCE_CHIP: Record<AgendaMeeting["source"], string> = {
+  google: "bg-sky-500/20 text-sky-800 dark:text-sky-200",
+  calendly: "bg-emerald-500/20 text-emerald-800 dark:text-emerald-200",
+  desk: "bg-violet-500/20 text-violet-800 dark:text-violet-200",
+};
+
+const SOURCE_BLOCK: Record<AgendaMeeting["source"], string> = {
+  google: "bg-sky-500/25 text-sky-900 dark:text-sky-100",
+  calendly: "bg-emerald-500/25 text-emerald-900 dark:text-emerald-100",
+  desk: "bg-violet-500/25 text-violet-900 dark:text-violet-100",
 };
 
 type View = "month" | "week";
@@ -98,6 +118,8 @@ const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 export default function CalendarPage() {
   const [events, setEvents] = useState<AgendaMeeting[]>([]);
   const [calendly, setCalendly] = useState<Payload["calendly"]>(undefined);
+  const [google, setGoogle] = useState<Payload["google"]>(undefined);
+  const [demo, setDemo] = useState(false);
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<Date | null>(null);
@@ -112,6 +134,8 @@ export default function CalendarPage() {
     const data = (await res.json()) as Payload;
     setEvents(data.events ?? []);
     setCalendly(data.calendly);
+    setGoogle(data.google);
+    setDemo(Boolean(data.demo));
     setLoading(false);
   }
 
@@ -199,6 +223,28 @@ export default function CalendarPage() {
         </form>
       ) : null}
 
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.google)} />
+          Google Calendar ·{" "}
+          {demo
+            ? "no se usa en el desk demo"
+            : google?.connected
+              ? `conectado (${google.count} eventos, solo lectura)`
+              : google?.error
+                ? google.error
+                : "no conectado — conecta Gmail/Google en Integraciones"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.calendly)} />
+          Calendly · {calendly?.connected ? "conectado" : "no conectado"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.desk)} />
+          {demo ? "Helix · datos de demo" : "Helix · propuestas desde correos (no están en tu calendario)"}
+        </span>
+      </div>
+
       {loading || !cursor ? (
         <p className="text-sm text-muted-foreground">Cargando calendario…</p>
       ) : view === "month" ? (
@@ -228,13 +274,8 @@ export default function CalendarPage() {
                         href={event.href}
                         target="_blank"
                         rel="noreferrer"
-                        title={`${event.title} · ${event.hrefLabel}`}
-                        className={cn(
-                          "block truncate rounded px-1 py-0.5 text-[10px] font-medium leading-4",
-                          event.source === "calendly"
-                            ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-200"
-                            : "bg-violet-500/20 text-violet-800 dark:text-violet-200"
-                        )}
+                        title={`${event.title} · ${SOURCE_LABEL[event.source]} · ${event.hrefLabel}`}
+                        className={cn("block truncate rounded px-1 py-0.5 text-[10px] font-medium leading-4", SOURCE_CHIP[event.source])}
                       >
                         {clock(event.start)} {event.title}
                       </a>
@@ -291,11 +332,8 @@ export default function CalendarPage() {
                         href={event.href}
                         target="_blank"
                         rel="noreferrer"
-                        title={event.location}
-                        className={cn(
-                          "absolute right-1 left-1 overflow-hidden rounded-md px-1.5 py-1 text-[10px] leading-tight",
-                          event.source === "calendly" ? "bg-emerald-500/25 text-emerald-900 dark:text-emerald-100" : "bg-violet-500/25 text-violet-900 dark:text-violet-100"
-                        )}
+                        title={`${SOURCE_LABEL[event.source]}${event.location ? ` · ${event.location}` : ""}`}
+                        className={cn("absolute right-1 left-1 overflow-hidden rounded-md px-1.5 py-1 text-[10px] leading-tight", SOURCE_BLOCK[event.source])}
                         style={{ top: `${Math.max(top, 0)}%`, height: `${Math.min(height, 100 - Math.max(top, 0))}%` }}
                       >
                         <span className="font-semibold">{clock(event.start)}</span> {event.title}

@@ -3,6 +3,7 @@ import { smartReplyHeuristic } from "@/lib/triage";
 import { getAgentProfile } from "@/lib/agent-profile";
 import { queryInboxKb } from "@/lib/kb-store";
 import { getSecret } from "@helix/core";
+import { claudeMessages } from "@/lib/ai-usage";
 
 type ClaudeReplyJson = {
   draftReply?: string;
@@ -43,20 +44,15 @@ export async function smartReplyWithContext(
       .slice(-6)
       .map((m) => `- ${m.fromEmail} @ ${m.sentAt}: ${m.body.slice(0, 400)}`)
       .join("\n");
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: profile.model,
-        max_tokens: 500,
-        messages: [
-          {
-            role: "user",
-            content: `You are Helix for Inbox. Draft a short professional reply (max 60 words).
+    const { text } = await claudeMessages({
+      purpose: "smart_reply",
+      model: profile.model,
+      maxTokens: 500,
+      timeoutMs: 20_000,
+      messages: [
+        {
+          role: "user",
+          content: `You are Helix for Inbox. Draft a short professional reply (max 60 words).
 ${persona}
 Use only the company sources below. If they do not contain a price or term, say you will confirm it. Do not invent figures.
 ${profile.prompt ? `Company voice:\n${profile.prompt}\n` : ""}
@@ -71,15 +67,9 @@ Body:
 ${thread.body.slice(0, 2500)}
 Prior messages:
 ${priorBlock || "(none)"}`,
-          },
-        ],
-      }),
+        },
+      ],
     });
-    if (!res.ok) throw new Error(`Claude ${res.status}`);
-    const payload = (await res.json()) as {
-      content?: Array<{ type?: string; text?: string }>;
-    };
-    const text = payload.content?.find((c) => c.type === "text")?.text ?? "";
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("No JSON");
     const parsed = JSON.parse(match[0]) as ClaudeReplyJson;

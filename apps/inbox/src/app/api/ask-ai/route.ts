@@ -1,5 +1,6 @@
 import { askAi, askAiWithProposal, isClaudeConfigured, type AskAiMessage } from "@helix/core";
-import { aiCtx, applyRiskPolicy, loadDeskState, respondWithDeskCookie } from "@/lib/ai-desk";
+import { aiCtx, applyRiskPolicy, loadDeskState, mayChangeDesk, respondWithDeskCookie } from "@/lib/ai-desk";
+import { newAgentCtx, startAgent } from "@/lib/inbox-agent-session";
 import { buildDemoReply } from "@/lib/demo-assistant";
 import { currentDeskMode, getMessage, listAllThreads, listMessages } from "@/lib/store";
 import type { EmailThread } from "@/lib/types";
@@ -93,6 +94,25 @@ export async function POST(req: Request) {
       }
       const reply = buildDemoReply(last.content, await listAllThreads());
       return respondWithDeskCookie(req, ctx, { ...(await applyRiskPolicy(req, ctx, reply)), engine: "fallback", demo: true });
+    }
+    // With a Claude key, text requests go to the tool-use agent; image attachments keep the
+    // single-call path because the agent transcript is text-only.
+    const last = body.history[body.history.length - 1];
+    if (isClaudeConfigured() && !last.attachments?.length) {
+      const agentCtx = newAgentCtx(ctx, mayChangeDesk(req));
+      try {
+        const payload = await startAgent(
+          agentCtx,
+          body.history.map((m) => ({ role: m.role, content: m.content }))
+        );
+        return respondWithDeskCookie(req, agentCtx, { ...payload, demo: currentDeskMode() === "demo" });
+      } catch (err) {
+        return respondWithDeskCookie(req, agentCtx, {
+          answer: `Ask Helix could not reach Claude, so nothing was done. (${err instanceof Error ? err.message : "unknown error"})`,
+          engine: "claude",
+          error: true,
+        });
+      }
     }
     const result = await askAiWithProposal({
       systemPrompt: SYSTEM_PROMPT,

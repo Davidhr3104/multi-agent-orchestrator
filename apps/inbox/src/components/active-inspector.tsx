@@ -128,9 +128,12 @@ export function ActiveInspector({
           <span className="text-muted-foreground">{whyOpen ? "Hide" : "Show"}</span>
         </button>
         {whyOpen ? (
-          <p className="px-3 pb-3 text-xs text-foreground/80 italic">
-            {thread.reasoning || "No written reason was stored for this message."}
-          </p>
+          <div className="px-3 pb-3">
+            <p className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {thread.engine === "claude" ? "Engine: Claude" : "Engine: keyword rules (no AI)"}
+            </p>
+            <p className="text-xs text-foreground/80 italic">{thread.reasoning || "No written reason was stored for this message."}</p>
+          </div>
         ) : null}
       </div>
       {thread.kbHits?.length ? (

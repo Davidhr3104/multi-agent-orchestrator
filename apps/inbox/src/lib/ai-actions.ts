@@ -7,6 +7,7 @@ import { currentDeskMode, getThread, patchMessage, regenerateSmartReply, snoozeT
 /**
  * What Helix AI may do on the Inbox desk, and when it may do it alone.
  *   draft_reply     write a draft, nothing is sent               -> auto (+Undo)
+ *   write_draft     store a draft the agent wrote, nothing sent  -> auto (+Undo)
  *   snooze_threads  hide until later                             -> auto (+Undo)
  *   archive_threads move out of the queue                        -> auto unless urgent / awaiting review (+Undo)
  *   route_threads   hand to the responsible person               -> auto unless awaiting review (+Undo)
@@ -20,6 +21,7 @@ const STATUSES: ThreadStatus[] = ["open", "review", "routed", "sent", "blocked",
 const CATEGORIES: ThreadCategory[] = ["action_required", "fyi", "meeting", "spam"];
 const BULK_LIMIT = 5;
 const URGENT = 80;
+const MAX_DRAFT = 4000;
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const names = (l: string[]) => l.join(", ");
@@ -108,6 +110,21 @@ export const inboxActions: DeskActionRegistry<InboxCtx> = {
     restore: restoreThread,
     resultText: (done, failed) => `Drafted a reply on ${plural(done.length, "thread")} — nothing was sent.${failed ? ` ${failed} failed.` : ""}`,
     announce: (l) => `Helix AI drafted a reply to ${names(l)}`,
+  },
+
+  write_draft: {
+    name: "write_draft",
+    validate: (p) => (typeof p.text === "string" && p.text.trim() && p.text.length <= MAX_DRAFT ? null : `Draft text must be 1-${MAX_DRAFT} characters`),
+    assess: (ids) => gate(ids, () => []),
+    snapshot,
+    apply: async (id, p, ctx) => {
+      const m = await patchMessage(id, { draftReply: String(p.text).trim() }, { actionType: `ai_draft:${ctx.actor}`, humanOverride: false });
+      if (m) ctx.touched.add(id);
+      return m !== null;
+    },
+    restore: restoreThread,
+    resultText: (done, failed) => `Wrote the draft on ${plural(done.length, "thread")} — nothing was sent.${failed ? ` ${failed} failed.` : ""}`,
+    announce: (l) => `Helix AI wrote a draft for ${names(l)}`,
   },
 
   snooze_threads: {

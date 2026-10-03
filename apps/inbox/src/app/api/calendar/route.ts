@@ -1,7 +1,8 @@
 import { getSecret } from "@helix/core";
 import { fetchCalendlyAgenda } from "@/lib/calendly";
+import { googleEventToAgenda, loadGoogleCalendar } from "@/lib/google-calendar";
 import { deskAgenda, planShowing, type AgendaMeeting } from "@/lib/showing-schedule";
-import { listAllThreads } from "@/lib/store";
+import { currentDeskMode, listAllThreads } from "@/lib/store";
 
 export const runtime = "nodejs";
 
@@ -9,8 +10,10 @@ export async function GET(req: Request) {
   const header = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
   const token = getSecret("CALENDLY_TOKEN") || header;
   const now = new Date();
-  const desk = deskAgenda(now);
   const threads = await listAllThreads();
+  const demo = currentDeskMode() === "demo";
+  // The sample showings are demo data; a live desk only shows real calendars.
+  const desk = demo ? deskAgenda(now) : [];
   const booked: AgendaMeeting[] = [];
   for (const thread of threads) {
     const plan = planShowing({ fromName: thread.fromName, subject: thread.subject, body: thread.body, now });
@@ -26,17 +29,32 @@ export async function GET(req: Request) {
       hrefLabel: "Mapa",
     });
   }
-  const calendly = token
-    ? await fetchCalendlyAgenda(token, now)
-    : { connected: false, name: null, schedulingUrl: null, events: [], error: null };
-  const events = [...desk, ...booked, ...calendly.events].sort((a, b) => a.start.localeCompare(b.start));
+  const [calendly, google] = await Promise.all([
+    token
+      ? fetchCalendlyAgenda(token, now)
+      : Promise.resolve({ connected: false, name: null, schedulingUrl: null, events: [], error: null }),
+    demo
+      ? Promise.resolve({ connected: false, error: null, timeZone: "", events: [], needsReconnect: false })
+      : loadGoogleCalendar(now),
+  ]);
+  const events = [...desk, ...booked, ...calendly.events, ...google.events.map(googleEventToAgenda)].sort((a, b) =>
+    a.start.localeCompare(b.start)
+  );
   return Response.json({
     events,
+    demo,
     calendly: {
       connected: calendly.connected,
       name: calendly.name,
       schedulingUrl: calendly.schedulingUrl,
       error: calendly.error,
+    },
+    google: {
+      connected: google.connected,
+      error: google.error,
+      needsReconnect: google.needsReconnect,
+      timeZone: google.timeZone || null,
+      count: google.events.length,
     },
   });
 }

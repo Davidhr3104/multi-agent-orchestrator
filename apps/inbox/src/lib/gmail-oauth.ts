@@ -10,7 +10,10 @@ import { DEFAULT_WORKSPACE_ID } from "@/lib/types";
 
 const AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const SCOPES = ["https://www.googleapis.com/auth/gmail.modify"].join(" ");
+export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
+/** Read-only access to calendar events: enough to list meetings and compute free slots, never to write. */
+export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly";
+const SCOPES = [GMAIL_SCOPE, GOOGLE_CALENDAR_SCOPE].join(" ");
 
 export function isGoogleOAuthConfigured(): boolean {
   return Boolean(getSecret("GOOGLE_OAUTH_CLIENT_ID") && getSecret("GOOGLE_OAUTH_CLIENT_SECRET"));
@@ -29,6 +32,7 @@ export function buildGoogleAuthUrl(origin: string): string {
     scope: SCOPES,
     access_type: "offline",
     prompt: "consent",
+    include_granted_scopes: "true",
   });
   return `${AUTH_BASE}?${params.toString()}`;
 }

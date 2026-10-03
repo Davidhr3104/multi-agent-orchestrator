@@ -6,7 +6,8 @@ import {
   toInboxMessage,
   type InboxMessage,
 } from "@/lib/types";
-import { suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
+import { routeFor, suggestSnoozeUntil, triageHeuristic } from "@/lib/triage";
+import { formatTriageReasoning, triageWithClaude } from "@/lib/ai-triage";
 import { guardrailReason } from "@/lib/agent-profile";
 import { smartReplyWithContext } from "@/lib/smart-reply";
 import { queryInboxKb } from "@/lib/kb-store";
@@ -522,11 +523,30 @@ export async function ingestMessage(input: {
   emailAccountId?: string;
   /** ISO timestamp of when the message was actually sent (e.g. a .eml's Date header) — when omitted, defaults to now. Only affects the message's own sentAt, not the thread's createdAt/receivedAt (ingestion time stays ingestion time). */
   sentAt?: string;
+  /** The operator's own recent sent emails — a style reference for Claude drafts only. */
+  toneSamples?: string[];
 }): Promise<InboxMessage> {
   const mem = deskMem();
   seedMemory();
   await hydrateFromRemote();
-  const scored = triageHeuristic(input);
+  const heuristic = triageHeuristic(input);
+  const claude = mem.prefs.autoTriage
+    ? await triageWithClaude(input, { tone: mem.prefs.defaultTone, toneSamples: input.toneSamples })
+    : null;
+  const scored = claude
+    ? {
+        ...heuristic,
+        category: claude.category,
+        sentiment: claude.sentiment,
+        urgencyScore: claude.urgencyScore,
+        aiConfidence: claude.confidence,
+        leadIntent: claude.leadIntent,
+        routeTo: routeFor(claude.category, claude.leadIntent),
+        needsReview: claude.category !== "spam" && claude.category !== "fyi",
+        draftReply: claude.draftReply,
+        reasoning: formatTriageReasoning(claude),
+      }
+    : heuristic;
   const createdAt = nowIso();
   const id = `thr-${Date.now().toString(36)}`;
   const account = input.emailAccountId ? await supabaseGetEmailAccountById(input.emailAccountId) : null;
@@ -538,7 +558,7 @@ export async function ingestMessage(input: {
     updatedAt: createdAt,
     snoozeUntil: null,
     status: scored.category === "spam" ? "blocked" : scored.needsReview ? "review" : "open",
-    engine: "heuristic",
+    engine: claude ? "claude" : "heuristic",
     needsReview: scored.needsReview,
     externalThreadId: input.externalThreadId ?? null,
     emailAccountId: input.emailAccountId ?? DEFAULT_ACCOUNT_ID,
@@ -562,7 +582,13 @@ export async function ingestMessage(input: {
   ];
   mem.messages.set(id, history);
 
-  if (mem.prefs.autoTriage) {
+  if (claude) {
+    thread = {
+      ...thread,
+      draftTone: mem.prefs.defaultTone,
+      kbHits: queryInboxKb({ subject: input.subject, body: input.body }),
+    };
+  } else if (mem.prefs.autoTriage) {
     const smart = await smartReplyWithContext(thread, history);
     thread = {
       ...thread,

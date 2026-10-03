@@ -107,6 +107,50 @@ export async function sendGmailReply(input: {
   return { id: payload.id, threadId: payload.threadId || input.threadId };
 }
 
+/** Drops quoted history ("> ..." lines and everything after "On ... wrote:") so only the operator's own words remain. */
+export function stripQuotedReply(body: string): string {
+  const lines = body.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  for (const line of lines) {
+    if (/^\s*(On|El) .+(wrote|escribió):\s*$/i.test(line) || /^-{2,}\s*Original Message/i.test(line)) break;
+    if (/^\s*>/.test(line)) continue;
+    out.push(line);
+  }
+  return out.join("\n").trim();
+}
+
+/**
+ * A few of the mailbox's own recent sent emails, used only as a style reference for drafts.
+ * Returns [] on any failure — drafts then fall back to the saved tone, never to invented samples.
+ */
+export async function fetchGmailSentSamples(limit = 3, emailAccountId?: string): Promise<string[]> {
+  const resolved = emailAccountId ? await getValidGmailAccessTokenForAccount(emailAccountId) : await getValidGmailAccessToken();
+  if (!resolved.ok) return [];
+  try {
+    const listRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${limit * 2}&q=${encodeURIComponent("in:sent newer_than:60d")}`,
+      { headers: { Authorization: `Bearer ${resolved.token}` }, signal: AbortSignal.timeout(10_000) }
+    );
+    if (!listRes.ok) return [];
+    const list = (await listRes.json()) as { messages?: Array<{ id?: string }> };
+    const samples: string[] = [];
+    for (const row of list.messages ?? []) {
+      if (!row.id || samples.length >= limit) continue;
+      const msgRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${row.id}?format=full`, {
+        headers: { Authorization: `Bearer ${resolved.token}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!msgRes.ok) continue;
+      const msg = (await msgRes.json()) as { payload?: { mimeType?: string; body?: { data?: string }; parts?: unknown[] } };
+      const text = stripQuotedReply(extractBody(msg.payload));
+      if (text.length >= 20) samples.push(text.slice(0, 600));
+    }
+    return samples;
+  } catch {
+    return [];
+  }
+}
+
 /** Syncs one specific connected mailbox by account id — the multi-mailbox path used by sync/route.ts. */
 export async function fetchGmailInboxForAccount(
   accountId: string,
