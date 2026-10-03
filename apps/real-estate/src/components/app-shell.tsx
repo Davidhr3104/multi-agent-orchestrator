@@ -87,7 +87,7 @@ function useCollapsed(): [boolean, () => void] {
   return [collapsed, toggle];
 }
 
-export function AppShell({ children, badges = {}, notices = [] }: { children: React.ReactNode; badges?: NavBadges; notices?: DeskNotice[] }) {
+export function AppShell({ children, badges = {}, notices = [], mode = "demo" }: { children: React.ReactNode; badges?: NavBadges; notices?: DeskNotice[]; mode?: "demo" | "live" }) {
   const pathname = usePathname();
   const [collapsed, toggleCollapsed] = useCollapsed();
   return (
@@ -187,10 +187,17 @@ export function AppShell({ children, badges = {}, notices = [] }: { children: Re
         <header className="sticky top-0 z-20 hidden h-16 items-center justify-between gap-4 bg-background/85 px-6 shadow-[0_1px_8px_rgba(0,0,0,0.25)] backdrop-blur-xl lg:flex lg:px-8">
           <HeaderSearch />
           <div className="flex items-center gap-2">
-            <span className="hidden items-center gap-2 rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground xl:inline-flex" title="Sample agency data held in memory — nothing is connected to an MLS or CRM yet">
-              <span className="size-2 rounded-full bg-[var(--tertiary,#38bdf8)]" aria-hidden />
-              Demo desk · sample data
-            </span>
+            {mode === "demo" ? (
+              <span className="hidden items-center gap-2 rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground xl:inline-flex" title="Sample agency data held in memory — import your own listings under Settings to switch to your data">
+                <span className="size-2 rounded-full bg-[var(--tertiary,#38bdf8)]" aria-hidden />
+                Demo desk · sample data
+              </span>
+            ) : (
+              <span className="hidden items-center gap-2 rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground xl:inline-flex" title="Your own data, held in this server's memory">
+                <span className="size-2 rounded-full bg-emerald-400" aria-hidden />
+                Your data · in memory
+              </span>
+            )}
             <ThemeToggle compact />
             <NotificationBell notices={notices} align="right" />
           </div>

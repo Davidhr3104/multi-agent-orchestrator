@@ -5,6 +5,9 @@ import { BatchApproveBar, DraftSelect } from "@/components/batch-approve";
 import { DeskActionButton } from "@/components/desk-action-button";
 import { ToneSelect, TonedDeskActionButton } from "@/components/draft-tone";
 import { DraftPreview } from "@/components/draft-preview";
+import { PersonalizeButton, SendDraftControls } from "@/components/draft-send";
+import { claudeReady } from "@/lib/ai-claude";
+import { CHANNEL_LABEL, CHANNELS, channelReady, type Channel } from "@/lib/messaging";
 import { COLD_AFTER_DAYS, isCold } from "@/lib/outreach";
 import { listDrafts, listLeads, listProperties, type ScoredLead } from "@/lib/store";
 import type { OutreachDraft, Property } from "@/lib/types";
@@ -20,7 +23,7 @@ function when(iso: string) {
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function DraftCard({ d, lead, props }: { d: OutreachDraft; lead: ScoredLead | undefined; props: Property[] }) {
+function DraftCard({ d, lead, props, claude }: { d: OutreachDraft; lead: ScoredLead | undefined; props: Property[]; claude: boolean }) {
   const kind = KIND[d.kind];
   const name = lead?.name ?? "Unknown buyer";
   const label = `${name}: ${d.subject}`;
@@ -49,6 +52,12 @@ function DraftCard({ d, lead, props }: { d: OutreachDraft; lead: ScoredLead | un
             <span>drafted {when(d.createdAt)}</span>
           </p>
         </div>
+        {d.writer === "claude" ? (
+          <span className="inline-flex items-center rounded-full bg-orange-500/10 px-2.5 py-1 text-[11px] font-semibold text-orange-300 ring-1 ring-orange-500/30">Worded by Claude</span>
+        ) : null}
+        {d.queuedBy === "nightly" ? (
+          <span className="inline-flex items-center rounded-full bg-sky-500/10 px-2.5 py-1 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-500/30">Nightly matching</span>
+        ) : null}
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
           <kind.icon className="size-3.5" aria-hidden /> {kind.label}
         </span>
@@ -67,6 +76,13 @@ function DraftCard({ d, lead, props }: { d: OutreachDraft; lead: ScoredLead | un
               ))}
             </ul>
           </div>
+          {d.explanation && d.writer === "claude" ? (
+            <div>
+              <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Claude&apos;s reading of the match</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-foreground/90">{d.explanation}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">The fit score above is computed by the desk, not by Claude.</p>
+            </div>
+          ) : null}
           {props.length ? (
             <div>
               <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Listings mentioned</p>
@@ -84,12 +100,13 @@ function DraftCard({ d, lead, props }: { d: OutreachDraft; lead: ScoredLead | un
         </aside>
       </div>
       <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background/30 px-5 py-3">
-        <p className="mr-auto text-[11px] text-muted-foreground">Approving records your sign-off. Nothing is sent — you send it yourself.</p>
+        <p className="mr-auto text-[11px] text-muted-foreground">Approving records your sign-off; nothing is sent. Sending is a separate step you confirm for each message.</p>
+        {d.kind === "new_match" ? <PersonalizeButton draftId={d.id} claude={claude} /> : null}
         <DeskActionButton action="dismiss_draft" targetIds={[d.id]} labels={[label]} variant="ghost" busyLabel="Dismissing…">
           <X className="size-4" aria-hidden /> Dismiss
         </DeskActionButton>
         <DeskActionButton action="approve_draft" targetIds={[d.id]} labels={[label]} variant="glow" busyLabel="Approving…">
-          <Check className="size-4" aria-hidden /> Approve (you send it)
+          <Check className="size-4" aria-hidden /> Approve (not sent yet)
         </DeskActionButton>
       </footer>
     </article>
@@ -106,6 +123,9 @@ export default async function OutreachPage() {
   // eslint-disable-next-line react-hooks/purity -- server component, rendered per request
   const now = Date.now();
   const cold = leads.filter((l) => isCold(l, now) && !waiting.has(l.id));
+  const claude = claudeReady();
+  const ready = Object.fromEntries(CHANNELS.map((c) => [c, channelReady(c)])) as Record<Channel, boolean>;
+  const connected = CHANNELS.filter((c) => ready[c]).map((c) => CHANNEL_LABEL[c]);
 
   return (
     <>
@@ -128,8 +148,12 @@ export default async function OutreachPage() {
 
       <p className="flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-400/5 px-4 py-3 text-xs leading-relaxed text-amber-200">
         <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-        No email or WhatsApp account is connected, so nothing is sent from this desk. Approving records your sign-off; copy the message into your own inbox
-        to send it. Cold means an open buyer with no contact in more than {COLD_AFTER_DAYS} days.
+        <span>
+          {connected.length
+            ? `Connected for sending: ${connected.join(", ")}. A message goes out only after you approve the draft and then confirm the send for that buyer and channel.`
+            : "No email, SMS or WhatsApp account is connected, so nothing is sent from this desk. Approving records your sign-off; copy the message into your own inbox to send it."}{" "}
+          Cold means an open buyer with no contact in more than {COLD_AFTER_DAYS} days.
+        </span>
       </p>
 
       <section aria-labelledby="pending-h" className="space-y-4">
@@ -149,7 +173,7 @@ export default async function OutreachPage() {
           <>
           <BatchApproveBar items={pending.map((d) => ({ id: d.id, kind: d.kind, label: `${leadById.get(d.leadId)?.name ?? "Unknown buyer"}: ${d.subject}` }))} />
           {pending.map((d) => (
-            <DraftCard key={d.id} d={d} lead={leadById.get(d.leadId)} props={d.propertyIds.map((id) => propById.get(id)).filter((p): p is Property => !!p)} />
+            <DraftCard key={d.id} d={d} lead={leadById.get(d.leadId)} props={d.propertyIds.map((id) => propById.get(id)).filter((p): p is Property => !!p)} claude={claude} />
           ))}
           </>
         )}
@@ -162,8 +186,10 @@ export default async function OutreachPage() {
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card/80">
             {decided.map((d) => {
-              const name = leadById.get(d.leadId)?.name ?? "Unknown buyer";
+              const lead = leadById.get(d.leadId);
+              const name = lead?.name ?? "Unknown buyer";
               const approved = d.status === "approved";
+              const sent = d.deliveries?.length ?? 0;
               return (
                 <li key={d.id} data-ai-id={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
                   <span className={`inline-flex size-7 items-center justify-center rounded-full ${approved ? "bg-emerald-500/15 text-emerald-300" : "bg-muted text-muted-foreground"}`}>
@@ -174,10 +200,15 @@ export default async function OutreachPage() {
                     <span className="text-muted-foreground"> · {d.subject}</span>
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {approved ? "Approved — ready for you to send" : "Dismissed"}
+                    {approved ? (sent ? `Approved · sent on ${sent} channel${sent === 1 ? "" : "s"}` : "Approved — not sent yet") : "Dismissed"}
                     {d.decidedBy ? ` by ${d.decidedBy}` : ""}
                     {d.decidedAt ? ` · ${when(d.decidedAt)}` : ""}
                   </span>
+                  {approved && lead ? (
+                    <div className="basis-full pl-10">
+                      <SendDraftControls draftId={d.id} leadName={name} email={lead.email} phone={lead.phone} subject={d.subject} body={d.body} ready={ready} deliveries={d.deliveries ?? []} />
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

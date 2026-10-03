@@ -132,7 +132,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <DemoBanner message="You are exploring a sample agency: 10 properties and 20 buyers, with sample photos. Import your own listings and this desk switches to your real data." />
+      <DemoBanner message="You are exploring a sample agency: 10 properties and 20 buyers, with sample photos. Import your own listings and this desk switches to your real data." connectLabel="Import your listings →" connectHref="/settings#import" />
 
       {awaitingList.length ? (
         <div role="region" aria-label="Feedback waiting" className="flex flex-wrap items-center gap-3 rounded-xl bg-sky-500/10 px-4 py-3">

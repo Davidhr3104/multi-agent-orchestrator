@@ -57,7 +57,7 @@ export function BatchApproveBar({ items }: { items: Item[] }) {
   async function run(action: "approve_draft" | "dismiss_draft") {
     const verb = action === "approve_draft" ? "Approve" : "Dismiss";
     const list = live.map((i) => `• ${i.label}`).join("\n");
-    const tail = action === "approve_draft" ? "\n\nApproving records your sign-off. Nothing is sent — no email or WhatsApp is connected." : "";
+    const tail = action === "approve_draft" ? "\n\nApproving records your sign-off. Nothing is sent — each send is a separate confirmation in Outreach." : "";
     if (!window.confirm(`${verb} ${live.length} draft${live.length === 1 ? "" : "s"}?\n\n${list}${tail}`)) return;
     setBusy(action === "approve_draft" ? "approve" : "dismiss");
     setError(null);

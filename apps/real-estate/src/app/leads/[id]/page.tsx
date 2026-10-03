@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarPlus } from "lucide-react";
 import { Avatar, ScoreRing, money } from "@/components/bits";
+import { HubspotPush } from "@/components/hubspot-push";
 import { PropertyCover } from "@/components/property-cover";
+import { hubspotReady } from "@/lib/hubspot";
 import { InterestLabel, ShowingStatusBadge } from "@/components/showing-bits";
 import { DEMO_PHOTOS } from "@/lib/demo-photos";
 import { matchProperties } from "@/lib/scoring";
@@ -45,6 +47,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <span className="rounded-full border border-border px-2.5 py-0.5 text-muted-foreground">{FIN[lead.financing]}</span>
               {lead.budget > 0 ? <span className="tabular rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-primary">{money(lead.budget)}</span> : null}
             </p>
+            <div className="mt-3">
+              <HubspotPush leadId={lead.id} name={lead.name} email={lead.email} ready={hubspotReady()} pushedAt={lead.crm?.pushedAt} />
+            </div>
           </div>
           <ScoreRing score={lead.buyer.score} tier={lead.buyer.tier} size={84} />
         </div>

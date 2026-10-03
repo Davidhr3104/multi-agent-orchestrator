@@ -14,6 +14,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "JSON required." }, { status: 400 });
   }
   if (body.action !== "demo") return Response.json({ error: "action must be demo." }, { status: 400 });
+  if ((await deskStatus()).imported) return Response.json({ error: "Your imported data is on this desk, so the demo can't be loaded over it." }, { status: 409 });
   try {
     return Response.json(await loadDemoCatalog());
   } catch (err) {

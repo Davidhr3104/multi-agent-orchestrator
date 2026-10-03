@@ -3,7 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import { AppShell, type NavBadges } from "@/components/app-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { needsFeedback, sameDay } from "@/lib/showings";
-import { listDrafts, listSellers, listShowings } from "@/lib/store";
+import { currentDeskMode, listDrafts, listSellers, listShowings } from "@/lib/store";
 import { TourHost } from "@/components/tour-host";
 import type { DeskNotice } from "@/components/notification-bell";
 import { THEME_BOOT } from "@/lib/theme";
@@ -55,7 +55,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full bg-background">
         <TooltipProvider>
-          <AppShell badges={badges} notices={notices}>
+          <AppShell badges={badges} notices={notices} mode={currentDeskMode()}>
             {children}
           </AppShell>
         </TooltipProvider>

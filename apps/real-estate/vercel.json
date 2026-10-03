@@ -2,5 +2,6 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace=helix-real-estate",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [{ "path": "/api/cron/nightly-match", "schedule": "0 7 * * *" }]
 }

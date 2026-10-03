@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Bath, BedDouble, BellRing, MapPin, Maximize2, Megaphone, Tag } from "lucide-react";
 import { Avatar, CoverChip, KIND_LABEL, StatusBadge, TierBadge, money } from "@/components/bits";
 import { TonedDeskActionButton } from "@/components/draft-tone";
-import { PromoCopy } from "@/components/promo-copy";
+import { ListingCopyEditor } from "@/components/listing-copy-editor";
 import { PropertyCover } from "@/components/property-cover";
+import { claudeReady } from "@/lib/ai-claude";
 import { DEMO_PHOTOS } from "@/lib/demo-photos";
 import { listingCopy } from "@/lib/listing-copy";
 import { ALERT_MIN_FIT, buyersToAlert } from "@/lib/outreach";
 import { matchProperties } from "@/lib/scoring";
-import { getProperty, listDrafts, listLeads, listShowings } from "@/lib/store";
+import { getListingCopy, getProperty, listDrafts, listLeads, listShowings } from "@/lib/store";
 import { fmtWhen } from "@/lib/when";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
   const now = Date.now();
   const upcoming = (await listShowings()).filter((s) => s.propertyId === p.id && s.status === "scheduled" && Date.parse(s.startsAt) > now);
   const photo = DEMO_PHOTOS[p.id];
+  const approvedCopy = await getListingCopy(p.id);
 
   return (
     <>
@@ -170,7 +172,8 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
               <Megaphone className="size-4 text-primary" aria-hidden /> Promotion copy
             </h2>
             <p className="text-xs text-muted-foreground">
-              Written only from this listing&apos;s own details — nothing added. Copy it into your portal, social account or chat; Helix doesn&apos;t publish anything.
+              Written only from this listing&apos;s own details — Claude&apos;s drafts are discarded if they add a figure or feature that isn&apos;t here. Edit, approve, then copy it
+              into your portal, social account or chat; Helix doesn&apos;t publish anything.
             </p>
           </div>
         </div>
@@ -181,7 +184,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
                 This listing is still a draft. Finish the photos and details before you promote it.
               </p>
             ) : null}
-            <PromoCopy copy={listingCopy(p)} />
+            <ListingCopyEditor key={p.id} propertyId={p.id} template={listingCopy(p)} approved={approvedCopy} claude={claudeReady()} />
           </>
         ) : (
           <p className="text-sm text-muted-foreground">This listing is {p.status}, so there&apos;s nothing to promote.</p>

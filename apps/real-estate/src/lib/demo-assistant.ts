@@ -121,7 +121,7 @@ function outreachCommand(q: string, lead: ScoredLead | undefined, prop: Property
     if (!lead && !/\ball\b/.test(q)) return { answer: `${pending.length} drafts are waiting in [Outreach](/outreach). Say "approve the draft for <buyer>" or review them there.` };
     const label = (d: OutreachDraft) => `${leads.find((l) => l.id === d.leadId)?.name ?? d.leadId}: ${d.subject}`;
     return {
-      answer: `Ready to approve ${pending.length} draft${pending.length === 1 ? "" : "s"}. Approving marks them ready to send; nothing is sent from this desk.`,
+      answer: `Ready to approve ${pending.length} draft${pending.length === 1 ? "" : "s"}. Approving marks them ready to send; nothing is sent until you confirm each send in Outreach.`,
       command: true,
       proposal: { action: "approve_draft", summary: `Approve ${pending.length} outreach draft${pending.length === 1 ? "" : "s"}`, targets: pending.map((d) => ({ id: d.id, label: label(d) })) },
     };

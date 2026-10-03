@@ -1,6 +1,8 @@
 import { MapPin, Home, Info, PlusSquare, TrendingUp } from "lucide-react";
 import { Kpi } from "@/components/bits";
+import { MarketBrief } from "@/components/market-brief";
 import { UsMarketMap } from "@/components/us-market-map";
+import { claudeReady } from "@/lib/ai-claude";
 import { monthLabel, US_MARKET_SOURCE_PAGE } from "@/lib/us-market";
 import { getUsMarket } from "@/lib/us-market-source";
 
@@ -66,6 +68,8 @@ export default async function MarketPage() {
         <Kpi size="hero" label="New listings" value={newListings.toLocaleString("en-US")} hint={`Came on the market in ${month}`} icon={PlusSquare} />
         <Kpi size="hero" label="Most inventory" value={leader?.id ?? "—"} hint={leader ? `${leader.name} · ${leader.latest.active?.toLocaleString("en-US")} for sale` : ""} icon={MapPin} />
       </section>
+
+      <MarketBrief month={month} claude={claudeReady()} />
 
       <UsMarketMap states={current} />
 

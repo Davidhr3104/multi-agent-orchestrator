@@ -13,7 +13,7 @@ const TABS = [
 /** Plain-text segments a carrier would bill: 160 characters for one, 153 each once it has to be split. */
 const smsSegments = (n: number) => (n <= 160 ? 1 : Math.ceil(n / 153));
 
-/** How the draft would read in each channel. A preview only — no account is connected, so it can't be sent from here. */
+/** How the draft would read in each channel. A preview only; sending happens from the approved draft, one confirmed channel at a time. */
 export function DraftPreview({ subject, body, to, hasPhone }: { subject: string; body: string; to: string; hasPhone: boolean }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("email");
   return (
@@ -36,7 +36,7 @@ export function DraftPreview({ subject, body, to, hasPhone }: { subject: string;
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-muted-foreground">Preview only — not connected</span>
+        <span className="text-[11px] text-muted-foreground">Preview only — sending is a separate, confirmed step after approval</span>
       </div>
       {tab === "email" ? (
         <div role="tabpanel" className="overflow-hidden rounded-lg border border-border bg-background/50">

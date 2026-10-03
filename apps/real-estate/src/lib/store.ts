@@ -1,10 +1,11 @@
 import { demoAvailable, type DeskMode } from "@helix/core";
 import { scoreBuyer } from "./scoring";
 import { DEMO_ZONES, LEAD_SEEDS, PROPERTY_SEEDS, SELLER_SEEDS, buildSeedShowings } from "./seed";
-import type { ActivityEntry, BuyerScore, Lead, LeadStage, MarketZone, OutreachDraft, Property, Seller, SellerStage, Showing } from "./types";
+import type { ActivityEntry, ApprovedListingCopy, BuyerScore, Lead, LeadStage, MarketZone, OutreachDraft, Property, Seller, SellerStage, Showing } from "./types";
 
 /**
- * In-memory desk. Phase 0 has only the demo sandbox: nothing here is persisted or sent anywhere. When a
+ * In-memory desk: nothing here is persisted. It starts on the demo sandbox; importing the agent's own listings or
+ * buyers wipes every sample record first and switches the desk to live, so demo and real data never mix. When a
  * deployment sets HELIX_DESK_SEED=off the desk starts empty (an honest live desk) instead of showing samples.
  */
 type Desk = {
@@ -15,20 +16,31 @@ type Desk = {
   sellers: Map<string, Seller>;
   activity: ActivityEntry[];
   zones: MarketZone[];
+  listingCopies: Map<string, ApprovedListingCopy>;
+  /** Property id -> fingerprint of the fields matching depends on, as of the last nightly run. */
+  matchFingerprints: Map<string, string>;
   seeded: boolean;
+  /** The sample agency is loaded. */
+  demoLoaded: boolean;
+  /** The agent imported their own data; demo can't come back over it. */
+  live: boolean;
 };
 
 const ACTIVITY_CAP = 500;
 
 function desk(): Desk {
   const g = globalThis as typeof globalThis & { __helixRealEstate?: Desk };
-  g.__helixRealEstate ??= { properties: new Map(), leads: new Map(), drafts: new Map(), showings: new Map(), sellers: new Map(), activity: [], zones: [], seeded: false };
+  g.__helixRealEstate ??= { properties: new Map(), leads: new Map(), drafts: new Map(), showings: new Map(), sellers: new Map(), activity: [], zones: [], listingCopies: new Map(), matchFingerprints: new Map(), seeded: false, demoLoaded: false, live: false };
   const d = g.__helixRealEstate;
   d.drafts ??= new Map();
   d.showings ??= new Map();
   d.sellers ??= new Map();
   d.activity ??= [];
   d.zones ??= [];
+  d.listingCopies ??= new Map();
+  d.matchFingerprints ??= new Map();
+  d.demoLoaded ??= false;
+  d.live ??= false;
   return d;
 }
 
@@ -43,7 +55,11 @@ function applyDemo() {
   d.sellers = new Map(SELLER_SEEDS.map((s) => [s.id, cloneSeller(s)]));
   d.activity = [];
   d.zones = DEMO_ZONES.map((z) => ({ ...z }));
+  d.listingCopies = new Map();
+  d.matchFingerprints = new Map();
   d.seeded = true;
+  d.demoLoaded = true;
+  d.live = false;
 }
 
 function ensure() {
@@ -57,7 +73,67 @@ function ensure() {
 export type ScoredLead = Lead & { buyer: BuyerScore };
 
 export function currentDeskMode(): DeskMode {
+  if (ensure().live) return "live";
   return demoAvailable() ? "demo" : "live";
+}
+
+export type ImportOutcome = { added: number; updated: number; clearedDemo: boolean };
+
+/**
+ * Adds the agent's own listings and/or buyers. The first import removes every sample record (listings, buyers,
+ * drafts, showings, sellers, zones, activity) so real and demo data are never on the desk together.
+ */
+export async function importRecords(input: { properties?: Property[]; leads?: Lead[] }): Promise<ImportOutcome> {
+  const d = ensure();
+  const clearedDemo = d.demoLoaded;
+  if (clearedDemo) {
+    d.properties = new Map();
+    d.leads = new Map();
+    d.drafts = new Map();
+    d.showings = new Map();
+    d.sellers = new Map();
+    d.activity = [];
+    d.zones = [];
+    d.listingCopies = new Map();
+    d.matchFingerprints = new Map();
+    d.demoLoaded = false;
+  }
+  d.live = true;
+  let added = 0;
+  let updated = 0;
+  for (const p of input.properties ?? []) {
+    if (d.properties.has(p.id)) updated++;
+    else added++;
+    d.properties.set(p.id, { ...p, amenities: [...p.amenities] });
+  }
+  for (const l of input.leads ?? []) {
+    const prev = d.leads.get(l.id);
+    if (prev) updated++;
+    else added++;
+    d.leads.set(l.id, { ...l, zones: [...l.zones], notes: prev ? [...prev.notes] : [...l.notes], createdAt: prev?.createdAt ?? l.createdAt, crm: prev?.crm });
+  }
+  return { added, updated, clearedDemo };
+}
+
+export async function putLead(l: Lead): Promise<void> {
+  ensure().leads.set(l.id, { ...l, zones: [...l.zones], notes: [...l.notes] });
+}
+
+export async function getListingCopy(propertyId: string): Promise<ApprovedListingCopy | null> {
+  const c = ensure().listingCopies.get(propertyId);
+  return c ? { ...c } : null;
+}
+
+export async function putListingCopy(c: ApprovedListingCopy): Promise<void> {
+  ensure().listingCopies.set(c.propertyId, { ...c });
+}
+
+export async function getMatchFingerprints(): Promise<Map<string, string>> {
+  return new Map(ensure().matchFingerprints);
+}
+
+export async function setMatchFingerprint(propertyId: string, fingerprint: string): Promise<void> {
+  ensure().matchFingerprints.set(propertyId, fingerprint);
 }
 
 export async function listProperties(): Promise<Property[]> {
@@ -160,7 +236,7 @@ export async function listZones(): Promise<MarketZone[]> {
   return ensure().zones.map((z) => ({ ...z }));
 }
 
-const cloneDraft = (x: OutreachDraft): OutreachDraft => ({ ...x, propertyIds: [...x.propertyIds], why: [...x.why] });
+const cloneDraft = (x: OutreachDraft): OutreachDraft => ({ ...x, propertyIds: [...x.propertyIds], why: [...x.why], deliveries: x.deliveries?.map((v) => ({ ...v })) });
 
 /** Newest batch first; within a batch, the order it was drafted in (best fit first). */
 export async function listDrafts(): Promise<OutreachDraft[]> {
@@ -193,14 +269,15 @@ export async function listActivity(): Promise<ActivityEntry[]> {
   return ensure().activity.map((a) => ({ ...a, labels: [...a.labels] }));
 }
 
-export type DeskModeStatus = { empty: boolean; demo: boolean; mode: DeskMode; connected: boolean; store: "memory"; count: number };
+export type DeskModeStatus = { empty: boolean; demo: boolean; mode: DeskMode; connected: boolean; imported: boolean; store: "memory"; count: number };
 
 export async function deskStatus(): Promise<DeskModeStatus> {
   const d = ensure();
   const mode = currentDeskMode();
-  return { empty: d.properties.size === 0 && d.leads.size === 0, demo: mode === "demo", mode, connected: false, store: "memory", count: d.properties.size + d.leads.size };
+  return { empty: d.properties.size === 0 && d.leads.size === 0, demo: mode === "demo", mode, connected: false, imported: d.live, store: "memory", count: d.properties.size + d.leads.size };
 }
 
+/** Puts the sample agency back. This replaces everything on the desk, including imported data. */
 export async function loadDemoCatalog(): Promise<DeskModeStatus> {
   if (!demoAvailable()) throw new Error("Demo data is disabled on this deployment.");
   applyDemo();

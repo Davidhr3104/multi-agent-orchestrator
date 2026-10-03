@@ -1,9 +1,14 @@
-import { isClaudeConfigured } from "@helix/core";
-import { Bot, CalendarDays, Check, Database, Download, Eye, FileSpreadsheet, Globe, Mail, MessageCircle, Plug, ShieldCheck, SlidersHorizontal, Users, Webhook, X, type LucideIcon } from "lucide-react";
+import { getSecret, isClaudeConfigured } from "@helix/core";
+import { Bot, CalendarDays, Check, Clock, Coins, Database, Download, Eye, FileSpreadsheet, Globe, Mail, MessageCircle, Plug, ShieldCheck, SlidersHorizontal, Table2, Users, Webhook, X, type LucideIcon } from "lucide-react";
 import { CommissionRateField } from "@/components/commission-kpi";
 import { ToneSelect } from "@/components/draft-tone";
+import { ImportPanel } from "@/components/import-panel";
 import { ResetDemoButton } from "@/components/reset-demo-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AI_FEATURE_LABEL, EST_USD_PER_MILLION_INPUT_TOKENS, EST_USD_PER_MILLION_OUTPUT_TOKENS, aiUsageTotals, fmtUsd, type AiFeature } from "@/lib/ai-usage";
+import { hubspotReady } from "@/lib/hubspot";
+import { channelReady } from "@/lib/messaging";
+import { lastNightlyRun } from "@/lib/nightly";
 import { deskStatus } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +81,13 @@ function Status({ connected, children }: { connected: boolean; children: React.R
 export default async function SettingsPage() {
   const status = await deskStatus();
   const claude = isClaudeConfigured();
+  const email = channelReady("email");
+  const sms = channelReady("sms");
+  const whatsapp = channelReady("whatsapp");
+  const hubspot = hubspotReady();
+  const cron = Boolean(getSecret("CRON_SECRET"));
+  const nightly = lastNightlyRun();
+  const usage = aiUsageTotals();
   const integrations: Integration[] = [
     {
       name: "Helix AI (Claude)",
@@ -86,10 +98,55 @@ export default async function SettingsPage() {
       tone: "bg-orange-500/10 text-orange-300 ring-orange-500/30",
       how: claude ? "Set by the server's API key." : "Turns on when the server has an Anthropic API key.",
     },
-    { name: "WhatsApp Business", does: "Send approved drafts and log replies", icon: MessageCircle, connected: false, status: "Not connected", tone: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30", how: SOON },
-    { name: "Email (Gmail / Outlook)", does: "Send approved drafts from your own address", icon: Mail, connected: false, status: "Not connected", tone: "bg-sky-500/10 text-sky-300 ring-sky-500/30", how: SOON },
+    {
+      name: "Email (Resend)",
+      does: "Send approved drafts by email, one confirmed send at a time",
+      icon: Mail,
+      connected: email,
+      status: email ? "Connected" : "Not connected",
+      tone: "bg-sky-500/10 text-sky-300 ring-sky-500/30",
+      how: email ? "Set by the server's RESEND_API_KEY and RESEND_FROM." : "Turns on when the server has RESEND_API_KEY and RESEND_FROM (a sender on a domain verified in Resend).",
+    },
+    {
+      name: "SMS & WhatsApp (Twilio)",
+      does: "Send approved drafts by SMS or WhatsApp, one confirmed send at a time",
+      icon: MessageCircle,
+      connected: sms || whatsapp,
+      status: sms && whatsapp ? "Connected" : sms || whatsapp ? "Partly connected" : "Not connected",
+      tone: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30",
+      how: sms || whatsapp ? "Set by the server's TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM." : "Turns on when the server has TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM (TWILIO_WHATSAPP_FROM for a separate WhatsApp sender).",
+    },
+    {
+      name: "Google Sheets",
+      does: "Import listings or buyers from a published or link-shared sheet",
+      icon: Table2,
+      connected: true,
+      status: "Available",
+      tone: "bg-green-500/10 text-green-300 ring-green-500/30",
+      how: "No sign-in needed: paste the sheet link under Import & export. The sheet must be published to the web or shared as \"Anyone with the link\".",
+    },
+    {
+      name: "CRM (HubSpot)",
+      does: "Create or update a buyer as a HubSpot contact, after you confirm",
+      icon: Users,
+      connected: hubspot,
+      status: hubspot ? "Connected" : "Not connected",
+      tone: "bg-amber-500/10 text-amber-300 ring-amber-500/30",
+      how: hubspot ? "Set by the server's HUBSPOT_TOKEN." : "Turns on when the server has HUBSPOT_TOKEN (a HubSpot private app token with contacts write access).",
+    },
+    {
+      name: "Nightly matching",
+      does: "Matches new or changed listings to buyers every night and queues drafts. Never sends.",
+      icon: Clock,
+      connected: cron,
+      status: cron ? (nightly ? `Last run ${new Date(nightly.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Scheduled") : "Not set up",
+      tone: "bg-cyan-500/10 text-cyan-300 ring-cyan-500/30",
+      how: cron
+        ? `Vercel Cron calls it daily at 07:00 UTC.${nightly ? ` Last run: ${nightly.changed} changed listing${nightly.changed === 1 ? "" : "s"}, ${nightly.drafted} draft${nightly.drafted === 1 ? "" : "s"} queued, 0 sent.` : ""}`
+        : "Turns on when the server has CRON_SECRET; the schedule is in vercel.json.",
+    },
     { name: "Google / Outlook Calendar", does: "Two-way sync for showings and invites", icon: CalendarDays, connected: false, status: "Not connected", tone: "bg-blue-500/10 text-blue-300 ring-blue-500/30", how: SOON },
-    { name: "CRM (HubSpot, GoHighLevel)", does: "Keep buyers and sellers in sync with your CRM", icon: Users, connected: false, status: "Not connected", tone: "bg-amber-500/10 text-amber-300 ring-amber-500/30", how: SOON },
+    { name: "GoHighLevel", does: "Keep buyers and sellers in sync with GoHighLevel", icon: Users, connected: false, status: "Not connected", tone: "bg-amber-500/10 text-amber-300 ring-amber-500/30", how: SOON },
     { name: "Portals (Zillow, Idealista)", does: "Import leads and publish listings", icon: Globe, connected: false, status: "Not connected", tone: "bg-indigo-500/10 text-indigo-300 ring-indigo-500/30", how: SOON },
     { name: "Webhooks / Zapier", does: "Push desk events to your other tools", icon: Webhook, connected: false, status: "Not connected", tone: "bg-violet-500/10 text-violet-300 ring-violet-500/30", how: SOON },
   ];
@@ -108,7 +165,7 @@ export default async function SettingsPage() {
         <dl className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <dt className="text-[11px] tracking-wider text-muted-foreground uppercase">Mode</dt>
-            <dd className="mt-0.5 text-sm font-semibold text-foreground">{status.demo ? "Demo sandbox" : "Live"}</dd>
+            <dd className="mt-0.5 text-sm font-semibold text-foreground">{status.demo ? "Demo sandbox" : status.imported ? "Live — your imported data" : "Live"}</dd>
           </div>
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <dt className="text-[11px] tracking-wider text-muted-foreground uppercase">Storage</dt>
@@ -209,8 +266,22 @@ export default async function SettingsPage() {
         <h2 id="data-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <FileSpreadsheet className="size-4 text-primary" aria-hidden /> Import &amp; export
         </h2>
-        <p className="text-xs text-muted-foreground">Download what&apos;s on the desk right now as CSV for Excel, Google Sheets or another CRM.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <p className="text-xs text-muted-foreground">
+          Bring in your real listings and buyers from a CSV or a Google Sheet, or download what&apos;s on the desk as CSV for Excel, Google Sheets or another CRM.
+        </p>
+        <div id="import" className="mt-4 scroll-mt-6 rounded-lg border border-border bg-background/30 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Import</h3>
+          <ImportPanel />
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            {status.demo
+              ? "Your first import removes the sample agency — demo and real data are never shown together. "
+              : ""}
+            Imported records live in this server&apos;s memory: a restart or a new deployment clears them, so keep your sheet as the source of truth and re-import when
+            needed. Re-importing a row with the same listing ID (or address) or buyer email updates it instead of duplicating it.
+          </p>
+        </div>
+        <h3 className="mt-5 text-sm font-semibold text-foreground">Export</h3>
+        <div className="mt-2 flex flex-wrap gap-2">
           {(
             [
               ["leads", "Buyers"],
@@ -227,14 +298,48 @@ export default async function SettingsPage() {
             <CalendarDays className="size-4" aria-hidden /> Upcoming showings (.ics)
           </a>
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">CSV import isn&apos;t available yet — it arrives with saved storage, so imported records don&apos;t vanish on restart.</p>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card/80 p-5" aria-labelledby="ai-cost-heading">
+        <h2 id="ai-cost-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <Coins className="size-4 text-primary" aria-hidden /> AI usage <span className="text-sm font-normal text-muted-foreground">(estimated)</span>
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Claude calls this server made since it started: listing copy, match alerts, market briefs and nightly matching. The cost is an estimate at $
+          {EST_USD_PER_MILLION_INPUT_TOKENS} per million input tokens and ${EST_USD_PER_MILLION_OUTPUT_TOKENS} per million output tokens (list price) — your Anthropic invoice is
+          the real figure. The Ask Helix chat isn&apos;t counted here.
+        </p>
+        <dl className="mt-3 grid gap-3 sm:grid-cols-4">
+          {[
+            ["Calls", usage.calls.toLocaleString("en-US")],
+            ["Input tokens", usage.inputTokens.toLocaleString("en-US")],
+            ["Output tokens", usage.outputTokens.toLocaleString("en-US")],
+            ["Estimated cost", `${fmtUsd(usage.estUsd)} estimated`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-border bg-background/40 p-3">
+              <dt className="text-[11px] tracking-wider text-muted-foreground uppercase">{label}</dt>
+              <dd className="tabular mt-0.5 font-mono text-sm font-semibold text-foreground">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {usage.calls ? (
+          <ul className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            {(Object.entries(usage.byFeature) as [AiFeature, { calls: number; estUsd: number }][]).map(([f, v]) => (
+              <li key={f} className="rounded-full border border-border px-2.5 py-0.5">
+                {AI_FEATURE_LABEL[f]}: {v.calls} call{v.calls === 1 ? "" : "s"} · {fmtUsd(v.estUsd)} estimated
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-[11px] text-muted-foreground">{claude ? "No Claude calls yet." : "Claude isn't connected, so nothing has been spent; the desk uses templates."}</p>
+        )}
       </section>
 
       <section id="integrations" className="scroll-mt-6 rounded-xl border border-border bg-card/80 p-5" aria-labelledby="int-heading">
         <h2 id="int-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <Plug className="size-4 text-primary" aria-hidden /> Integrations
         </h2>
-        <p className="text-xs text-muted-foreground">Real connection status. Until a tool is connected, Helix drafts and you send it yourself.</p>
+        <p className="text-xs text-muted-foreground">Real connection status, read from the server&apos;s environment. Until a channel is connected, Helix drafts and you send it yourself.</p>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {integrations.map(({ name, does, icon: Icon, connected, status: label, tone, how }) => (
             <li key={name} className={cn("flex flex-col gap-3 rounded-xl border bg-background/40 p-4 transition", connected ? "border-emerald-500/30" : "border-border")}>

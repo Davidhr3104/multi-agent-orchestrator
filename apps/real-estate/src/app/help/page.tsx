@@ -41,7 +41,7 @@ const STEPS: Step[] = [
   },
   {
     title: "7. Approve outreach",
-    body: "Helix drafts new-listing alerts and cold-buyer check-ins in the tone you pick. Preview each as email, WhatsApp or SMS. Tick several drafts and use Review & approve: you see the full list before confirming. Approving never sends anything.",
+    body: "Helix drafts new-listing alerts and cold-buyer check-ins in the tone you pick. Preview each as email, WhatsApp or SMS. Tick several drafts and use Review & approve: you see the full list before confirming. Approving never sends anything. Once email (Resend) or SMS/WhatsApp (Twilio) is connected, an approved draft shows Send buttons, and each send asks you to confirm the buyer and channel first.",
     href: "/outreach",
     open: "Open Outreach",
     ask: "Draft check-ins for cold buyers",

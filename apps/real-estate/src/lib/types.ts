@@ -44,6 +44,8 @@ export type Lead = {
   lastContactAt?: string;
   interestedIn?: string;
   notes: string[];
+  /** Set only after HubSpot answered with a contact id. */
+  crm?: { provider: "hubspot"; contactId: string; pushedAt: string };
 };
 
 export type ScoreFactor = { label: string; points: number; max: number; detail: string };
@@ -54,7 +56,13 @@ export type PropertyMatch = { property: Property; fit: number; reasons: string[]
 export type DraftKind = "new_match" | "reactivation";
 export type DraftStatus = "pending" | "approved" | "dismissed";
 
-/** A message Helix wrote for the agent. Nothing is sent from this desk: no email or WhatsApp is connected. */
+/** One real send, recorded only after the provider answered with a message id. */
+export type Delivery = { channel: "email" | "sms" | "whatsapp"; provider: "resend" | "twilio"; providerId: string; to: string; at: string; by: string };
+
+/**
+ * A message Helix wrote for the agent. It is sent only when the agent approves it and then confirms a send on a
+ * connected channel (Resend or Twilio); otherwise the agent copies it into their own inbox.
+ */
 export type OutreachDraft = {
   id: string;
   kind: DraftKind;
@@ -69,7 +77,17 @@ export type OutreachDraft = {
   createdAt: string;
   decidedBy?: string;
   decidedAt?: string;
+  /** Who wrote the wording. The fit score and "why" are always computed by the desk. */
+  writer?: "template" | "claude";
+  /** Claude's plain-language reading of the computed fit, for the agent. */
+  explanation?: string;
+  /** "nightly" when the scheduled matching run queued it. */
+  queuedBy?: "agent" | "nightly";
+  deliveries?: Delivery[];
 };
+
+/** Listing copy the agent edited and approved. Helix doesn't publish it anywhere. */
+export type ApprovedListingCopy = { propertyId: string; portal: string; social: string; message: string; writer: "template" | "claude"; approvedBy: string; approvedAt: string };
 
 export type ShowingStatus = "scheduled" | "done" | "cancelled" | "no_show";
 export const INTEREST_LEVELS = ["high", "medium", "low", "none"] as const;
@@ -125,7 +143,7 @@ export type ActivityEntry = {
   action: string;
   /** "run" = executed, "undo" = reverted, "proposed" = Helix asked a person first. */
   kind: "run" | "undo" | "proposed";
-  via: "button" | "chat";
+  via: "button" | "chat" | "schedule";
   labels: string[];
   done: number;
   failed: number;

@@ -55,7 +55,8 @@ const newShowingId = () => `show-${Date.now().toString(36)}-${(showSeq++).toStri
  *   approve_draft       mark a draft ready to send                                  -> always asks a person
  *   add_seller / move_seller_stage / create_listing_from_seller
  *                       the listing side; a new listing is always a draft           -> auto (+Undo); "lost" asks
- * Drafting only writes inside the desk. No email or WhatsApp is connected, so nothing is ever sent from here.
+ * Drafting only writes inside the desk. No action here sends anything: sending an approved draft is a separate,
+ * per-draft confirmation in Outreach (see outreach-send.ts) and is never reachable from the chat or the risk policy.
  */
 
 export type RealEstateCtx = { actor: string };
@@ -487,7 +488,7 @@ export const realEstateActions: DeskActionRegistry<RealEstateCtx> = {
     apply: decide("approved"),
     restore: restoreDraft,
     resultText: (done, failed) =>
-      `Approved ${plural(done.length, "draft")}. Not sent — no email or WhatsApp is connected yet, so copy it into your own inbox.${failed ? ` ${failed} couldn't be approved.` : ""}`,
-    announce: (l) => `Approved ${names(l)} (not sent)`,
+      `Approved ${plural(done.length, "draft")}. Not sent — confirm each send from Outreach (needs email or WhatsApp connected), or copy it into your own inbox.${failed ? ` ${failed} couldn't be approved.` : ""}`,
+    announce: (l) => `Approved ${names(l)} (not sent yet)`,
   },
 };
