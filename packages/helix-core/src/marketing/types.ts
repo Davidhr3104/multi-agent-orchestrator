@@ -1,6 +1,6 @@
 import type { LeadClassification, LeadTier } from "../types";
 
-export type AdPlatform = "meta" | "google" | "other";
+export type AdPlatform = "meta" | "google" | "tiktok" | "other";
 export type CampaignAction = "pause" | "scale" | "keep";
 export type CampaignStatus =
   | "active"

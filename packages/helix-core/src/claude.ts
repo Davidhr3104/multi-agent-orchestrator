@@ -1,15 +1,20 @@
+import { readClaudeUsage, reportClaudeUsage, type ClaudeUsage } from "./claude-usage";
 import { getSecret } from "./secrets";
+
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 export function isClaudeConfigured(): boolean {
   return Boolean(getSecret("ANTHROPIC_API_KEY"));
 }
 
-export async function completeWithClaude(
+/** Like completeWithClaude(), but also returns the token usage of the call. */
+export async function completeWithClaudeDetailed(
   prompt: string,
-  maxTokens = 900
-): Promise<string | null> {
+  opts: { maxTokens?: number; model?: string; feature?: string } = {}
+): Promise<{ text: string; usage?: ClaudeUsage } | null> {
   const key = getSecret("ANTHROPIC_API_KEY");
   if (!key) return null;
+  const model = opts.model ?? DEFAULT_CLAUDE_MODEL;
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -20,8 +25,8 @@ export async function completeWithClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: maxTokens,
+        model,
+        max_tokens: opts.maxTokens ?? 900,
         messages: [{ role: "user", content: prompt }],
       }),
       signal: AbortSignal.timeout(20_000),
@@ -30,11 +35,20 @@ export async function completeWithClaude(
     const data = (await res.json()) as {
       content?: { type: string; text?: string }[];
     };
-    const text = data.content?.find((c) => c.type === "text")?.text;
-    return text?.trim() || null;
+    const usage = readClaudeUsage(data, model, opts.feature ?? "complete");
+    if (usage) reportClaudeUsage(usage);
+    const text = data.content?.find((c) => c.type === "text")?.text?.trim();
+    return text ? { text, usage } : null;
   } catch {
     return null;
   }
+}
+
+export async function completeWithClaude(
+  prompt: string,
+  maxTokens = 900
+): Promise<string | null> {
+  return (await completeWithClaudeDetailed(prompt, { maxTokens }))?.text ?? null;
 }
 
 export function parseJsonObject<T>(raw: string): T | null {

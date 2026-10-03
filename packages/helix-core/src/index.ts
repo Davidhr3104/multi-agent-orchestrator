@@ -1,4 +1,20 @@
-export { completeWithClaude, isClaudeConfigured, parseJsonObject } from "./claude";
+export {
+  completeWithClaude,
+  completeWithClaudeDetailed,
+  DEFAULT_CLAUDE_MODEL,
+  isClaudeConfigured,
+  parseJsonObject,
+} from "./claude";
+export {
+  anthropicErrorMessage,
+  ESTIMATED_CLAUDE_PRICES_USD_PER_MTOK,
+  estimateClaudeCostUsd,
+  onClaudeUsage,
+  readClaudeUsage,
+  reportClaudeUsage,
+  type ClaudeUsage,
+} from "./claude-usage";
+export { cronAuthResponse } from "./cron-auth";
 export {
   askAi,
   askAiWithProposal,
@@ -21,7 +37,10 @@ export {
   KEYS_LEADS,
   KEYS_LEGAL,
   KEYS_MARKETING,
+  KEYS_REAL_ESTATE,
+  KEYS_SOCIAL,
   listSecretStatus,
+  resetSecretsCache,
   setSecrets,
   type SecretField,
   type SecretStatus,

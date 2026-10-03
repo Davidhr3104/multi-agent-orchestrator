@@ -5,6 +5,28 @@ export type SecretField = {
   stub?: boolean;
 };
 
+function cronSecretField(legacyEndpoint?: string): SecretField {
+  return {
+    name: "CRON_SECRET",
+    label: "Cron secret",
+    hint: `Same value as Vercel's CRON_SECRET env var. Required for the scheduled jobs under /api/cron/*: they refuse to run without it.${
+      legacyEndpoint ? ` It also locks the ${legacyEndpoint} endpoint, which otherwise accepts any GET.` : ""
+    }`,
+  };
+}
+
+const HUBSPOT_FIELD: SecretField = {
+  name: "HUBSPOT_TOKEN",
+  label: "HubSpot private app token",
+  hint: "HubSpot → Settings → Integrations → Private Apps, with contact write scope. Pushes only after you confirm.",
+};
+
+const TWILIO_FIELDS: SecretField[] = [
+  { name: "TWILIO_ACCOUNT_SID", label: "Twilio account SID", hint: "From the Twilio console. SMS/WhatsApp sends only after you confirm each message." },
+  { name: "TWILIO_AUTH_TOKEN", label: "Twilio auth token", hint: "Paired with the account SID." },
+  { name: "TWILIO_FROM", label: "Twilio sender", hint: "A Twilio number in E.164 format, e.g. +15550001111." },
+];
+
 export const KEYS_SHARED: SecretField[] = [
   {
     name: "ANTHROPIC_API_KEY",
@@ -69,9 +91,24 @@ export const KEYS_LEADS: SecretField[] = [
     label: "Cal.com event type ID",
     hint: "Required with the Cal.com API key — the event type slots are pulled from.",
   },
+  HUBSPOT_FIELD,
+  {
+    name: "HELIX_INTAKE_TOKEN",
+    label: "Lead intake token",
+    hint: "Secret path segment for the public intake URL /api/leads/intake/<token>, used when Supabase is not configured.",
+  },
+  cronSecretField(),
 ];
 
-export const KEYS_LEGAL: SecretField[] = [...KEYS_SHARED];
+export const KEYS_LEGAL: SecretField[] = [
+  ...KEYS_SHARED,
+  {
+    name: "SAM_GOV_API_KEY",
+    label: "SAM.gov public API key",
+    hint: "sam.gov → your profile → Account Details → Public API Key. Imports real federal RFPs; the daily quota is small.",
+  },
+  cronSecretField(),
+];
 
 export const KEYS_INBOX: SecretField[] = [
   ...KEYS_SHARED,
@@ -98,11 +135,10 @@ export const KEYS_INBOX: SecretField[] = [
     hint: "Full URL from Helix for Leads → Settings → Workspace (the GHL webhook URL for that workspace). Enables 'Send to Leads' handoff on buyer-intent threads.",
   },
   { name: "SLACK_WEBHOOK_URL", label: "Slack webhook", hint: "Optional ping when a buyer-intent thread arrives, and for the weekly hours-saved report." },
-  {
-    name: "CRON_SECRET",
-    label: "Cron secret",
-    hint: "Optional. Set the same value as Vercel's CRON_SECRET env var to require it on the weekly report endpoint — otherwise that endpoint accepts any GET.",
-  },
+  { name: "CALENDLY_TOKEN", label: "Calendly personal access token", hint: "Reads your scheduled Calendly events for the Calendar page." },
+  HUBSPOT_FIELD,
+  ...TWILIO_FIELDS,
+  cronSecretField("weekly report"),
 ];
 
 export const KEYS_COMMERCE: SecretField[] = [
@@ -115,11 +151,7 @@ export const KEYS_COMMERCE: SecretField[] = [
     hint: "From the webhook subscription in Shopify admin (or your app's API credentials). Required for live webhooks — without it, /api/webhooks/shopify rejects everything.",
   },
   { name: "SLACK_WEBHOOK_URL", label: "Slack webhook", hint: "Optional daily ops brief: high-risk orders + $ on hold." },
-  {
-    name: "CRON_SECRET",
-    label: "Cron secret",
-    hint: "Optional. Set the same value as Vercel's CRON_SECRET env var to require it on the daily brief endpoint — otherwise that endpoint accepts any GET.",
-  },
+  cronSecretField("daily brief"),
 ];
 
 export const KEYS_MARKETING: SecretField[] = [
@@ -137,13 +169,37 @@ export const KEYS_MARKETING: SecretField[] = [
   {
     name: "GOOGLE_ADS_DEVELOPER_TOKEN",
     label: "Google Ads developer token",
-    hint: "Saved for later. Google Ads read/write is not live this sprint — use CSV ingest.",
-    stub: true,
+    hint: "Google Ads MCC → Tools → API Center. Test access only reads test accounts; real accounts need Basic access. Read-only: Helix never writes to Google Ads.",
   },
+  { name: "GOOGLE_ADS_CLIENT_ID", label: "Google Ads OAuth client ID", hint: "Google Cloud OAuth client with the Google Ads API enabled." },
+  { name: "GOOGLE_ADS_CLIENT_SECRET", label: "Google Ads OAuth client secret", hint: "Paired with the client ID." },
+  { name: "GOOGLE_ADS_REFRESH_TOKEN", label: "Google Ads refresh token", hint: "OAuth refresh token with the adwords scope." },
+  { name: "GOOGLE_ADS_CUSTOMER_ID", label: "Google Ads customer ID", hint: "The account to read, digits only." },
+  { name: "GOOGLE_ADS_LOGIN_CUSTOMER_ID", label: "Google Ads login customer ID", hint: "Only when access goes through a manager (MCC) account." },
+  { name: "TIKTOK_ADS_ACCESS_TOKEN", label: "TikTok Ads access token", hint: "From your approved TikTok for Business app. Read-only reporting." },
+  { name: "TIKTOK_ADS_ADVERTISER_ID", label: "TikTok advertiser ID", hint: "From TikTok Ads Manager." },
   { name: "SLACK_WEBHOOK_URL", label: "Slack webhook", hint: "Optional daily brief: $ spent, spend on spam, top waste campaign." },
-  {
-    name: "CRON_SECRET",
-    label: "Cron secret",
-    hint: "Optional. Set the same value as Vercel's CRON_SECRET env var to require it on the daily brief endpoint — otherwise that endpoint accepts any GET.",
-  },
+  cronSecretField("daily brief"),
+];
+
+export const KEYS_SOCIAL: SecretField[] = [
+  ...KEYS_SHARED,
+  { name: "HELIX_META_ACCESS_TOKEN", label: "Meta access token", hint: "Long-lived user token for Instagram Business and the Facebook Page. Reads insights; publishing needs approval per post and the live switch." },
+  { name: "HELIX_META_IG_USER_ID", label: "Instagram business account ID", hint: "From /{page-id}?fields=instagram_business_account." },
+  { name: "HELIX_META_PAGE_ID", label: "Facebook Page ID", hint: "The Page linked to the Instagram account." },
+  { name: "HELIX_META_PAGE_ACCESS_TOKEN", label: "Facebook Page access token", hint: "From /me/accounts. Needed to publish to the Page." },
+  { name: "HELIX_LINKEDIN_ACCESS_TOKEN", label: "LinkedIn access token", hint: "3-legged OAuth token with w_organization_social. Lasts about 60 days." },
+  { name: "HELIX_LINKEDIN_ORGANIZATION_URN", label: "LinkedIn organization", hint: "Organization number or urn:li:organization:N." },
+  cronSecretField(),
+];
+
+export const KEYS_REAL_ESTATE: SecretField[] = [
+  ...KEYS_SHARED,
+  { name: "RESEND_API_KEY", label: "Resend", hint: "Sends approved buyer alerts by email, one confirmation per message." },
+  { name: "RESEND_FROM", label: "Resend from", hint: "An address on a domain verified in Resend." },
+  ...TWILIO_FIELDS,
+  { name: "TWILIO_WHATSAPP_FROM", label: "Twilio WhatsApp sender", hint: "Optional, e.g. whatsapp:+14155238886 (sandbox) or an approved sender." },
+  HUBSPOT_FIELD,
+  { name: "HELIX_NIGHTLY_AI", label: "Nightly AI drafts", hint: "Set to off to make the nightly matching cron use templates only, with no Claude spend." },
+  cronSecretField(),
 ];

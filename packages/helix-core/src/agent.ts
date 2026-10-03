@@ -48,7 +48,11 @@ export type ModelRequest = {
   messages: AgentMessage[];
   tools: { name: string; description: string; inputSchema: JsonSchema }[];
 };
-export type ModelTurn = { text?: string; toolCalls: ToolCall[] };
+export type ModelTurn = {
+  text?: string;
+  toolCalls: ToolCall[];
+  usage?: { model: string; inputTokens: number; outputTokens: number; feature: string };
+};
 /** Injectable so the loop is testable without a network and so a desk can swap providers. */
 export type AgentModel = (req: ModelRequest) => Promise<ModelTurn>;
 
@@ -80,6 +84,8 @@ export type AgentResult = {
   messages: AgentMessage[];
   /** True if the step budget ran out before the model finished. Never silent. */
   truncated: boolean;
+  /** Set when the model call failed mid-run. `steps` still lists everything that already ran. */
+  error?: string;
 };
 
 export type AgentConfig<Ctx> = {
@@ -128,7 +134,24 @@ async function loop<Ctx>(
   let lastText = "";
 
   for (let turn = 0; turn < budget; turn++) {
-    const modelTurn = await cfg.model({ system: cfg.system, messages, tools: toolDefs });
+    let modelTurn: ModelTurn;
+    try {
+      modelTurn = await cfg.model({ system: cfg.system, messages, tools: toolDefs });
+    } catch (err) {
+      // Throwing here would discard the record of tools that already ran this session.
+      if (steps.length === 0) throw err;
+      const error = errText(err);
+      const done = steps.filter((s) => s.status === "executed").map((s) => s.summary);
+      return {
+        answer: `The AI model stopped responding (${error}). ${
+          done.length ? `Already done: ${done.join("; ")}.` : "No action had run yet."
+        }`,
+        steps,
+        messages,
+        truncated: false,
+        error,
+      };
+    }
     if (modelTurn.text) lastText = modelTurn.text;
     messages.push({ role: "assistant", text: modelTurn.text, toolCalls: modelTurn.toolCalls });
 
@@ -241,10 +264,23 @@ export async function resumeAgent<Ctx>(
     slot.output = { status: "declined_by_user" };
     steps.push({ toolCallId: pending.toolCallId, tool: pending.tool, summary: pending.summary, status: "denied", reasons: ["Declined by the operator"] });
   } else {
-    const { step, message } = await execute(tool, { id: pending.toolCallId, name: pending.tool, input: pending.input }, cfg.ctx, pending.reasons);
-    steps.push(step);
-    slot.output = message.output;
-    slot.isError = "isError" in message ? message.isError : undefined;
+    // The desk may have changed while the human was deciding: approval covers "confirm", never "deny".
+    let recheck: RiskDecision;
+    try {
+      recheck = await tool.risk(pending.input, cfg.ctx);
+    } catch (err) {
+      recheck = { level: "deny", reasons: [`Risk check failed: ${errText(err)}`] };
+    }
+    if (recheck.level === "deny") {
+      slot.output = { error: `Not permitted: ${recheck.reasons.join("; ")}` };
+      slot.isError = true;
+      steps.push({ toolCallId: pending.toolCallId, tool: pending.tool, summary: pending.summary, status: "denied", reasons: recheck.reasons });
+    } else {
+      const { step, message } = await execute(tool, { id: pending.toolCallId, name: pending.tool, input: pending.input }, cfg.ctx, pending.reasons);
+      steps.push(step);
+      slot.output = message.output;
+      slot.isError = "isError" in message ? message.isError : undefined;
+    }
   }
 
   messages[messages.length - 1] = { role: "tool", results };

@@ -38,6 +38,7 @@ function platformOf(value: string): SpendRowInput["platform"] {
   const v = value.toLowerCase();
   if (v.includes("meta") || v.includes("facebook") || v.includes("ig")) return "meta";
   if (v.includes("google") || v.includes("adwords")) return "google";
+  if (v.includes("tiktok")) return "tiktok";
   return "other";
 }
 

@@ -1,4 +1,6 @@
 import type { AgentMessage, AgentModel, ToolCall } from "./agent";
+import { DEFAULT_CLAUDE_MODEL } from "./claude";
+import { anthropicErrorMessage, readClaudeUsage, reportClaudeUsage } from "./claude-usage";
 import { getSecret } from "./secrets";
 
 type Block =
@@ -6,29 +8,38 @@ type Block =
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 
-/** Maps the provider-neutral transcript onto Anthropic's tool-use message format. */
-export function toAnthropicMessages(messages: AgentMessage[]): { role: "user" | "assistant"; content: string | Block[] }[] {
-  return messages.map((m) => {
-    if (m.role === "user") return { role: "user", content: m.content };
-    if (m.role === "assistant") {
+type AnthropicMessage = { role: "user" | "assistant"; content: string | Block[] };
+
+/**
+ * Maps the provider-neutral transcript onto Anthropic's tool-use message format.
+ * Empty assistant turns are dropped: Anthropic rejects an assistant message with no content.
+ */
+export function toAnthropicMessages(messages: AgentMessage[]): AnthropicMessage[] {
+  const out: AnthropicMessage[] = [];
+  for (const m of messages) {
+    if (m.role === "user") {
+      out.push({ role: "user", content: m.content });
+    } else if (m.role === "assistant") {
       const blocks: Block[] = [];
       if (m.text) blocks.push({ type: "text", text: m.text });
       for (const c of m.toolCalls ?? []) blocks.push({ type: "tool_use", id: c.id, name: c.name, input: c.input });
-      return { role: "assistant", content: blocks.length ? blocks : "" };
+      if (blocks.length) out.push({ role: "assistant", content: blocks });
+    } else {
+      out.push({
+        role: "user",
+        content: m.results.map((r) => ({
+          type: "tool_result" as const,
+          tool_use_id: r.toolCallId,
+          content: typeof r.output === "string" ? r.output : JSON.stringify(r.output),
+          ...(r.isError ? { is_error: true } : {}),
+        })),
+      });
     }
-    return {
-      role: "user",
-      content: m.results.map((r) => ({
-        type: "tool_result" as const,
-        tool_use_id: r.toolCallId,
-        content: typeof r.output === "string" ? r.output : JSON.stringify(r.output),
-        ...(r.isError ? { is_error: true } : {}),
-      })),
-    };
-  });
+  }
+  return out;
 }
 
-export const DEFAULT_AGENT_MODEL = "claude-sonnet-5-5";
+export const DEFAULT_AGENT_MODEL = DEFAULT_CLAUDE_MODEL;
 
 /**
  * Anthropic-backed AgentModel. Unlike askAi() it does not fall back silently: an agent that
@@ -39,11 +50,12 @@ export function anthropicAgentModel(opts: { model?: string; maxTokens?: number }
     const key = getSecret("ANTHROPIC_API_KEY");
     if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
 
+    const model = opts.model ?? DEFAULT_AGENT_MODEL;
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
-        model: opts.model ?? DEFAULT_AGENT_MODEL,
+        model,
         max_tokens: opts.maxTokens ?? 1500,
         system,
         messages: toAnthropicMessages(messages),
@@ -51,9 +63,14 @@ export function anthropicAgentModel(opts: { model?: string; maxTokens?: number }
       }),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) throw new Error(`Anthropic request failed (${res.status})`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(`Anthropic request failed (${anthropicErrorMessage(body, res.status)})`);
+    }
 
     const data = (await res.json()) as { content?: Block[] };
+    const usage = readClaudeUsage(data, model, "agent");
+    if (usage) reportClaudeUsage(usage);
     const blocks = data.content ?? [];
     const text = blocks
       .filter((b): b is Extract<Block, { type: "text" }> => b.type === "text")
@@ -63,6 +80,6 @@ export function anthropicAgentModel(opts: { model?: string; maxTokens?: number }
     const toolCalls: ToolCall[] = blocks
       .filter((b): b is Extract<Block, { type: "tool_use" }> => b.type === "tool_use")
       .map((b) => ({ id: b.id, name: b.name, input: b.input ?? {} }));
-    return { text: text || undefined, toolCalls };
+    return { text: text || undefined, toolCalls, usage };
   };
 }

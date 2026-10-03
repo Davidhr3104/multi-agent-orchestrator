@@ -1,11 +1,12 @@
-import { parseJsonObject } from "./claude";
+import { DEFAULT_CLAUDE_MODEL, parseJsonObject } from "./claude";
+import { readClaudeUsage, reportClaudeUsage, type ClaudeUsage } from "./claude-usage";
 import { getSecret } from "./secrets";
 
 export type AskAiRole = "user" | "assistant";
 export type AskAiAttachment = { type: "image"; data: string; mediaType: string };
 export type AskAiMessage = { role: AskAiRole; content: string; attachments?: AskAiAttachment[] };
 export type AskAiEngine = "claude" | "fallback";
-export type AskAiResult = { answer: string; engine: AskAiEngine };
+export type AskAiResult = { answer: string; engine: AskAiEngine; usage?: ClaudeUsage };
 
 export type AskAiActionProposal = {
   type: "action_proposal";
@@ -45,8 +46,10 @@ async function callAnthropic(params: {
   system: string;
   history: AskAiMessage[];
   key: string;
-}): Promise<string | null> {
-  const { system, history, key } = params;
+  feature: string;
+}): Promise<{ text: string; usage?: ClaudeUsage } | null> {
+  const { system, history, key, feature } = params;
+  const model = DEFAULT_CLAUDE_MODEL;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -55,7 +58,7 @@ async function callAnthropic(params: {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model,
       max_tokens: 900,
       system,
       messages: history.map(toAnthropicMessage),
@@ -67,8 +70,10 @@ async function callAnthropic(params: {
   const data = (await res.json()) as {
     content?: { type: string; text?: string }[];
   };
+  const usage = readClaudeUsage(data, model, feature);
+  if (usage) reportClaudeUsage(usage);
   const text = data.content?.find((c) => c.type === "text")?.text?.trim();
-  return text || null;
+  return text ? { text, usage } : null;
 }
 
 export async function askAi(params: {
@@ -83,9 +88,9 @@ export async function askAi(params: {
   const system = recordContext ? `${systemPrompt}\n\n${recordContext}` : systemPrompt;
 
   try {
-    const text = await callAnthropic({ system, history, key });
-    if (!text) return fallback(recordContext);
-    return { answer: text, engine: "claude" };
+    const out = await callAnthropic({ system, history, key, feature: "ask-ai" });
+    if (!out) return fallback(recordContext);
+    return { answer: out.text, engine: "claude", usage: out.usage };
   } catch {
     return fallback(recordContext);
   }
@@ -112,14 +117,14 @@ export async function askAiWithProposal(params: {
   const system = [systemPrompt, recordContext, proposalInstruction].filter(Boolean).join("\n\n");
 
   try {
-    const text = await callAnthropic({ system, history, key });
-    if (!text) return fallback(recordContext);
+    const out = await callAnthropic({ system, history, key, feature: "ask-ai" });
+    if (!out) return fallback(recordContext);
 
-    const proposal = parseJsonObject<AskAiActionProposal>(text);
+    const proposal = parseJsonObject<AskAiActionProposal>(out.text);
     if (proposal && proposal.type === "action_proposal" && Array.isArray(proposal.targets)) {
-      return { answer: proposal.summary, engine: "claude", proposal };
+      return { answer: proposal.summary, engine: "claude", proposal, usage: out.usage };
     }
-    return { answer: text, engine: "claude" };
+    return { answer: out.text, engine: "claude", usage: out.usage };
   } catch {
     return fallback(recordContext);
   }
