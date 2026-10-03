@@ -11,7 +11,8 @@
     "apps/real-estate",
     "apps/social-media",
     "packages/helix-core",
-    "packages/helix-help"
+    "packages/helix-help",
+    "packages/helix-ui"
   ],
   "scripts": {
     "dev:core": "npm run dev --workspace=helix-orchestrator",
