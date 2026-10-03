@@ -10,8 +10,8 @@ export default async function RiskPage() {
   const risk = summarizeDeskRisk(orders);
   return (
     <div className="space-y-6">
-      <RiskHistoryCard />
       <RiskDesk initialOrders={orders} initialRisk={risk} />
+      <RiskHistoryCard />
     </div>
   );
 }

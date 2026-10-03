@@ -17,6 +17,10 @@ import { OrderInspector } from "@/components/order-inspector";
 import { ReorderQueue } from "@/components/reorder-queue";
 import { RevenueTrendChart } from "@/components/revenue-trend-chart";
 import { formatCurrency } from "@/lib/format";
+import { Donut } from "@helix/ui";
+import { DeskChartCard, useDeskMode } from "@/components/desk-mode";
+import { StockBar } from "@/components/stock-bar";
+import { dailyOpenRiskUsd, riskSlices, stockStatus } from "@/lib/commerce-charts";
 
 type RiskSummary = {
   atRiskUsd: number;
@@ -52,6 +56,7 @@ export function CommerceDashboard() {
   const [reorders, setReorders] = useState<ReorderRequest[]>([]);
   const [risk, setRisk] = useState<RiskSummary>(EMPTY_RISK);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const deskMode = useDeskMode();
 
   async function refresh() {
     const [ordersRes, productsRes, reordersRes] = await Promise.all([
@@ -112,6 +117,8 @@ export function CommerceDashboard() {
     return { revenue, fulfilled, pending, restockCount, restockTitles, risk };
   }, [orders, products, risk]);
 
+  const riskSpark = useMemo(() => dailyOpenRiskUsd(orders, 7), [orders]);
+
   const revenueSpark = useMemo(() => {
     const now = Date.now();
     const buckets = new Array(6).fill(0);
@@ -129,15 +136,17 @@ export function CommerceDashboard() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Commerce Operations</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-              <span className="size-1 rounded-full bg-primary" />
-              All Systems Operational
-            </span>
+            {deskMode ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                <span className="size-1 rounded-full bg-primary" />
+                {deskMode === "live" ? "Live store data" : "Demo data"}
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {orders.length === 0
-              ? "Empty until you Sync Shopify or Load demo in Settings · Agent pipeline automated"
-              : `${orders.length} orders · demo seed or Shopify · Agent pipeline automated`}
+              ? "Empty until you Sync Shopify or Load demo in Settings"
+              : `${orders.length} orders · demo seed or Shopify · actions wait for your approval`}
           </p>
         </div>
       </div>
@@ -181,6 +190,18 @@ export function CommerceDashboard() {
           attention
           value={`${metrics.restockCount} items`}
           hint={metrics.restockTitles || "None"}
+          footer={
+            products.length > 0 ? (
+              <div className="space-y-1.5">
+                {products
+                  .filter((p) => stockStatus(p) !== "ok")
+                  .slice(0, 2)
+                  .map((p) => (
+                    <StockBar key={p.id} product={p} compact />
+                  ))}
+              </div>
+            ) : undefined
+          }
         />
         <MetricCard
           icon={<ShieldAlert className="size-4" />}
@@ -189,9 +210,39 @@ export function CommerceDashboard() {
           statusBadge={metrics.risk.pendingReviewCount > 0 ? "HITL" : "Clear"}
           attention={metrics.risk.atRiskUsd > 0}
           value={formatCurrency(metrics.risk.atRiskUsd)}
-          hint={`Saved ${formatCurrency(metrics.risk.savedUsd)} · open /risk`}
+          hint={`Saved ${formatCurrency(metrics.risk.savedUsd)} · open $ at risk`}
+          right={riskSpark.some((v) => v > 0) ? <Sparkline points={riskSpark} className="h-8 w-16 text-[#fb923c] opacity-80" /> : undefined}
         />
       </section>
+
+      <div className="animate-enter delay-2 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <RevenueTrendChart orders={orders} />
+        </div>
+        <div className="lg:col-span-4">
+          <DeskChartCard
+            title="Orders by risk level"
+            subtitle="Fraud risk of every order on the desk"
+            source="Source: risk level assigned to each order by the fraud scorer."
+            className="h-full"
+          >
+            {orders.length === 0 ? (
+              <p className="py-10 text-center text-xs text-muted-foreground">No orders yet.</p>
+            ) : (
+              <div className="flex flex-wrap items-center justify-center gap-5">
+                <Donut
+                  slices={riskSlices(orders)}
+                  size={140}
+                  thickness={24}
+                  centerValue={orders.length}
+                  centerLabel="orders"
+                  ariaLabel="Orders by risk level"
+                />
+              </div>
+            )}
+          </DeskChartCard>
+        </div>
+      </div>
 
       <DailyBriefCard />
 
@@ -207,7 +258,7 @@ export function CommerceDashboard() {
         >
           <span>
             {formatCurrency(metrics.risk.atRiskUsd)} in high-risk orders still open
-            {metrics.risk.worstOrderLabel ? ` — worst: ${metrics.risk.worstOrderLabel}` : ""}.
+            {metrics.risk.worstOrderLabel ? ` — worst: ${metrics.risk.worstOrderLabel.replace(/gid:\/\/shopify\/Order\/(\d+)/g, "#$1")}` : ""}.
           </span>
           <span className="shrink-0 font-medium text-rose-300">$ at risk →</span>
         </Link>
@@ -241,7 +292,28 @@ export function CommerceDashboard() {
           />
         </div>
         <div className="lg:col-span-6">
-          <RevenueTrendChart orders={orders} />
+          <DeskChartCard
+            title="Stock vs reorder point"
+            subtitle="Units on hand, tick = reorder point"
+            source="Source: product inventory and trailing sales velocity."
+            className="h-full"
+          >
+            {products.length === 0 ? (
+              <p className="py-10 text-center text-xs text-muted-foreground">No products yet.</p>
+            ) : (
+            <ul className="space-y-3">
+              {[...products]
+                .sort((a, b) => Number(stockStatus(a) === "ok") - Number(stockStatus(b) === "ok") || a.currentInventory - b.currentInventory)
+                .slice(0, 6)
+                .map((p) => (
+                  <li key={p.id}>
+                    <p className="mb-1 truncate text-xs text-secondary-foreground">{p.title}</p>
+                    <StockBar product={p} compact />
+                  </li>
+                ))}
+            </ul>
+            )}
+          </DeskChartCard>
         </div>
       </div>
     </>

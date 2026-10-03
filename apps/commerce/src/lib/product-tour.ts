@@ -3,6 +3,7 @@
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { tourDoneKey, type TourProduct, type TourStepDef } from "@helix/help";
+import { OVERLAY_OPEN_EVENT } from "@/lib/overlay-events";
 
 const WAIT_MS = 6000;
 const POLL_MS = 250;
@@ -63,10 +64,24 @@ export function startHelixTour(product: TourProduct, steps: TourStepDef[], opts?
     d.drive();
   };
 
+  /** Another overlay (the navigation drawer) opened: close the tour and count it as seen. */
+  const onOverlayOpen = () => {
+    cancelled = true;
+    window.clearTimeout(timer);
+    try {
+      localStorage.setItem(key, "1");
+    } catch {
+      /* ignore */
+    }
+    active?.destroy();
+  };
+  window.addEventListener(OVERLAY_OPEN_EVENT, onOverlayOpen);
+
   timer = window.setTimeout(tick, POLL_MS);
   return () => {
     cancelled = true;
     window.clearTimeout(timer);
+    window.removeEventListener(OVERLAY_OPEN_EVENT, onOverlayOpen);
     active?.destroy();
   };
 }

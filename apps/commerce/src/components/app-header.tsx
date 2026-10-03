@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, HelpCircle, RefreshCw, Search } from "lucide-react";
+import { Bell, HelpCircle, Menu, RefreshCw, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const LABELS: Record<string, string> = {
   "/": "Dashboard",
   "/orders": "Orders",
+  "/risk": "$ at risk",
+  "/returns": "Returns / RMA",
   "/products": "Products",
   "/inventory": "Inventory",
   "/customers": "Customers",
@@ -17,7 +19,7 @@ const LABELS: Record<string, string> = {
   "/help": "How to use",
 };
 
-export function AppHeader() {
+export function AppHeader({ onOpenMenu }: { onOpenMenu?: () => void }) {
   const pathname = usePathname();
   const label = LABELS[pathname] ?? "Dashboard";
   const [syncing, setSyncing] = useState(false);
@@ -26,25 +28,38 @@ export function AppHeader() {
   async function syncShopify() {
     setSyncing(true);
     setSyncNote(null);
-    const res = await fetch("/api/shopify/sync", { method: "POST" });
-    const data = (await res.json()) as { error?: string };
-    setSyncing(false);
-    if (!res.ok) {
-      setSyncNote(data.error || `Sync failed (${res.status})`);
+    try {
+      const res = await fetch("/api/shopify/sync", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setSyncNote(data.error || `Sync failed (${res.status})`);
+        return;
+      }
+    } catch {
+      setSyncNote("Sync failed: the server did not answer.");
       return;
+    } finally {
+      setSyncing(false);
     }
-    setSyncNote("Shopify catalog refreshed.");
     window.location.reload();
   }
 
   return (
-    <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/90 px-6 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <span className="cursor-pointer transition hover:text-foreground">Workspaces</span>
-        <span className="text-muted-foreground/50">/</span>
-        <span className="text-secondary-foreground">Acme Apparel</span>
-        <span className="text-muted-foreground/50">/</span>
-        <span className="flex items-center gap-1.5 font-semibold text-primary">
+    <header className="z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-background/90 px-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md sm:px-6">
+      <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          aria-label="Open navigation menu"
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg text-foreground transition hover:bg-black/[0.04] active:scale-95 md:hidden dark:hover:bg-white/[0.08]"
+        >
+          <Menu className="size-5" />
+        </button>
+        <span className="hidden cursor-pointer transition hover:text-foreground sm:inline">Workspaces</span>
+        <span className="hidden text-muted-foreground/50 sm:inline">/</span>
+        <span className="hidden text-secondary-foreground sm:inline">Acme Apparel</span>
+        <span className="hidden text-muted-foreground/50 sm:inline">/</span>
+        <span className="flex items-center gap-1.5 truncate font-semibold text-primary">
           <span className="size-1.5 rounded-full bg-primary" />
           {label}
         </span>
@@ -60,24 +75,30 @@ export function AppHeader() {
           className="w-full rounded-full border border-border bg-black/[0.02] py-1.5 pr-12 pl-9 text-xs text-foreground placeholder-muted-foreground shadow-inner transition focus:border-primary focus:bg-black/[0.04] focus:ring-1 focus:ring-primary/50 focus:outline-none dark:bg-white/[0.04] dark:focus:bg-white/[0.07]"
         />
         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-          <kbd className="rounded border border-border bg-black/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-white/[0.06]">
+          <kbd className="rounded border border-border bg-black/[0.04] px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground dark:bg-white/[0.06]">
             Ctrl K
           </kbd>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+        {syncNote ? (
+          <span role="alert" title={syncNote} className="max-w-32 truncate text-[11px] text-rose-600 sm:max-w-56 dark:text-rose-300">
+            {syncNote}
+          </span>
+        ) : null}
         <button
           type="button"
           disabled={syncing}
           onClick={() => void syncShopify()}
-          className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98] disabled:opacity-50"
+          aria-label="Sync Shopify"
+          className="flex min-h-10 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/20 active:scale-[0.98] disabled:opacity-50"
         >
-          <RefreshCw className="size-3.5 text-primary" />
-          {syncing ? "Syncing…" : "Sync Shopify"}
+          <RefreshCw className={`size-3.5 text-primary ${syncing ? "animate-spin" : ""}`} />
+          <span className="hidden sm:inline">{syncing ? "Syncing…" : "Sync Shopify"}</span>
         </button>
         <button
-          className="relative rounded-lg p-2 text-foreground transition hover:bg-black/[0.04] active:scale-95 dark:hover:bg-white/[0.08]"
+          className="relative flex size-10 items-center justify-center rounded-lg text-foreground transition hover:bg-black/[0.04] active:scale-95 dark:hover:bg-white/[0.08]"
           aria-label="Notifications"
         >
           <Bell className="size-4" />
@@ -88,7 +109,7 @@ export function AppHeader() {
         </button>
         <Link
           href="/help"
-          className="rounded-lg p-2 text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground active:scale-95 dark:hover:bg-white/[0.06]"
+          className="hidden size-10 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground active:scale-95 sm:flex dark:hover:bg-white/[0.06]"
           aria-label="How to use"
           title="How to use"
         >

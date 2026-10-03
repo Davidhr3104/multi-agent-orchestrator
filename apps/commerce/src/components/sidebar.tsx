@@ -24,12 +24,14 @@ type NavItem = {
   badge?: number;
 };
 
-export function Sidebar({
+export function SidebarContent({
   ordersNeedingReview,
   inventoryAlerts,
+  onNavigate,
 }: {
   ordersNeedingReview: number;
   inventoryAlerts: number;
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname();
 
@@ -47,13 +49,7 @@ export function Sidebar({
   ];
 
   return (
-    <aside
-      className="flex w-64 shrink-0 flex-col justify-between border-r border-sidebar-border p-4 text-sm"
-      style={{
-        background:
-          "linear-gradient(180deg, #072019 0%, #061512 35%, #04100d 100%)",
-      }}
-    >
+    <>
       <div className="space-y-6">
         <div className="flex items-center gap-2.5 px-2 py-1.5">
           <Image src="/logo-icon.png" alt="" width={175} height={383} className="h-8 w-auto shrink-0" priority />
@@ -62,7 +58,7 @@ export function Sidebar({
               <span className="text-sm font-extrabold tracking-tight text-white">HELIX</span>
               <span className="text-sm font-medium text-white">for Commerce</span>
             </div>
-            <p className="text-[11px] leading-tight text-muted-foreground">Commerce OS</p>
+            <p className="text-[11px] leading-tight text-[#9aa3b2]">Commerce OS</p>
           </div>
         </div>
 
@@ -74,8 +70,10 @@ export function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center justify-between rounded-lg border-l-2 px-3 py-2 transition-all duration-150",
+                  "flex min-h-10 items-center justify-between rounded-lg border-l-2 px-3 py-2 transition-all duration-150",
                   active
                     ? "border-primary font-medium text-white"
                     : "border-transparent text-[#c7ccd3] hover:bg-white/[0.03] hover:text-white"
@@ -89,7 +87,7 @@ export function Sidebar({
                 {active ? (
                   <span className="size-1 rounded-full bg-primary" />
                 ) : item.badge ? (
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-[#c7ccd3]">
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-[#dfe3e8]">
                     {item.badge}
                   </span>
                 ) : null}
@@ -107,11 +105,25 @@ export function Sidebar({
             </div>
             <div className="overflow-hidden text-left">
               <p className="truncate text-xs font-medium text-white">Alex Rivera</p>
-              <p className="truncate text-[11px] text-muted-foreground">Acme Global</p>
+              <p className="truncate text-[11px] text-[#9aa3b2]">Acme Global</p>
             </div>
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+export const SIDEBAR_BACKGROUND = "linear-gradient(180deg, #072019 0%, #061512 35%, #04100d 100%)";
+
+/** Fixed rail from md up. Below md the same content lives in the header's drawer. */
+export function Sidebar(props: { ordersNeedingReview: number; inventoryAlerts: number }) {
+  return (
+    <aside
+      className="hidden w-64 shrink-0 flex-col justify-between border-r border-sidebar-border p-4 text-sm md:flex"
+      style={{ background: SIDEBAR_BACKGROUND }}
+    >
+      <SidebarContent {...props} />
     </aside>
   );
 }

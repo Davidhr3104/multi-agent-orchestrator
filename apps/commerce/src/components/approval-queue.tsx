@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Clock } from "lucide-react";
 import type { PollRun, QueuedProposal } from "@/lib/order-automation";
 import { formatCurrency } from "@/lib/format";
@@ -71,17 +72,17 @@ export function ApprovalQueue({ onChanged }: { onChanged?: () => void }) {
         <div className="flex items-center gap-2">
           <Clock className="size-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Approval queue</h2>
-          <span className="text-[10px] text-muted-foreground">{state.proposals.length} proposed</span>
+          <span className="text-[11px] text-muted-foreground">{state.proposals.length} proposed</span>
         </div>
-        <span className="text-[10px] text-muted-foreground">
-          Order poll: {state.cronConfigured ? "daily via Vercel Cron" : "off (set CRON_SECRET)"} · Slack: {state.slackConfigured ? "on" : "off"}
-        </span>
+        <Link href="/settings" className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+          Automation: {state.cronConfigured ? "daily poll on" : "manual"} · details in Settings
+        </Link>
       </div>
       <p className="text-[11px] text-muted-foreground">
         The poll scores new Shopify orders and proposes a hold or an approval. It never approves, fulfils or cancels on its own — every row waits for your click.
       </p>
       {run ? (
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Last poll {new Date(run.at).toLocaleString()}:{" "}
           {run.skipped ?? (run.ok ? `${run.newOrders} new of ${run.fetched} fetched from Shopify${run.postedToSlack ? ", Slack alert sent" : ""}` : `failed — ${run.error}`)}
         </p>
@@ -101,7 +102,7 @@ export function ApprovalQueue({ onChanged }: { onChanged?: () => void }) {
                     <span className="rounded bg-amber-500/10 px-1 text-[9px] text-amber-600 dark:text-amber-300">demo</span>
                   ) : null}
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   {formatCurrency(p.totalPrice, p.currency)} · score {p.fraudScore} ({p.riskLevel})
                   {p.reasons.length ? ` · ${p.reasons.join("; ")}` : ""}
                 </p>

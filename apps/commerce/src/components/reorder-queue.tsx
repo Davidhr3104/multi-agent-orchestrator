@@ -53,7 +53,7 @@ export function ReorderQueue({
             Products projected to stock out within 14 days
           </p>
         </div>
-        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
           {urgent.length} Urgent
         </span>
       </div>
@@ -77,13 +77,13 @@ export function ReorderQueue({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-foreground">{product.title}</span>
-                  <span className="rounded bg-black/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground dark:bg-white/[0.04]">
+                  <span className="rounded bg-black/[0.04] px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground dark:bg-white/[0.04]">
                     SKU: {product.sku}
                   </span>
                   {existing ? (
                     <span
                       className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        "rounded px-1.5 py-0.5 text-[11px] font-medium",
                         existing.status === "ordered"
                           ? "bg-blue-500/10 text-blue-400"
                           : "bg-amber-500/10 text-amber-400"

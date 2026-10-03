@@ -29,6 +29,26 @@ const ROWS: { key: keyof Status; label: string; hint: string }[] = [
   },
 ];
 
+function AutomationStatus() {
+  const [a, setA] = useState<{ cronConfigured?: boolean; slackConfigured?: boolean } | null>(null);
+  useEffect(() => {
+    void fetch("/api/automation")
+      .then((r) => r.json())
+      .then(setA)
+      .catch(() => setA({}));
+  }, []);
+  if (!a) return <p className="text-muted-foreground">Checking…</p>;
+  const chip = (on: boolean | undefined, yes: string, no: string) => (
+    <span className={cn("rounded border px-2 py-0.5 font-medium", on ? "border-primary/40 bg-primary/10 text-primary" : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300")}>{on ? yes : no}</span>
+  );
+  return (
+    <div className="space-y-2">
+      <p className="flex flex-wrap items-center gap-2 text-secondary-foreground">Daily order poll {chip(a.cronConfigured, "On", "Off")} <span className="text-muted-foreground">needs CRON_SECRET on the server</span></p>
+      <p className="flex flex-wrap items-center gap-2 text-secondary-foreground">Slack alerts {chip(a.slackConfigured, "On", "Off")} <span className="text-muted-foreground">needs SLACK_WEBHOOK_URL</span></p>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [status, setStatus] = useState<Status | null>(null);
 
@@ -71,7 +91,7 @@ export default function SettingsPage() {
               {status === null ? (
                 <span className="text-xs text-muted-foreground">Checking…</span>
               ) : connected ? (
-                <span className="flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                <span className="flex shrink-0 items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                   <CheckCircle2 className="size-3.5" />
                   Connected
                 </span>
@@ -130,15 +150,20 @@ export default function SettingsPage() {
         <h3 className="pt-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Admin API scopes this app calls</h3>
         <ul className="space-y-1">
           {SHOPIFY_SCOPES.map((s) => (
-            <li key={s.scope} className="flex gap-2">
+            <li key={s.scope} className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
               <span className={cn("shrink-0 font-mono", s.required ? "text-foreground" : "text-muted-foreground")}>{s.scope}</span>
-              <span className="text-muted-foreground">{s.usedFor}</span>
+              <span className="min-w-0 break-words text-muted-foreground">{s.usedFor}</span>
             </li>
           ))}
         </ul>
         <p className="text-muted-foreground">
           Approving fulfils the order and cancelling voids it in your real Shopify store; Helix cannot undo either. Both always wait for a human click.
         </p>
+      </div>
+
+      <div className="glass-panel glass-panel-glow rounded-xl p-5 text-xs">
+        <h2 className="mb-1 text-sm font-semibold text-foreground">Automation</h2>
+        <AutomationStatus />
       </div>
 
       <div className="glass-panel glass-panel-glow rounded-xl p-5">

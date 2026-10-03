@@ -1,6 +1,12 @@
 import type { HowToUseGuide } from "@helix/help";
 import { cn } from "@/lib/utils";
 
+const VIDEO_POSTER =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#072019"/><stop offset="1" stop-color="#04100d"/></linearGradient></defs><rect width="1280" height="720" fill="url(#g)"/><circle cx="640" cy="320" r="62" fill="#10b981" fill-opacity=".18" stroke="#10b981" stroke-width="3"/><path d="M620 288 L672 320 L620 352 Z" fill="#10b981"/><text x="640" y="450" text-anchor="middle" font-family="system-ui,sans-serif" font-size="40" font-weight="600" fill="#e6f4ee">Helix for Commerce</text><text x="640" y="500" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" fill="#9aa3b2">Desk walkthrough</text></svg>`
+  );
+
 export function HowToUsePanel({
   guide,
   accentClass = "text-primary",
@@ -36,6 +42,7 @@ export function HowToUsePanel({
               controls
               playsInline
               preload="metadata"
+              poster={VIDEO_POSTER}
               src={guide.videoSrc}
             />
           </div>

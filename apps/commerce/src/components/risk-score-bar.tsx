@@ -19,9 +19,9 @@ export function RiskScoreBar({
   const t = TONE_BY_LEVEL[level];
   return (
     <div className="w-24">
-      <div className={cn("mb-1 flex items-center justify-between font-mono text-[10px]", t.text)}>
+      <div className={cn("mb-1 flex items-center justify-between font-mono text-[11px]", t.text)}>
         <span>{String(score).padStart(2, "0")}/100</span>
-        <span className="text-[9px] font-semibold uppercase text-muted-foreground">
+        <span className="text-[11px] font-semibold uppercase text-muted-foreground">
           {LABEL_BY_LEVEL[level]}
         </span>
       </div>

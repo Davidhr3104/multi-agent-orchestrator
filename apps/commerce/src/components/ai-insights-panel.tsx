@@ -97,7 +97,7 @@ export function AiInsightsPanel() {
             <SourceBadge source={summary.source} lastSyncAt={summary.lastShopifySyncAt} />
           </div>
           <p className="leading-relaxed text-secondary-foreground">{summary.summary}</p>
-          <div className="flex flex-wrap gap-1.5 font-mono text-[10px] text-muted-foreground">
+          <div className="flex flex-wrap gap-1.5 font-mono text-[11px] text-muted-foreground">
             <span>orders {summary.metrics.windowHours}h: {summary.metrics.ordersInWindow}</span>
             {Object.entries(summary.metrics.revenueByCurrency).map(([cur, v]) => (
               <span key={cur}>
@@ -108,7 +108,7 @@ export function AiInsightsPanel() {
             <span>at risk: {summary.metrics.atRiskUsd.toFixed(2)}</span>
             <span>low stock: {summary.metrics.lowStockCount}</span>
           </div>
-          {summary.engineNote ? <p className="text-[10px] text-muted-foreground">{summary.engineNote}</p> : null}
+          {summary.engineNote ? <p className="text-[11px] text-muted-foreground">{summary.engineNote}</p> : null}
         </div>
       ) : null}
 
@@ -119,7 +119,7 @@ export function AiInsightsPanel() {
             <EngineBadge engine={restock.engine} />
             <SourceBadge source={restock.source} lastSyncAt={restock.lastShopifySyncAt} />
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Velocity = units sold ÷ {restock.observedDays} days ({restock.ordersInWindow} orders in the last {restock.windowDays} days). Quantity covers {restock.coverageDays} days of sales.
             Nothing is sent to a supplier — “Quick Restock PO” in the restock queue only records an internal draft.
           </p>
@@ -135,7 +135,7 @@ export function AiInsightsPanel() {
                     </span>
                     <span className="font-mono text-foreground">suggest {l.suggestedQuantity}</span>
                   </div>
-                  <p className="font-mono text-[10px] text-muted-foreground">
+                  <p className="font-mono text-[11px] text-muted-foreground">
                     stock {l.currentInventory} · reorder pt {l.reorderPoint} · sold {l.unitsSold} · {l.perDay}/day · cover {l.daysOfCover ?? "—"} d
                   </p>
                   <p className="mt-1 text-secondary-foreground">{l.reasoning}</p>
@@ -143,7 +143,7 @@ export function AiInsightsPanel() {
               ))}
             </ul>
           )}
-          {restock.engineNote ? <p className="text-[10px] text-muted-foreground">{restock.engineNote}</p> : null}
+          {restock.engineNote ? <p className="text-[11px] text-muted-foreground">{restock.engineNote}</p> : null}
         </div>
       ) : null}
 

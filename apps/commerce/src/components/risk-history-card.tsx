@@ -23,9 +23,18 @@ export function RiskHistoryCard() {
   if (snapshots === null) return null;
   if (snapshots.length === 0) {
     return (
-      <div className="glass-panel rounded-xl p-5 text-xs text-muted-foreground">
-        No historical snapshots yet — the daily brief cron records one per day once Slack is
-        configured and CRON_SECRET is set. Today's numbers above are live, not historical.
+      <div className="glass-panel rounded-xl p-5">
+        <h3 className="text-sm font-medium text-foreground">$ at risk over time</h3>
+        <div className="mt-3 flex h-24 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
+          History starts after the first daily snapshot. The figures above are the desk&apos;s current numbers.
+        </div>
+        <details className="mt-3 text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground">Why is this empty?</summary>
+          <p className="mt-1.5">
+            A snapshot is recorded once a day by the daily-brief job. It needs the scheduled job enabled
+            (CRON_SECRET) and Slack configured on the server.
+          </p>
+        </details>
       </div>
     );
   }

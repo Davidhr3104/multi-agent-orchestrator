@@ -22,6 +22,7 @@ export function MetricCard({
   statusBadge,
   attention = false,
   right,
+  footer,
 }: {
   icon: ReactNode;
   label: string;
@@ -33,6 +34,8 @@ export function MetricCard({
   /** Adds a thin emerald left border for cards that need the viewer's attention. */
   attention?: boolean;
   right?: ReactNode;
+  /** Optional strip under the value, e.g. mini stock bars. */
+  footer?: ReactNode;
 }) {
   return (
     <div
@@ -67,10 +70,11 @@ export function MetricCard({
           <span className="font-mono text-2xl font-semibold tracking-tight text-foreground">
             {value}
           </span>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
         </div>
         {right}
       </div>
+      {footer ? <div className="mt-3">{footer}</div> : null}
     </div>
   );
 }

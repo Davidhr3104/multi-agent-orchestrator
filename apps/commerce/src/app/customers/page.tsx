@@ -4,16 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { StoredOrder } from "@helix/core";
 import { formatCurrency, formatRelativeDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Avatar, HBarList } from "@helix/ui";
+import { DeskChartCard } from "@/components/desk-mode";
+import { aggregateCustomers } from "@/lib/commerce-charts";
 import { InquiriesPanel } from "@/components/inquiries-panel";
-
-type CustomerRow = {
-  email: string;
-  name: string;
-  orderCount: number;
-  totalSpend: number;
-  lastOrderAt: string;
-  hasCriticalRisk: boolean;
-};
 
 type Tab = "directory" | "inquiries";
 
@@ -29,28 +23,8 @@ export default function CustomersPage() {
     })();
   }, []);
 
-  const customers = useMemo<CustomerRow[]>(() => {
-    const byEmail = new Map<string, CustomerRow>();
-    for (const order of orders) {
-      const existing = byEmail.get(order.customerEmail);
-      if (existing) {
-        existing.orderCount += 1;
-        existing.totalSpend += order.totalPrice;
-        if (order.createdAt > existing.lastOrderAt) existing.lastOrderAt = order.createdAt;
-        existing.hasCriticalRisk = existing.hasCriticalRisk || order.riskLevel === "critical";
-      } else {
-        byEmail.set(order.customerEmail, {
-          email: order.customerEmail,
-          name: order.customerName,
-          orderCount: 1,
-          totalSpend: order.totalPrice,
-          lastOrderAt: order.createdAt,
-          hasCriticalRisk: order.riskLevel === "critical",
-        });
-      }
-    }
-    return [...byEmail.values()].sort((a, b) => b.totalSpend - a.totalSpend);
-  }, [orders]);
+  const customers = useMemo(() => aggregateCustomers(orders), [orders]);
+  const returning = customers.filter((c) => c.segment === "returning").length;
 
   return (
     <div className="space-y-4">
@@ -65,7 +39,7 @@ export default function CustomersPage() {
           <button
             onClick={() => setTab("directory")}
             className={cn(
-              "rounded px-3 py-1 text-xs font-medium transition",
+              "min-h-9 rounded px-3 py-1 text-xs font-medium transition",
               tab === "directory" ? "bg-primary/30 text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -74,7 +48,7 @@ export default function CustomersPage() {
           <button
             onClick={() => setTab("inquiries")}
             className={cn(
-              "rounded px-3 py-1 text-xs font-medium transition",
+              "min-h-9 rounded px-3 py-1 text-xs font-medium transition",
               tab === "inquiries" ? "bg-primary/30 text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -83,10 +57,21 @@ export default function CustomersPage() {
         </div>
       </div>
 
+      {tab === "directory" && customers.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <DeskChartCard title="Top customers by spend" subtitle={`Top ${Math.min(5, customers.length)} of ${customers.length}`} source="Source: sum of order totals per e-mail on loaded orders." className="lg:col-span-8">
+            <HBarList items={customers.slice(0, 5).map((c) => ({ label: c.name, value: c.totalSpend, hint: c.email }))} format={(n) => formatCurrency(n)} colorAll="#10b981" />
+          </DeskChartCard>
+          <DeskChartCard title="Segments" subtitle="New vs returning" source="Returning = more than one order, counting the store's own order count." className="lg:col-span-4">
+            <HBarList items={[{ label: "New", value: customers.length - returning, color: "#34d399" }, { label: "Returning", value: returning, color: "#10b981" }]} format={(n) => String(n)} />
+          </DeskChartCard>
+        </div>
+      ) : null}
+
       {tab === "directory" ? (
         <div className="glass-panel glass-panel-glow overflow-hidden rounded-xl shadow-2xl">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-secondary-foreground">
+            <table className="min-w-[560px] w-full text-left text-xs text-secondary-foreground">
               <thead className="border-b border-primary/20 bg-black/[0.02] font-mono text-[11px] tracking-wider text-primary/80 uppercase dark:bg-[#051913]/90">
                 <tr>
                   <th className="px-4 py-3">Customer</th>
@@ -100,10 +85,18 @@ export default function CustomersPage() {
                 {customers.map((c) => (
                   <tr key={c.email} className="transition hover:bg-primary/10">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">{c.name}</div>
-                      <div className="font-mono text-[11px] text-primary/70">{c.email}</div>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={c.name} size={32} />
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground">
+                            {c.name}
+                            <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">{c.segment === "returning" ? "Returning" : "New"}</span>
+                          </div>
+                          <div className="font-mono text-[11px] text-primary/70">{c.email}</div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-foreground">{c.orderCount}</td>
+                    <td className="px-4 py-3 font-mono text-foreground">{c.lifetimeOrders}</td>
                     <td className="px-4 py-3 font-mono font-medium text-foreground">
                       {formatCurrency(c.totalSpend)}
                     </td>
@@ -112,7 +105,7 @@ export default function CustomersPage() {
                     </td>
                     <td className="px-4 py-3">
                       {c.hasCriticalRisk ? (
-                        <span className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 font-mono text-[10px] text-rose-600 dark:text-rose-300">
+                        <span className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 font-mono text-[11px] text-rose-600 dark:text-rose-300">
                           Critical risk order
                         </span>
                       ) : (

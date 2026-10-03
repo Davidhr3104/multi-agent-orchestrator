@@ -1,5 +1,6 @@
 "use client";
 
+import { lifetimeOrders, orderNumber } from "@/lib/commerce-charts";
 import { useState } from "react";
 import type { ReturnRequest, StoredOrder } from "@helix/core";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
@@ -92,14 +93,14 @@ export function OrderInspector({
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-base font-semibold tracking-tight text-foreground">
-              {order.shopifyOrderId.split("/").pop()}
+              {orderNumber(order.shopifyOrderId)}
             </span>
             {order.requiresReview ? (
-              <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+              <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
                 HITL Review Req
               </span>
             ) : (
-              <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
                 {order.reviewDecision ?? "Reviewed"}
               </span>
             )}
@@ -109,8 +110,10 @@ export function OrderInspector({
           </p>
         </div>
         <button
+          type="button"
+          aria-label="Close order inspector"
           onClick={onClose}
-          className="flex size-6 items-center justify-center rounded text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]"
+          className="flex size-10 items-center md:size-7 justify-center rounded text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]"
         >
           <X className="size-3.5" />
         </button>
@@ -119,7 +122,7 @@ export function OrderInspector({
       <div className="space-y-3 rounded-lg border border-border bg-black/[0.015] p-4 dark:bg-white/[0.02]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               AI Agent Fraud Score
             </span>
             {order.shopifySignalApplied ? (
@@ -160,7 +163,7 @@ export function OrderInspector({
 
         <div className="rounded border border-border p-2 text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Why this score</span>
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Why this score</span>
             <button
               disabled={explainBusy}
               onClick={() => void explain()}
@@ -177,11 +180,11 @@ export function OrderInspector({
                 <SourceBadge source={explanation.source} lastSyncAt={explanation.fetchedFromShopify ? explanation.generatedAt : null} />
               </div>
               <p className="leading-relaxed text-secondary-foreground">{explanation.explanation}</p>
-              {explanation.engineNote ? <p className="text-[10px] text-muted-foreground">{explanation.engineNote}</p> : null}
+              {explanation.engineNote ? <p className="text-[11px] text-muted-foreground">{explanation.engineNote}</p> : null}
               {explanation.source === "shopify" && !explanation.fetchedFromShopify ? (
-                <p className="text-[10px] text-muted-foreground">Shopify did not answer just now; explained from the stored order fields.</p>
+                <p className="text-[11px] text-muted-foreground">Shopify did not answer just now; explained from the stored order fields.</p>
               ) : null}
-              <p className="text-[10px] text-muted-foreground">Explanation only — the score and the review requirement are unchanged.</p>
+              <p className="text-[11px] text-muted-foreground">Explanation only — the score and the review requirement are unchanged.</p>
             </div>
           ) : null}
         </div>
@@ -208,13 +211,13 @@ export function OrderInspector({
 
       <div className="space-y-4 pt-1">
         <div className="border-t border-border pt-3">
-          <h3 className="mb-2 text-[10px] tracking-wider text-muted-foreground uppercase">
+          <h3 className="mb-2 text-[11px] tracking-wider text-muted-foreground uppercase">
             Customer Dossier
           </h3>
           <div className="space-y-1 text-xs">
             <p className="font-medium text-foreground">{order.customerName}</p>
             <p className="text-muted-foreground">
-              Lifetime Orders: <span className="text-foreground">{order.customerOrderCount}</span> ·
+              Lifetime Orders: <span className="text-foreground">{lifetimeOrders(order)}</span> ·
               Total Spend:{" "}
               <span className="font-mono text-foreground">
                 {formatCurrency(order.totalPrice, order.currency)}
@@ -224,7 +227,7 @@ export function OrderInspector({
         </div>
 
         <div className="border-t border-border pt-3">
-          <h3 className="mb-2 text-[10px] tracking-wider text-muted-foreground uppercase">
+          <h3 className="mb-2 text-[11px] tracking-wider text-muted-foreground uppercase">
             Order Items ({order.items.length})
           </h3>
           <div className="space-y-2 text-xs">
@@ -249,7 +252,7 @@ export function OrderInspector({
         </div>
 
         <div className="border-t border-border pt-3 text-xs">
-          <h3 className="mb-1 text-[10px] tracking-wider text-muted-foreground uppercase">
+          <h3 className="mb-1 text-[11px] tracking-wider text-muted-foreground uppercase">
             Destination Address
           </h3>
           <p className="text-secondary-foreground">
@@ -262,7 +265,7 @@ export function OrderInspector({
         {order.fulfillmentStatus === "fulfilled" ? (
           <div className="border-t border-border pt-3 text-xs">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-[10px] tracking-wider text-muted-foreground uppercase">Returns / RMA</h3>
+              <h3 className="text-[11px] tracking-wider text-muted-foreground uppercase">Returns / RMA</h3>
               {!returnOpen ? (
                 <button
                   onClick={() => setReturnOpen(true)}

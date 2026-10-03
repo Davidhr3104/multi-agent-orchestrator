@@ -387,7 +387,7 @@ export function AskAiDrawer({
               sessions.map((s) => (
                 <button key={s.id} type="button" onClick={() => restore(s)} className={`w-full rounded-md border ${border} bg-[var(--ai-panel)] px-2.5 py-1.5 text-left hover:bg-[var(--ai-accent-soft)]`}>
                   <p className="truncate text-[11px] font-medium text-slate-200">{s.preview}</p>
-                  <p className="text-[10px] text-slate-500">{new Date(s.startedAt).toLocaleString()} · {s.turns.length} messages</p>
+                  <p className="text-[11px] text-slate-500">{new Date(s.startedAt).toLocaleString()} · {s.turns.length} messages</p>
                 </button>
               ))
             )}
@@ -415,7 +415,7 @@ export function AskAiDrawer({
                     : `max-w-[90%] rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2 text-sm whitespace-pre-line text-slate-200`
                 }
               >
-                {t.attachments?.length ? <p className="mb-1 text-[10px] text-[var(--ai-accent)]">📎 attached image</p> : null}
+                {t.attachments?.length ? <p className="mb-1 text-[11px] text-[var(--ai-accent)]">📎 attached image</p> : null}
                 {t.content}
               </div>
 
@@ -532,7 +532,7 @@ export function AskAiDrawer({
             </button>
           </form>
 
-          <p className="pb-3 text-[10px] text-slate-500">Helix AI can make mistakes. Review the information before acting.</p>
+          <p className="pb-3 text-[11px] text-slate-500">Helix AI can make mistakes. Review the information before acting.</p>
         </div>
       </SheetContent>
     </Sheet>

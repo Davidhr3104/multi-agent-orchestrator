@@ -1,5 +1,6 @@
 "use client";
 
+import { orderNumber, pluralize } from "@/lib/commerce-charts";
 import { useMemo, useState } from "react";
 import type { StoredOrder } from "@helix/core";
 import { MoreVertical } from "lucide-react";
@@ -72,13 +73,13 @@ export function LiveOrdersTable({
             Automated fraud detection and deterministic webhook routing
           </p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg bg-black/[0.03] p-1 dark:bg-white/[0.03]">
+        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-black/[0.03] p-1 dark:bg-white/[0.03]">
           {filters.map((f) => (
             <button
               key={f.id}
               onClick={() => setFilterAndReset(f.id)}
               className={cn(
-                "rounded px-2.5 py-1 text-xs font-medium transition",
+                "min-h-8 rounded px-2.5 py-1 text-xs font-medium transition",
                 filter === f.id
                   ? "bg-primary/15 text-primary"
                   : "text-muted-foreground hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.03]"
@@ -91,16 +92,16 @@ export function LiveOrdersTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-[13px] text-secondary-foreground">
-          <thead className="border-b border-border text-[10px] tracking-wider text-muted-foreground uppercase">
+        <table className="min-w-[680px] w-full text-left text-[13px] text-secondary-foreground">
+          <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
             <tr>
-              <th className="px-4 py-3">Order ID</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Items</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">Fulfillment</th>
-              <th className="px-4 py-3">AI Risk Score</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-3 py-3">Order ID</th>
+              <th className="px-3 py-3">Customer</th>
+              <th className="px-3 py-3">Items</th>
+              <th className="px-3 py-3">Total</th>
+              <th className="px-3 py-3">Fulfillment</th>
+              <th className="px-3 py-3">AI Risk Score</th>
+              <th className="relative px-3 py-3 text-right"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -119,39 +120,39 @@ export function LiveOrdersTable({
                       : "hover:bg-emerald-50/30 dark:hover:bg-white/[0.02]"
                   )}
                 >
-                  <td className="px-4 py-3 font-mono font-medium text-foreground">
+                  <td className="px-3 py-3 font-mono font-medium text-foreground">
                     <span className="flex items-center gap-1.5">
                       {order.requiresReview ? (
                         <span className="size-1 rounded-full bg-amber-500" />
                       ) : null}
-                      #{order.shopifyOrderId.split("/").pop()}
+                      {orderNumber(order.shopifyOrderId)}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div className="font-medium text-foreground">{order.customerName}</div>
                     <div className="text-[11px] text-muted-foreground">{order.customerEmail}</div>
                   </td>
-                  <td className="px-4 py-3 text-secondary-foreground">
-                    {order.items.reduce((n, i) => n + i.quantity, 0)} items
+                  <td className="px-3 py-3 whitespace-nowrap text-secondary-foreground">
+                    {pluralize(order.items.reduce((n, i) => n + i.quantity, 0), "item")}
                   </td>
-                  <td className="px-4 py-3 font-mono font-medium text-foreground">
+                  <td className="px-3 py-3 font-mono font-medium text-foreground">
                     {formatCurrency(order.totalPrice, order.currency)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <span
                       className={cn(
-                        "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium",
+                        "inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-medium",
                         STATUS_TONE[pill.tone]
                       )}
                     >
                       {pill.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <RiskScoreBar score={order.fraudScore} level={order.riskLevel} />
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <button className="rounded p-1 text-muted-foreground transition hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]">
+                  <td className="px-3 py-3 text-right">
+                    <button type="button" aria-label={`Actions for order ${orderNumber(order.shopifyOrderId)}`} className="inline-flex size-10 items-center justify-center rounded text-muted-foreground md:size-8 transition hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]">
                       <MoreVertical className="size-4" />
                     </button>
                   </td>

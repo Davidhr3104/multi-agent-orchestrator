@@ -6,6 +6,9 @@ import type { DeskRiskSummary, StoredOrder } from "@helix/core";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OrderInspector } from "@/components/order-inspector";
+import { EmptyChart, Gauge, HBarList } from "@helix/ui";
+import { DeskChartCard } from "@/components/desk-mode";
+import { RISK_COLOR, exposureUsd, orderNumber } from "@/lib/commerce-charts";
 
 export function RiskDesk({
   initialOrders,
@@ -48,6 +51,26 @@ export function RiskDesk({
     return [...list].sort((a, b) => b.fraudScore - a.fraudScore || b.totalPrice - a.totalPrice);
   }, [orders, filter]);
 
+  const exposureItems = useMemo(
+    () =>
+      orders
+        .filter(
+          (o) =>
+            (o.riskLevel === "high" || o.riskLevel === "critical" || o.requiresReview) &&
+            o.reviewDecision !== "cancelled" &&
+            o.reviewDecision !== "approved"
+        )
+        .map((o) => ({
+          label: `${orderNumber(o.shopifyOrderId)} · ${o.customerName}`,
+          value: exposureUsd(o),
+          color: RISK_COLOR[o.riskLevel],
+          hint: `score ${o.fraudScore}`,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8),
+    [orders]
+  );
+
   async function review(decision: "approved" | "flagged" | "cancelled") {
     if (!selected) return;
     const res = await fetch(`/api/orders/${selected.id}/review`, {
@@ -68,15 +91,14 @@ export function RiskDesk({
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">$ at risk</h1>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Money exposed in high-risk orders waiting on HITL, vs dollars blocked by cancel. This is the
-            Commerce sell story — not another Shopify admin clone.
+            Money exposed in high-risk orders waiting on human review, vs dollars blocked by cancelling before ship.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => void refresh()}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-10 items-center text-xs font-medium text-muted-foreground hover:text-foreground"
           >
             Refresh
           </button>
@@ -106,13 +128,48 @@ export function RiskDesk({
         />
         <Stat
           label="Worst open"
-          value={risk.worstOrderLabel ?? "—"}
+          value={risk.worstOrderLabel ? risk.worstOrderLabel.replace(/gid:\/\/shopify\/Order\/(\d+)/g, "#$1") : "—"}
           hint={
             risk.worstOrderUsd
               ? `${formatCurrency(risk.worstOrderUsd)} · score ${risk.worstFraudScore}`
               : "No open high-risk"
           }
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <DeskChartCard
+          title="Exposed $ per order"
+          subtitle="Order total x fraud score, open high-risk orders"
+          source="Source: totalPrice x fraudScore/100 per order. An exposure estimate, not a loss forecast."
+          className="lg:col-span-8"
+        >
+          {exposureItems.length === 0 ? (
+            <EmptyChart label="No open high-risk orders" />
+          ) : (
+            <HBarList items={exposureItems} format={(n) => formatCurrency(n)} />
+          )}
+        </DeskChartCard>
+        <DeskChartCard
+          title="Saved vs still exposed"
+          subtitle="Cancelled before ship vs open"
+          source="Source: desk risk summary."
+          className="lg:col-span-4"
+        >
+          {risk.savedUsd + risk.atRiskUsd === 0 ? (
+            <EmptyChart label="Nothing exposed or saved yet" />
+          ) : (
+            <div className="flex justify-center">
+              <Gauge
+                value={risk.savedUsd}
+                max={risk.savedUsd + risk.atRiskUsd}
+                label="$ saved"
+                caption={`${formatCurrency(risk.atRiskUsd)} still open`}
+                size={200}
+              />
+            </div>
+          )}
+        </DeskChartCard>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -149,8 +206,8 @@ export function RiskDesk({
               No matching orders. Load demo in Settings or Sync Shopify, then score high-risk orders.
             </p>
           ) : (
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-border/50 text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="overflow-x-auto"><table className="min-w-[560px] w-full text-left text-xs">
+              <thead className="border-b border-border/50 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 font-medium">Order</th>
                   <th className="px-3 py-2 font-medium">Customer</th>
@@ -172,7 +229,7 @@ export function RiskDesk({
                       selectedId === o.id && "bg-primary/5"
                     )}
                   >
-                    <td className="px-4 py-2.5 font-medium text-foreground">{o.shopifyOrderId}</td>
+                    <td className="px-4 py-2.5 font-medium text-foreground">{orderNumber(o.shopifyOrderId)}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">{o.customerName}</td>
                     <td className="px-3 py-2.5 text-foreground">
                       {formatCurrency(o.totalPrice, o.currency)}
@@ -197,7 +254,7 @@ export function RiskDesk({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
 
@@ -234,7 +291,7 @@ function Stat({
 }) {
   return (
     <div className="glass-panel rounded-xl px-4 py-3">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p
         className={cn(
           "mt-1 truncate text-xl font-semibold tracking-tight",

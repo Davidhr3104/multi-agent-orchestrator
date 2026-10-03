@@ -4,20 +4,30 @@ import { useEffect, useState } from "react";
 import type { ReturnRequest } from "@helix/core";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
+import { DemoChip, KpiCard } from "@helix/ui";
+import { PackageOpen } from "lucide-react";
+import { returnStats } from "@/lib/commerce-charts";
 
 export default function ReturnsPage() {
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [orderCount, setOrderCount] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   async function refresh() {
     const res = await fetch("/api/returns");
     const data = (await res.json()) as { returns: ReturnRequest[] };
     setReturns(data.returns);
+    setLoaded(true);
   }
 
   useEffect(() => {
     void refresh();
+    void fetch("/api/orders")
+      .then((r) => r.json())
+      .then((d: { orders: unknown[] }) => setOrderCount(d.orders.length))
+      .catch(() => setOrderCount(0));
   }, []);
 
   async function resolve(id: string, decision: "approved" | "rejected") {
@@ -42,6 +52,7 @@ export default function ReturnsPage() {
 
   const pending = returns.filter((r) => r.status === "requested");
   const resolved = returns.filter((r) => r.status !== "requested");
+  const stats = returnStats(returns, orderCount);
 
   return (
     <div className="space-y-6">
@@ -53,6 +64,40 @@ export default function ReturnsPage() {
       </div>
 
       {error ? <p className="text-xs text-[#dc2626]">{error}</p> : null}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard label="Returns" value={String(stats.count)} accent="#10b981" />
+        <KpiCard label="Return rate" value={stats.ratePct === null ? "—" : `${stats.ratePct}%`} accent="#10b981" hint={`${stats.count} of ${orderCount} orders`} />
+        <KpiCard label="Refunded" value={formatCurrency(stats.refundUsd)} accent="#34d399" hint="Approved or refunded" />
+        <KpiCard label="Pending refunds" value={formatCurrency(stats.pendingUsd)} accent="#f59e0b" hint={`${pending.length} awaiting a decision`} />
+      </div>
+
+      {loaded && returns.length === 0 ? (
+        <div className="glass-panel rounded-xl p-6">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <PackageOpen className="size-6" aria-hidden />
+            </span>
+            <h2 className="text-sm font-medium text-foreground">No return requests yet</h2>
+            <p className="max-w-md text-xs text-muted-foreground">
+              Open a fulfilled order and choose Request return. It lands here for you to approve or reject.
+            </p>
+          </div>
+          <div className="mx-auto mt-5 max-w-xl rounded-lg border border-dashed border-border p-3 opacity-80">
+            <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>What a request looks like</span>
+              <DemoChip />
+            </div>
+            <div className="flex items-center justify-between gap-3 text-xs" aria-hidden>
+              <div>
+                <p className="font-medium text-foreground">customer@example.com</p>
+                <p className="text-muted-foreground">Item arrived damaged · $48.00 · restock</p>
+              </div>
+              <span className="rounded bg-primary/10 px-2 py-1 font-medium text-primary">Approve refund</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="glass-panel rounded-xl p-5">
         <h2 className="mb-3 text-sm font-medium text-foreground">Pending ({pending.length})</h2>
@@ -69,18 +114,18 @@ export default function ReturnsPage() {
                   {r.restock ? " · restock" : ""}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <button
                   disabled={busyId === r.id}
                   onClick={() => void resolve(r.id, "approved")}
-                  className="rounded bg-[#059669] px-3 py-1.5 font-medium text-white disabled:opacity-50"
+                  className="min-h-10 rounded bg-[#059669] px-3 py-1.5 font-medium text-white disabled:opacity-50"
                 >
                   {busyId === r.id ? "…" : "Approve refund"}
                 </button>
                 <button
                   disabled={busyId === r.id}
                   onClick={() => void resolve(r.id, "rejected")}
-                  className="rounded border border-[#dc2626]/40 px-3 py-1.5 font-medium text-[#dc2626] disabled:opacity-50"
+                  className="min-h-10 rounded border border-[#dc2626]/40 px-3 py-1.5 font-medium text-[#dc2626] disabled:opacity-50"
                 >
                   Reject
                 </button>

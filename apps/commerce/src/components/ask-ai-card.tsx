@@ -83,7 +83,7 @@ export function AskAiCard({
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
               Helix AI
             </span>
             <span className={`flex items-center gap-1 text-[11px] font-semibold ${statusTone}`}>
@@ -94,11 +94,11 @@ export function AskAiCard({
 
           <div>
             <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
-              {orderId ? "Ask Helix AI about this order" : "Ask Helix AI"}
+              Ask Helix AI
             </h2>
             <p className="mt-1 max-w-xl text-xs text-muted-foreground">
               {orderId
-                ? "Ask why this order scored the way it did, grounded in its actual fraud reasoning."
+                ? "Ask why the selected order scored the way it did, grounded in its actual fraud reasoning."
                 : "Ask how fraud scoring, risk levels, and review work in this desk."}
             </p>
           </div>
