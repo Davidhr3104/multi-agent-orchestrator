@@ -64,7 +64,7 @@ export default async function PostPage({ params }: PageProps<"/posts/[id]">) {
             <DeskAction action="evergreen" body={{ id: post.id, months: 6 }} label="Copy in 6 months" message="Scheduled a later copy." />
           </>
         ) : null}
-        <p className="w-full text-[11px] text-muted-foreground">The set is rewritten for each channel from this caption. A later copy keeps the signed-off wording. Neither one uses engagement, because this desk has none.</p>
+        <p className="w-full text-xs text-muted-foreground">The set is rewritten for each channel from this caption. A later copy keeps the signed-off wording. Neither one uses engagement, because this desk has none.</p>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -142,7 +142,7 @@ export default async function PostPage({ params }: PageProps<"/posts/[id]">) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-[11px] text-muted-foreground">The results behind each source are in the notes, computed from the Graph API.</p>
+              <p className="mt-2 text-xs text-muted-foreground">The results behind each source are in the notes, computed from the Graph API.</p>
             </section>
           ) : null}
         </div>
@@ -168,11 +168,11 @@ export default async function PostPage({ params }: PageProps<"/posts/[id]">) {
                   <span className="mt-1 block h-1.5 rounded-full bg-muted">
                     <span className={cn("block h-1.5 rounded-full", f.points === 0 ? "bg-rose-400" : f.points < f.max ? "bg-amber-400" : "bg-primary")} style={{ width: `${(f.points / f.max) * 100}%` }} />
                   </span>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{f.detail}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{f.detail}</p>
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-[11px] text-muted-foreground">These rules check form, not taste — whether the post is good is your call. Click the score on any row for the same checklist.</p>
+            <p className="mt-4 text-xs text-muted-foreground">These rules check form, not taste — whether the post is good is your call. Click the score on any row for the same checklist.</p>
           </section>
 
           <ScheduleHint postId={post.id} scheduledFor={post.scheduledFor} suggestionIso={suggestion.iso} reason={suggestion.reason} matches={sameSlot(post.scheduledFor, suggestion)} />

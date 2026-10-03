@@ -1,59 +1,86 @@
-import { PILLAR_LABEL } from "@/lib/format";
-import type { Pillar } from "@/lib/types";
+import type { ReactNode } from "react";
+import { AreaChart, Donut } from "@helix/ui";
+import { channelLabel, PILLAR_LABEL } from "@/lib/format";
+import { formatKey } from "@/lib/tz";
+import { PILLAR_COLOR, PILLAR_ORDER } from "@/lib/visuals";
+import type { Channel, Pillar } from "@/lib/types";
 
-const COLORS = ["#34d399", "#38bdf8", "#fbbf24", "#fb7185", "#a78bfa"];
+/** Chart wrappers for planned-calendar data. Nothing here is engagement: every number counts posts or scores. */
 
-export function PillarDonut({ rows }: { rows: { pillar: Pillar; count: number }[] }) {
-  const total = rows.reduce((sum, row) => sum + row.count, 0) || 1;
-  const r = 42;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
+export function Source({ children }: { children: ReactNode }) {
+  return <p className="mt-3 text-xs text-muted-foreground">{children}</p>;
+}
+
+export function hourLabel(hour: number): string {
+  return `${hour % 12 || 12}${hour < 12 ? "a" : "p"}`;
+}
+
+export function PillarDonut({ rows, size = 150 }: { rows: { pillar: Pillar; count: number }[]; size?: number }) {
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
   return (
-    <div className="flex flex-wrap items-center gap-6">
-      <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label="Planned posts by pillar">
-        <circle cx="70" cy="70" r={r} fill="none" stroke="currentColor" className="text-muted" strokeWidth="16" />
-        {rows.map((row, index) => {
-          const length = (row.count / total) * c;
-          const dash = `${length} ${c - length}`;
-          const circle = (
-            <circle key={row.pillar} cx="70" cy="70" r={r} fill="none" stroke={COLORS[index % COLORS.length]} strokeWidth="16" strokeDasharray={dash} strokeDashoffset={-offset} transform="rotate(-90 70 70)" />
-          );
-          offset += length;
-          return circle;
-        })}
-        <text x="70" y="74" textAnchor="middle" className="fill-foreground text-sm font-semibold">
-          {rows.reduce((sum, row) => sum + row.count, 0)}
-        </text>
-      </svg>
-      <ul className="space-y-1 text-xs">
-        {rows.map((row, index) => (
-          <li key={row.pillar} className="flex items-center gap-2">
-            <span className="size-2.5 rounded-full" style={{ background: COLORS[index % COLORS.length] }} />
-            <span className="text-foreground">{PILLAR_LABEL[row.pillar]}</span>
-            <span className="tabular font-mono text-muted-foreground">{row.count}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Donut
+      size={size}
+      ariaLabel="Planned posts by pillar"
+      centerValue={total}
+      centerLabel="posts"
+      slices={rows.map((row) => ({ label: PILLAR_LABEL[row.pillar], value: row.count, color: PILLAR_COLOR[row.pillar] }))}
+    />
   );
 }
 
-export function PlannedArea({ values }: { values: number[] }) {
-  const max = Math.max(1, ...values);
-  const w = 320;
-  const h = 96;
-  const points = values.map((value, index) => {
-    const x = values.length === 1 ? 0 : (index / (values.length - 1)) * w;
-    const y = h - 8 - (value / max) * (h - 16);
-    return [x, y] as const;
-  });
-  const line = points.map(([x, y]) => `${x},${y}`).join(" ");
-  const area = `0,${h} ${line} ${w},${h}`;
+export function PlannedArea({ days }: { days: { key: string; count: number }[] }) {
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-28 w-full" role="img" aria-label="Planned posts over the next two weeks">
-      <polygon points={area} className="fill-primary/20" />
-      <polyline points={line} fill="none" className="stroke-primary" strokeWidth="2" />
-    </svg>
+    <AreaChart
+      ariaLabel="Posts planned on each of the next 14 days"
+      color="#34d399"
+      unit=" posts"
+      height={170}
+      smooth={false}
+      points={days.map((day) => ({ label: formatKey(day.key, { month: "short", day: "numeric" }), value: day.count, detail: `${day.count} planned` }))}
+    />
+  );
+}
+
+export function PillarLegend() {
+  return (
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Pillar colours">
+      {PILLAR_ORDER.map((pillar) => (
+        <li key={pillar} className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="size-2.5 rounded-sm" style={{ background: PILLAR_COLOR[pillar] }} />
+          {PILLAR_LABEL[pillar]}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** One bar per channel, split by pillar. Bar length is the channel's share of the busiest channel. */
+export function ChannelPillarBars({ rows }: { rows: { channel: Channel; total: number; byPillar: Record<Pillar, number> }[] }) {
+  const max = Math.max(1, ...rows.map((row) => row.total));
+  return (
+    <div className="space-y-3">
+      <ul className="space-y-3">
+        {rows.map((row) => (
+          <li key={row.channel} className="grid grid-cols-[5.5rem_1fr_2rem] items-center gap-3 text-xs">
+            <span className="text-foreground">{channelLabel(row.channel)}</span>
+            <span
+              role="img"
+              aria-label={`${channelLabel(row.channel)}: ${PILLAR_ORDER.filter((p) => row.byPillar[p] > 0)
+                .map((p) => `${row.byPillar[p]} ${PILLAR_LABEL[p]}`)
+                .join(", ") || "no posts"}`}
+              className="flex h-4 overflow-hidden rounded-md bg-muted"
+              style={{ width: `${Math.max(row.total ? 6 : 0, (row.total / max) * 100)}%` }}
+            >
+              {PILLAR_ORDER.filter((p) => row.byPillar[p] > 0).map((p) => (
+                <span key={p} title={`${PILLAR_LABEL[p]}: ${row.byPillar[p]}`} style={{ width: `${(row.byPillar[p] / row.total) * 100}%`, background: PILLAR_COLOR[p] }} />
+              ))}
+            </span>
+            <span className="tabular text-right font-mono text-muted-foreground">{row.total}</span>
+          </li>
+        ))}
+      </ul>
+      <PillarLegend />
+    </div>
   );
 }
 
@@ -63,13 +90,13 @@ export function PlanHeatmap({ cells }: { cells: { day: string; hour: number; cou
   const days = [...new Set(cells.map((cell) => cell.day))];
   return (
     <div className="overflow-x-auto">
-      <table className="border-separate border-spacing-1 text-[10px]">
+      <table className="border-separate border-spacing-1 text-xs" aria-label="Planned posts by weekday and hour">
         <thead>
           <tr>
             <th />
             {hours.map((hour) => (
-              <th key={hour} className="px-1 font-normal text-muted-foreground">
-                {hour}
+              <th key={hour} scope="col" className="px-0.5 text-center font-normal text-muted-foreground">
+                {hourLabel(hour)}
               </th>
             ))}
           </tr>
@@ -77,13 +104,19 @@ export function PlanHeatmap({ cells }: { cells: { day: string; hour: number; cou
         <tbody>
           {days.map((day) => (
             <tr key={day}>
-              <th className="pr-2 text-left font-normal text-muted-foreground">{day}</th>
+              <th scope="row" className="pr-2 text-left font-normal text-muted-foreground">
+                {day}
+              </th>
               {hours.map((hour) => {
                 const count = cells.find((cell) => cell.day === day && cell.hour === hour)?.count ?? 0;
-                const alpha = count === 0 ? 0.08 : 0.2 + (count / max) * 0.8;
+                const alpha = count === 0 ? 0.08 : 0.3 + (count / max) * 0.7;
                 return (
                   <td key={hour}>
-                    <span className="grid size-5 place-items-center rounded-sm text-[9px] text-foreground" style={{ background: `rgba(52, 211, 153, ${alpha})` }} title={`${day} ${hour}:00 · ${count} planned`}>
+                    <span
+                      className="grid size-7 place-items-center rounded-md text-xs font-semibold text-foreground sm:size-8"
+                      style={{ background: `rgba(52, 211, 153, ${alpha})` }}
+                      title={`${day} ${hourLabel(hour)}: ${count} planned`}
+                    >
                       {count || ""}
                     </span>
                   </td>

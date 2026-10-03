@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hardBlockers, postLength, scoreReadiness } from "./readiness";
 import { buildSeedPosts, DEMO_BRAND } from "./seed";
+import { startOfZonedDay } from "./tz";
 import type { Post } from "./types";
 
 const base: Post = {
@@ -14,6 +15,7 @@ const base: Post = {
   status: "needs_review",
   createdBy: "helix_ai",
   notes: [],
+  media: [{ id: "m1", kind: "image", label: "Huila bag", url: "/huila.jpg", source: "upload" }],
 };
 
 describe("readiness score", () => {
@@ -22,6 +24,21 @@ describe("readiness score", () => {
     expect(r.score).toBe(100);
     expect(r.ready).toBe(true);
     expect(r.factors.map((f) => f.label)).toEqual(["Length", "Hashtags", "Call to action", "Brand voice", "Visual brief"]);
+  });
+
+  it("does not call an Instagram or TikTok post ready without an image or approved stock photo", () => {
+    for (const channel of ["instagram", "tiktok"] as const) {
+      const r = scoreReadiness({ ...base, channel, media: [] }, DEMO_BRAND);
+      expect(r.ready).toBe(false);
+      expect(r.score).toBeLessThan(100);
+      expect(r.factors.find((f) => f.label === "Visual brief")?.detail).toMatch(/no image attached/i);
+    }
+    const stock = scoreReadiness({ ...base, media: [{ id: "s", kind: "image", label: "Stock", url: "/s.jpg", source: "stock" }] }, DEMO_BRAND);
+    expect(stock.ready).toBe(true);
+  });
+
+  it("lets text-first networks be ready without media", () => {
+    expect(scoreReadiness({ ...base, channel: "linkedin", media: [], hashtags: ["coffee"], caption: `${base.caption} ${base.caption}` }, DEMO_BRAND).score).toBe(100);
   });
 
   it("blocks an X post over 280 characters regardless of the rest", () => {
@@ -56,8 +73,7 @@ describe("readiness score", () => {
   });
 
   it("places every seed post from today forward", () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfZonedDay(new Date());
     expect(buildSeedPosts().every((p) => Date.parse(p.scheduledFor) >= today.getTime())).toBe(true);
   });
 });

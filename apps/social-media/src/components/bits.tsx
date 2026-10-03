@@ -1,66 +1,13 @@
 import Link from "next/link";
 import { AutoFixButton } from "@/components/auto-fix-button";
-import { channelLabel, formatSlot, PILLAR_LABEL, snippet, STATUS_LABEL } from "@/lib/format";
+import { ChannelBadge, ChannelChip } from "@/components/channel";
+import { PostThumb } from "@/components/post-thumb";
+import { formatSlot, PILLAR_LABEL, STATUS_LABEL } from "@/lib/format";
 import type { ScoredPost } from "@/lib/store";
-import type { Channel, PostStatus, Readiness } from "@/lib/types";
+import type { PostStatus, Readiness } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function ChannelMark({ channel }: { channel: Channel }) {
-  const common = { viewBox: "0 0 24 24", className: "size-3.5", "aria-hidden": true, fill: "currentColor" } as const;
-  if (channel === "instagram") {
-    return (
-      <svg {...common}>
-        <rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-        <circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="2" />
-        <circle cx="17.2" cy="6.8" r="1" />
-      </svg>
-    );
-  }
-  if (channel === "x") {
-    return (
-      <svg {...common}>
-        <path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (channel === "linkedin") {
-    return (
-      <svg {...common}>
-        <rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-        <path d="M8 10.5V16M8 8h.01M12 16v-3.2a2 2 0 114 0V16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (channel === "tiktok") {
-    return (
-      <svg {...common}>
-        <path d="M14 6c.6 2.2 2.2 3.6 4.4 4v2.2A6.6 6.6 0 0114 11v5.2a4.2 4.2 0 11-4.2-4.2c.3 0 .6 0 .9.1v2.3a2 2 0 100 2.6V6H14z" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <path d="M14.5 8.5H12V6h4v8.2c0 1.5-1.2 2.8-2.8 2.8S10.4 15.7 10.4 14.2 11.6 11.4 13.2 11.4c.4 0 .7 0 1 .1V9.2A5.2 5.2 0 008 14.2C8 17 10.2 19 13.2 19s5.2-2 5.2-4.8V8.5z" />
-    </svg>
-  );
-}
-
-const CHANNEL_STYLE: Record<Channel, string> = {
-  instagram: "bg-pink-400/10 text-pink-300 ring-pink-400/30",
-  linkedin: "bg-sky-400/10 text-sky-300 ring-sky-400/30",
-  x: "bg-slate-300/10 text-slate-200 ring-slate-300/30",
-  tiktok: "bg-teal-400/10 text-teal-300 ring-teal-400/30",
-  facebook: "bg-blue-400/10 text-blue-300 ring-blue-400/30",
-};
-
-export function ChannelBadge({ channel }: { channel: Channel }) {
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1", CHANNEL_STYLE[channel])}>
-      <ChannelMark channel={channel} />
-      {channelLabel(channel)}
-    </span>
-  );
-}
+export { ChannelBadge };
 
 const STATUS_STYLE: Record<PostStatus, string> = {
   draft: "bg-slate-400/10 text-slate-300 ring-slate-400/30",
@@ -97,12 +44,12 @@ export function ReadinessPill({ r }: { r: Readiness }) {
         )}
         title={r.summary}
       >
-        {r.score === 100 ? "Ready" : r.summary.startsWith("Blocked") ? "Blocked" : "Not ready"}
-        <span className="tabular font-mono text-[11px]">{r.score}</span>
+        {r.score === 100 && r.ready ? "Ready" : r.summary.startsWith("Blocked") ? "Blocked" : "Not ready"}
+        <span className="tabular font-mono text-xs">{r.score}</span>
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-80 rounded-xl border border-border bg-card p-3 text-left shadow-xl">
+      <div className="absolute right-0 z-30 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-border bg-card p-3 text-left shadow-xl">
         <p className="text-xs font-semibold text-foreground">Quality score {r.score}/100</p>
-        <p className="mt-1 text-[11px] text-muted-foreground">{r.summary}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{r.summary}</p>
         <ul className="mt-3 space-y-2">
           {r.factors.map((factor) => (
             <li key={factor.label}>
@@ -112,7 +59,7 @@ export function ReadinessPill({ r }: { r: Readiness }) {
                   {factor.points}/{factor.max}
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">{factor.detail}</p>
+              <p className="text-xs text-muted-foreground">{factor.detail}</p>
             </li>
           ))}
         </ul>
@@ -124,32 +71,54 @@ export function ReadinessPill({ r }: { r: Readiness }) {
 export function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <div className="rounded-xl border border-border bg-card/80 p-4 backdrop-blur">
-      <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">{label}</p>
+      <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">{label}</p>
       <p className="tabular mt-2 font-mono text-3xl font-semibold text-foreground">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }
 
+/** Thin bar for a 0-100 readiness score. The number stays next to it so colour is never the only signal. */
+export function MiniBar({ score }: { score: number }) {
+  const tone = score === 100 ? "bg-emerald-400" : score < 70 ? "bg-rose-400" : "bg-amber-400";
+  return (
+    <span className="flex w-24 items-center gap-2" role="img" aria-label={`Readiness ${score} of 100`}>
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <span className={cn("block h-full rounded-full", tone)} style={{ width: `${score}%` }} />
+      </span>
+    </span>
+  );
+}
+
 export function PostRow({ p, showPillar = false, quickFix = false, peekHref }: { p: ScoredPost; showPillar?: boolean; quickFix?: boolean; peekHref?: string }) {
   return (
-    <div data-ai-id={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 transition hover:bg-accent/50">
-      <Link href={`/posts/${p.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-        <span className="tabular w-36 shrink-0 font-mono text-xs text-muted-foreground">{formatSlot(p.scheduledFor)}</span>
-        <ChannelBadge channel={p.channel} />
+    <div data-ai-id={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 transition hover:bg-accent/50 sm:px-5">
+      <Link href={`/posts/${p.id}`} className="flex min-w-0 flex-1 basis-72 items-center gap-4 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+        <span className="relative shrink-0">
+          <PostThumb post={p} className="h-[4.5rem] w-24 sm:h-20 sm:w-28" />
+          <ChannelChip channel={p.channel} className="absolute top-1 right-1 bg-background/85 backdrop-blur" />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-foreground">{snippet(p.caption, 90)}</span>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="tabular font-mono text-xs text-muted-foreground">{formatSlot(p.scheduledFor)}</span>
+            <StatusBadge status={p.status} />
+          </span>
+          <span className="mt-1 line-clamp-2 block text-sm font-medium text-foreground">{p.caption}</span>
           {showPillar ? <span className="block text-xs text-muted-foreground">{PILLAR_LABEL[p.pillar]}</span> : null}
         </span>
-        <StatusBadge status={p.status} />
       </Link>
-      {peekHref ? (
-        <Link href={peekHref} className="text-xs font-semibold text-primary hover:underline">
-          Preview
-        </Link>
-      ) : null}
-      {quickFix ? <AutoFixButton postId={p.id} score={p.readiness.score} compact /> : null}
-      <ReadinessPill r={p.readiness} />
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex flex-col items-end gap-1.5">
+          <ReadinessPill r={p.readiness} />
+          <MiniBar score={p.readiness.score} />
+        </div>
+        {peekHref ? (
+          <Link href={peekHref} className="inline-flex min-h-10 items-center rounded-lg px-2 text-xs font-semibold text-primary hover:underline">
+            Preview
+          </Link>
+        ) : null}
+        {quickFix ? <AutoFixButton postId={p.id} score={p.readiness.score} compact /> : null}
+      </div>
     </div>
   );
 }

@@ -61,7 +61,7 @@ export function AskAiSection() {
       <div className="pointer-events-none absolute -top-32 -left-32 size-96 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative grid items-center gap-8 lg:grid-cols-12">
         <div className="flex flex-col gap-4 lg:col-span-7">
-          <p className="flex items-center gap-2 text-[10px] font-bold tracking-[0.18em] text-primary uppercase">
+          <p className="flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-primary uppercase">
             <span className="size-2 rounded-full bg-primary shadow-[0_0_10px_rgba(247,81,161,0.8)]" />
             Helix · brand voice
           </p>
@@ -96,13 +96,13 @@ export function AskAiSection() {
             </button>
           </form>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Prompts</span>
+            <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Prompts</span>
             {PROMPTS.map((prompt) => (
               <button
                 key={prompt.label}
                 type="button"
                 onClick={() => setText(prompt.text)}
-                className="rounded-full bg-muted px-2.5 py-1 text-[11px] text-foreground hover:bg-accent"
+                className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground hover:bg-accent"
               >
                 {prompt.label}
               </button>
@@ -113,12 +113,21 @@ export function AskAiSection() {
           <div className="overflow-hidden rounded-xl bg-background shadow-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/helix-desk.jpg" alt="" className="h-64 w-full object-cover lg:h-72" />
-            <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-lg bg-background/80 px-2.5 py-2 text-[11px] text-foreground backdrop-blur">
+            <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-lg bg-background/80 px-2.5 py-2 text-xs text-foreground backdrop-blur">
               <span>Drafts stay here until someone approves them.</span>
             </figcaption>
           </div>
         </figure>
       </div>
     </section>
+  );
+}
+
+/** Opens the Ask Helix AI drawer mounted in the app shell. */
+export function AskHelixButton({ question, children, className }: { question?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <button type="button" className={className} onClick={() => window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question } }))}>
+      {children}
+    </button>
   );
 }

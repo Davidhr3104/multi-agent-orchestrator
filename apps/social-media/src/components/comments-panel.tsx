@@ -43,7 +43,7 @@ export function CommentsPanel({ postId, comments, revisions }: { postId: string;
         <ul className="mt-3 space-y-2">
           {comments.map((comment) => (
             <li key={comment.id} className="rounded-md bg-background/60 px-3 py-2">
-              <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 {ROLES.find((item) => item.id === comment.role)?.label} · {comment.actor} · {new Date(comment.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
               <p className="mt-1 text-sm text-foreground">{comment.body}</p>
@@ -96,7 +96,7 @@ export function CommentsPanel({ postId, comments, revisions }: { postId: string;
         <ul className="mt-2 space-y-2">
           {[...revisions].reverse().map((revision) => (
             <li key={revision.id} className="rounded-md bg-background/60 px-3 py-2">
-              <p className="text-[11px] font-semibold text-muted-foreground">
+              <p className="text-xs font-semibold text-muted-foreground">
                 {revision.summary} · {revision.actor}
               </p>
               <p className="mt-1 line-clamp-3 text-xs text-foreground">{revision.caption}</p>

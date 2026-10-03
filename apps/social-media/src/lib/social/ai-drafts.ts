@@ -5,6 +5,7 @@ import { callClaude, type AiCallRecord } from "./claude";
 import type { FetchLike } from "./config";
 import { topPosts, type RankedPost } from "./performance";
 import type { RealPost } from "./meta-graph";
+import { addZonedDays } from "@/lib/tz";
 
 const PILLARS: Pillar[] = ["product", "behind_the_scenes", "education", "community", "promo"];
 const DRAFT_CHANNELS: Channel[] = ["instagram", "facebook", "linkedin"];
@@ -63,10 +64,7 @@ export async function draftsFromTopPosts(
       .filter((p): p is RankedPost => Boolean(p));
     if (!channel || !caption || !sources.length) continue;
     const pillar = PILLARS.includes(raw.pillar as Pillar) ? (raw.pillar as Pillar) : "education";
-    const day = new Date(now);
-    day.setDate(day.getDate() + drafts.length + 1);
-    const slot = new Date(day);
-    slot.setHours(suggestSlot(channel, pillar, now).hour, 0, 0, 0);
+    const slot = addZonedDays(now, drafts.length + 1, suggestSlot(channel, pillar, now).hour);
     const hashtags = (Array.isArray(raw.hashtags) ? raw.hashtags : [])
       .filter((t): t is string => typeof t === "string")
       .map((t) => t.replace(/^#/, "").trim().toLowerCase())

@@ -57,7 +57,7 @@ export function LibraryDesk({ assets }: { assets: LibraryAsset[] }) {
         Search
         <input id="library-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, tag, folder or prompt text" className="mt-2 w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:border-primary focus:outline-none" />
       </label>
-      <p className="-mt-4 text-[11px] text-muted-foreground">Matches the name, tags, folder and prompt text saved on the asset. It does not look at the picture.</p>
+      <p className="-mt-4 text-xs text-muted-foreground">Matches the name, tags, folder and prompt text saved on the asset. It does not look at the picture.</p>
       <div className="flex flex-wrap gap-2">
         {folders.map((item) => (
           <button
@@ -98,7 +98,7 @@ export function LibraryDesk({ assets }: { assets: LibraryAsset[] }) {
                   type="button"
                   disabled={busy === asset.id}
                   onClick={() => void run(asset.id, { action: "approve", id: asset.id, approved: !asset.approved }, asset.approved ? "Cleared brand approval." : "Marked approved by the brand.")}
-                  className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold ${asset.approved ? "border-primary/50 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${asset.approved ? "border-primary/50 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
                 >
                   {asset.approved ? "Brand approved" : "Mark approved"}
                 </button>

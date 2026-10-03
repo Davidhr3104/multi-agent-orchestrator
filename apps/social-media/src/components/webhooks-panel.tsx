@@ -41,7 +41,7 @@ export function WebhooksPanel({ hooks, outbox }: { hooks: WebhookEndpoint[]; out
       <p className="mt-1 text-xs text-muted-foreground">
         Make, n8n, Zapier, Slack, WhatsApp or Discord can be named here. This desk records the event in the outbox and does not call the address.
       </p>
-      <label className="mt-3 block text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <label className="mt-3 block text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         HTTPS endpoint
         <input
           value={url}
@@ -51,7 +51,7 @@ export function WebhooksPanel({ hooks, outbox }: { hooks: WebhookEndpoint[]; out
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
         {EVENTS.map((event) => (
-          <button key={event} type="button" aria-pressed={picked.includes(event)} onClick={() => toggle(event)} className={`rounded-full border px-3 py-1 font-mono text-[11px] ${picked.includes(event) ? "border-primary/50 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}>
+          <button key={event} type="button" aria-pressed={picked.includes(event)} onClick={() => toggle(event)} className={`rounded-full border px-3 py-1 font-mono text-xs ${picked.includes(event) ? "border-primary/50 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}>
             {event}
           </button>
         ))}
@@ -69,7 +69,7 @@ export function WebhooksPanel({ hooks, outbox }: { hooks: WebhookEndpoint[]; out
           {hooks.map((hook) => (
             <li key={hook.id} className="py-2">
               <p className="truncate font-mono text-xs text-foreground">{hook.url}</p>
-              <p className="text-[11px] text-muted-foreground">{hook.events.join(", ")}</p>
+              <p className="text-xs text-muted-foreground">{hook.events.join(", ")}</p>
             </li>
           ))}
         </ul>
@@ -79,7 +79,7 @@ export function WebhooksPanel({ hooks, outbox }: { hooks: WebhookEndpoint[]; out
           <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Outbox</h3>
           <ul className="mt-2 space-y-1">
             {outbox.slice(0, 8).map((item) => (
-              <li key={item.id} className="font-mono text-[11px] text-muted-foreground">
+              <li key={item.id} className="font-mono text-xs text-muted-foreground">
                 {item.event} · {item.at}
               </li>
             ))}

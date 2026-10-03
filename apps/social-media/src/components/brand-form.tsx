@@ -76,7 +76,7 @@ function TagField({ label, hint, values, onChange }: { label: string; hint: stri
         placeholder="Type a word and press Enter"
         className="mt-2 w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
       />
-      <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -126,17 +126,17 @@ export function BrandForm({ brand }: { brand: Brand }) {
         Website
         <input id="brand-site" value={site} onChange={(event) => setSite(event.target.value)} placeholder="https://example.com" className="mt-2 w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:border-primary focus:outline-none" />
       </label>
-      <p className="-mt-2 text-[11px] text-muted-foreground">Saved as a site: line on this desk. Helix does not open or scrape that URL.</p>
+      <p className="-mt-2 text-xs text-muted-foreground">Saved as a site: line on this desk. Helix does not open or scrape that URL.</p>
       <label className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase" htmlFor="brand-notes">
         Source notes
         <textarea id="brand-notes" value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:border-primary focus:outline-none" />
       </label>
-      <p className="-mt-2 text-[11px] text-muted-foreground">Pasted text only. A new draft can include the first note. Files are not uploaded.</p>
+      <p className="-mt-2 text-xs text-muted-foreground">Pasted text only. A new draft can include the first note. Files are not uploaded.</p>
       <label className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase" htmlFor="brand-regulated">
         Regulated words
         <textarea id="brand-regulated" value={regulated} onChange={(event) => setRegulated(event.target.value)} rows={2} className="mt-2 w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:border-primary focus:outline-none" />
       </label>
-      <p className="-mt-2 text-[11px] text-muted-foreground">One term per line. The editor highlights them in amber, next to the avoid list in red. This is not a copyright or legal scan.</p>
+      <p className="-mt-2 text-xs text-muted-foreground">One term per line. The editor highlights them in amber, next to the avoid list in red. This is not a copyright or legal scan.</p>
       <TagField label="Voice words" hint="Press Enter to add a pill. Click a pill to remove it. These describe the tone the co-pilot should keep." values={voice} onChange={setVoice} />
       <TagField label="Words to avoid" hint="A post that uses one of these is blocked. Click the × to remove it." values={avoid} onChange={setAvoid} />
       <div className="space-y-3">
@@ -156,13 +156,13 @@ export function BrandForm({ brand }: { brand: Brand }) {
             <input type="range" min={0} max={100} value={value} onChange={(event) => set(Number(event.target.value))} className="mt-1 w-full" />
           </label>
         ))}
-        <p className="text-[11px] text-muted-foreground">Saved as tone lines in the directives. They guide the co-pilot. They are not a model temperature.</p>
+        <p className="text-xs text-muted-foreground">Saved as tone lines in the directives. They guide the co-pilot. They are not a model temperature.</p>
       </div>
       <label className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase" htmlFor="brand-directives">
         Standing directives
       </label>
       <textarea id="brand-directives" value={directives} onChange={(e) => setDirectives(e.target.value)} rows={6} maxLength={800} className="w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm leading-relaxed text-foreground focus:border-primary focus:outline-none" />
-      <p className="text-[11px] text-muted-foreground">Free text, plus lines that start with always: or never:. Example: never: emojis</p>
+      <p className="text-xs text-muted-foreground">Free text, plus lines that start with always: or never:. Example: never: emojis</p>
       <button type="submit" disabled={busy} className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50">
         {busy ? "Saving…" : "Save brand voice"}
       </button>

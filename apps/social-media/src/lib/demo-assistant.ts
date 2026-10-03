@@ -2,6 +2,7 @@ import type { ActionProposal } from "@helix/core";
 import { channelLabel, formatSlot, postLabel, STATUS_LABEL } from "./format";
 import type { ScoredPost } from "./store";
 import type { Brand, Channel } from "./types";
+import { startOfZonedDay, zoneParts, zonedTime } from "./tz";
 
 /**
  * Deterministic stand-in for Claude, used only on the demo desk when no ANTHROPIC_API_KEY is set. Every post,
@@ -29,9 +30,7 @@ const STOP = new Set(["the", "and", "for", "post", "posts", "approve", "this", "
 const tokens = (t: string) => (t.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !STOP.has(w));
 
 function startOfDay(ms: number) {
-  const d = new Date(ms);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  return startOfZonedDay(ms).getTime();
 }
 
 /** "today" / "tomorrow" / weekday name, if the text names a day. Returns the day's midnight. */
@@ -41,7 +40,7 @@ function dayIn(q: string, now: number): number | null {
   if (/\btomorrow\b/.test(q)) return today + DAY;
   const wd = WEEKDAYS.findIndex((w) => new RegExp(`\\b${w}\\b`).test(q));
   if (wd >= 0) {
-    const diff = (wd - new Date(today).getDay() + 7) % 7 || 7;
+    const diff = (wd - zoneParts(today).dow + 7) % 7 || 7;
     return today + diff * DAY;
   }
   return null;
@@ -113,9 +112,9 @@ function explain(p: ScoredPost): string {
 function newSlot(q: string, from: ScoredPost, now: number): string | null {
   const keep = new Date(from.scheduledFor);
   const set = (dayMs: number) => {
-    const d = new Date(dayMs);
-    d.setHours(keep.getHours(), keep.getMinutes(), 0, 0);
-    return d.toISOString();
+    const k = zoneParts(keep);
+    const d = zoneParts(dayMs + 12 * 3_600_000);
+    return zonedTime(d.year, d.month, d.day, k.hour, k.minute).toISOString();
   };
   const plus = q.match(/\+?\s*(\d{1,2})\s*days?\s*(later)?/);
   const toPart = q.split(/\bto\b/).slice(1).join(" to ");

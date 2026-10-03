@@ -1,4 +1,6 @@
 import type { Brand, Channel, Pillar, Post, PostStatus } from "./types";
+import { stockById } from "./stock";
+import { addZonedDays, startOfZonedDay } from "./tz";
 
 /**
  * Demo brand: a small specialty coffee roaster. Every slot is placed relative to the day the demo loads,
@@ -26,6 +28,8 @@ type SeedRow = {
   hashtags: string[];
   asset: string;
   notes?: string[];
+  /** A stock frame a person explicitly attached (shown as "Stock" in the media panel). */
+  stockId?: string;
 };
 
 const ROWS: SeedRow[] = [
@@ -40,6 +44,7 @@ const ROWS: SeedRow[] = [
       "Our Huila harvest lot is here. Red apple, panela and a long cocoa finish — roasted light so the fruit stays loud. Small batch: 120 bags this week. Tap the link in bio to grab one before Friday.",
     hashtags: ["specialtycoffee", "colombiancoffee", "lightroast", "coffeeroaster", "smallbatch"],
     asset: "Overhead shot of the Huila bag on the roasting table, morning light",
+    stockId: "product-bag",
   },
   {
     key: "li-hiring-roaster",
@@ -332,14 +337,11 @@ const HARBOR_ROWS: SeedRow[] = [
   },
 ];
 
-/** Builds the seed against `now`: slot `day` is that many days after today, at `hour` local time. */
+/** Builds the seed against `now`: slot `day` is that many days after today, at `hour` desk-zone time (see lib/tz.ts). */
 export function buildSeedPosts(now: Date = new Date()): Post[] {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
+  const start = startOfZonedDay(now);
   return ROWS.map((r) => {
-    const at = new Date(start);
-    at.setDate(at.getDate() + r.day);
-    at.setHours(r.hour, 0, 0, 0);
+    const at = addZonedDays(start, r.day, r.hour);
     const approved = r.status === "approved";
     return {
       id: `seed-${r.key}`,
@@ -352,18 +354,16 @@ export function buildSeedPosts(now: Date = new Date()): Post[] {
       status: r.status,
       createdBy: r.createdBy ?? "helix_ai",
       notes: [...(r.notes ?? [])],
+      ...(r.stockId && stockById(r.stockId) ? { media: [{ id: `seed-media-${r.key}`, kind: "image" as const, label: stockById(r.stockId)!.label, url: stockById(r.stockId)!.url, source: "stock" as const }] } : {}),
       ...(approved ? { approvedBy: "Marta (brand lead)", approvedAt: start.toISOString() } : {}),
     };
   });
 }
 
 export function buildHarborPosts(now: Date = new Date()): Post[] {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
+  const start = startOfZonedDay(now);
   return HARBOR_ROWS.map((row) => {
-    const at = new Date(start);
-    at.setDate(at.getDate() + row.day);
-    at.setHours(row.hour, 0, 0, 0);
+    const at = addZonedDays(start, row.day, row.hour);
     const approved = row.status === "approved";
     return {
       id: `harbor-${row.key}`,

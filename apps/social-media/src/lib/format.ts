@@ -1,4 +1,5 @@
 import { CHANNEL_RULES } from "./readiness";
+import { DESK_TZ } from "./tz";
 import type { Channel, Pillar, Post, PostStatus } from "./types";
 
 export const channelLabel = (c: Channel) => CHANNEL_RULES[c].label;
@@ -20,11 +21,11 @@ export const STATUS_LABEL: Record<PostStatus, string> = {
 };
 
 export function formatSlot(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: DESK_TZ });
 }
 
 export function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: DESK_TZ });
 }
 
 /** Posts scheduled before now + `days` (the seed only plans forward, so this is "the next N days"). */

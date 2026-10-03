@@ -62,7 +62,7 @@ export function BatchApprove({ rows }: { rows: Row[] }) {
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Channel
         <select className={`mt-1 block ${field}`} value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Batch channel">
           <option value="">Any</option>
@@ -73,7 +73,7 @@ export function BatchApprove({ rows }: { rows: Row[] }) {
           ))}
         </select>
       </label>
-      <label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Pillar
         <select className={`mt-1 block ${field}`} value={pillar} onChange={(e) => setPillar(e.target.value)} aria-label="Batch pillar">
           <option value="">Any</option>
@@ -84,11 +84,11 @@ export function BatchApprove({ rows }: { rows: Row[] }) {
           ))}
         </select>
       </label>
-      <label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         From
         <input type="date" className={`mt-1 block ${field}`} value={from} onChange={(e) => setFrom(e.target.value)} />
       </label>
-      <label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         To
         <input type="date" className={`mt-1 block ${field}`} value={to} onChange={(e) => setTo(e.target.value)} />
       </label>
@@ -101,7 +101,7 @@ export function BatchApprove({ rows }: { rows: Row[] }) {
         <CheckCheck className="size-4" aria-hidden />
         {busy ? "Approving…" : `Approve matching 100/100 (${count})`}
       </button>
-      <p className="w-full text-[11px] text-muted-foreground">Dates use the UTC day on the scheduled time.</p>
+      <p className="w-full text-xs text-muted-foreground">Dates use the UTC day on the scheduled time.</p>
       {error ? (
         <p role="alert" className="w-full text-xs text-rose-400">
           {error}

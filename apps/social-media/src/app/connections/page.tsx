@@ -75,12 +75,12 @@ export default async function ConnectionsPage() {
               <ChannelBadge channel={channel.channel} />
               <p className="mt-3 text-sm font-semibold text-foreground">{channelLabel(channel.channel)}</p>
               <p className="text-xs text-muted-foreground">{NETWORK[channel.channel]}</p>
-              <p className={`mt-3 inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${TONE[state.tone]}`}>{state.label}</p>
-              {state.detail ? <p className="mt-1 text-[11px] text-muted-foreground">{state.detail}</p> : null}
-              <p className="mt-2 font-mono text-[11px] text-muted-foreground">{channel.tokenEnv}</p>
-              <p className="font-mono text-[11px] text-muted-foreground">{channel.expiresEnv}</p>
+              <p className={`mt-3 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONE[state.tone]}`}>{state.label}</p>
+              {state.detail ? <p className="mt-1 text-xs text-muted-foreground">{state.detail}</p> : null}
+              <p className="mt-2 font-mono text-xs text-muted-foreground">{channel.tokenEnv}</p>
+              <p className="font-mono text-xs text-muted-foreground">{channel.expiresEnv}</p>
               {channel.extraEnv.map((env) => (
-                <p key={env.name} className="font-mono text-[11px] text-muted-foreground">
+                <p key={env.name} className="font-mono text-xs text-muted-foreground">
                   {env.name}
                   {env.optional ? " (optional)" : ""} · {env.present ? "set" : "missing"}
                 </p>

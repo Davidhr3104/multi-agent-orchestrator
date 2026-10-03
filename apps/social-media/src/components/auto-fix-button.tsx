@@ -81,16 +81,16 @@ export function AutoFixButton({ postId, score, compact = false, prominent = fals
         onClick={() => void preview()}
         className={
           prominent
-            ? "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-emerald-300/70 bg-gradient-to-r from-emerald-400/30 to-primary/30 px-3 text-[11px] font-semibold text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.35)] hover:brightness-110 disabled:opacity-50"
+            ? "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-emerald-300/70 bg-gradient-to-r from-emerald-400/30 to-primary/30 px-3 text-xs font-semibold text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.35)] hover:brightness-110 disabled:opacity-50"
             : compact
-              ? "inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-[11px] font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+              ? "inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
               : "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
         }
       >
         <Wand2 className={compact ? "size-3.5" : "size-4"} aria-hidden />
         {busy ? "Fixing…" : compact ? "Auto-fix with AI" : "Auto-fix to 100"}
       </button>
-      {compact ? null : <p className="text-[11px] text-muted-foreground">Fixes form: length, hashtags, a call to action, banned words and a visual brief. It spends one AI credit. It does not decide if the post is good.</p>}
+      {compact ? null : <p className="text-xs text-muted-foreground">Fixes form: length, hashtags, a call to action, banned words and a visual brief. It spends one AI credit. It does not decide if the post is good. Instagram and TikTok also need an attached image to reach 100; auto-fix does not add one.</p>}
       {diff ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm" role="presentation" onMouseDown={() => setDiff(null)}>
           <div role="dialog" aria-modal="true" aria-label="Auto-fix preview" className="w-full max-w-lg space-y-3 rounded-2xl border border-border bg-card p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>

@@ -26,7 +26,7 @@ export default async function ReportPage({ params }: PageProps<"/reports/[id]">)
           ["Average", report.avgScore],
         ].map(([label, value]) => (
           <article key={label} className="rounded-xl border border-border bg-card/80 p-4">
-            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{label}</p>
+            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{label}</p>
             <p className="mt-2 font-mono text-2xl text-foreground">{value}</p>
           </article>
         ))}

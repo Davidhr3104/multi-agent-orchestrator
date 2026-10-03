@@ -41,7 +41,7 @@ export default async function TeamPage() {
                     <p className="text-xs text-muted-foreground">{ROLE_LABEL[member.role]}</p>
                   </div>
                 </div>
-                <p className="mt-3 text-[11px] text-muted-foreground">{here ? "This is the signed-in session." : "Roster only. Not a live account."}</p>
+                <p className="mt-3 text-xs text-muted-foreground">{here ? "This is the signed-in session." : "Roster only. Not a live account."}</p>
               </li>
             );
           })}

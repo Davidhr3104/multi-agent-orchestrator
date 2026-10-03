@@ -1,5 +1,6 @@
 import { PILLAR_LABEL } from "./format";
 import type { Pillar, Post } from "./types";
+import { startOfZonedDay } from "./tz";
 
 const DAY = 86_400_000;
 const PILLARS: Pillar[] = ["product", "behind_the_scenes", "education", "community", "promo"];
@@ -18,8 +19,7 @@ export type PillarGap = {
  * inside the planning window has none. Counts planned posts, not published performance.
  */
 export function pillarGaps(posts: Pick<Post, "pillar" | "scheduledFor">[], now = new Date(), horizonDays = 21, gapDays = 4): PillarGap[] {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
+  const start = startOfZonedDay(now);
   const gaps: PillarGap[] = [];
 
   for (const pillar of PILLARS) {

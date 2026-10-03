@@ -1,4 +1,9 @@
+import { CHANNEL_RULES, postLength } from "@/lib/readiness";
 import type { Channel, MediaItem } from "@/lib/types";
+
+function SampleTag({ show }: { show: boolean }) {
+  return show ? <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-xs leading-none font-medium text-white">Sample image</span> : null;
+}
 
 /** A static mock of the destination feed. It previews copy; it is not the live network. */
 export function ChannelPreview({
@@ -8,6 +13,7 @@ export function ChannelPreview({
   caption,
   hashtags,
   media,
+  sample = false,
 }: {
   channel: Channel;
   brand: string;
@@ -15,6 +21,8 @@ export function ChannelPreview({
   caption: string;
   hashtags: string[];
   media?: MediaItem;
+  /** The image is a stock stand-in, not this post's own. It gets a "Sample image" label. */
+  sample?: boolean;
 }) {
   const tags = hashtags.map((tag) => `#${tag}`).join(" ");
   const frame = "overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-sm";
@@ -30,6 +38,15 @@ export function ChannelPreview({
             </p>
             <p className="mt-1 text-sm leading-relaxed whitespace-pre-line">{caption}</p>
             {tags ? <p className="mt-2 text-sm text-sky-300">{tags}</p> : null}
+            {(() => {
+              const used = postLength({ caption, hashtags });
+              const limit = CHANNEL_RULES.x.hardMax ?? 280;
+              return (
+                <p className={`mt-2 text-xs ${used > limit ? "font-semibold text-rose-300" : "text-muted-foreground"}`}>
+                  {used} / {limit} characters{used > limit ? ` — ${used - limit} over the X limit, the post would be cut off` : ""}
+                </p>
+              );
+            })()}
           </div>
         </div>
       </article>
@@ -48,8 +65,11 @@ export function ChannelPreview({
         </div>
         <p className="px-4 pb-3 text-sm leading-relaxed whitespace-pre-line">{caption}</p>
         {media?.kind === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={media.url} alt="" className="max-h-72 w-full object-cover" />
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={media.url} alt="" className="max-h-72 w-full object-cover" />
+            <SampleTag show={sample} />
+          </div>
         ) : (
           <div className="grid h-36 place-items-center bg-sky-950/40 text-xs text-muted-foreground">No image attached</div>
         )}
@@ -63,8 +83,11 @@ export function ChannelPreview({
       <article className={`${frame} mx-auto max-w-xs bg-zinc-950`} aria-label="TikTok preview">
         <div className="relative grid min-h-96 place-items-end">
           {media?.kind === "image" ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={media.url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={media.url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+              <SampleTag show={sample} />
+            </>
           ) : (
             <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-black" />
           )}
@@ -86,8 +109,11 @@ export function ChannelPreview({
         <p className="text-sm font-semibold">{handle || brand}</p>
       </div>
       {media?.kind === "image" ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={media.url} alt="" className="aspect-square w-full object-cover" />
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={media.url} alt="" className="aspect-square w-full object-cover" />
+          <SampleTag show={sample} />
+        </div>
       ) : (
         <div className="grid aspect-square place-items-center bg-muted text-xs text-muted-foreground">No image attached</div>
       )}

@@ -39,7 +39,7 @@ export function DeskAction({
       <button type="button" disabled={busy} onClick={() => void run()} className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50">
         {busy ? "Working…" : label}
       </button>
-      {error ? <span className="text-[11px] text-rose-400">{error}</span> : null}
+      {error ? <span className="text-xs text-rose-400">{error}</span> : null}
     </span>
   );
 }

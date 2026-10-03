@@ -67,7 +67,7 @@ export async function RealDataPanel() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 id="real-heading" className="text-lg font-semibold text-foreground">
-            Real account data <span className="ml-2 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">Meta Graph API</span>
+            Real account data <span className="ml-2 rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-semibold text-emerald-200">Meta Graph API</span>
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {snap ? `Read ${when(snap.fetchedAt)}.` : "Not read yet."} Instagram {connected.instagram ? "connected" : "not connected"} · Facebook {connected.facebook ? "connected" : "not connected"}.

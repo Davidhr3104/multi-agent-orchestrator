@@ -33,7 +33,7 @@ export function CreateReportButton() {
       >
         {busy ? "Saving…" : "Save a reading link"}
       </button>
-      <p className="text-[11px] text-muted-foreground">The link is a page on this desk. It is not a PDF and it does not include likes or reach.</p>
+      <p className="text-xs text-muted-foreground">The link is a page on this desk. It is not a PDF and it does not include likes or reach.</p>
       {error ? (
         <p role="alert" className="text-xs text-rose-400">
           {error}

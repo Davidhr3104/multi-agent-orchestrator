@@ -1,23 +1,16 @@
 import type { Pillar } from "./types";
+import { addDaysKey, dayKey, formatKey } from "./tz";
 
 const PILLARS: Pillar[] = ["product", "behind_the_scenes", "education", "community", "promo"];
-
-function dayKey(iso: string) {
-  const day = new Date(iso);
-  return `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
-}
 
 /** The next three local days that have no planned post. Not a news scan. */
 export function openSlots(posts: { scheduledFor: string }[], now = new Date()): string[] {
   const taken = new Set(posts.map((post) => dayKey(post.scheduledFor)));
   const open: string[] = [];
   for (let offset = 0; offset < 3; offset += 1) {
-    const day = new Date(now);
-    day.setHours(0, 0, 0, 0);
-    day.setDate(day.getDate() + offset);
-    const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+    const key = addDaysKey(dayKey(now), offset);
     if (!taken.has(key)) {
-      open.push(day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }));
+      open.push(formatKey(key, { weekday: "short", month: "short", day: "numeric" }));
     }
   }
   return open;
@@ -25,8 +18,7 @@ export function openSlots(posts: { scheduledFor: string }[], now = new Date()): 
 
 export function scoreHealth(posts: { pillar: Pillar; score: number; scheduledFor: string }[], now = new Date()) {
   const month = posts.filter((post) => {
-    const day = new Date(post.scheduledFor);
-    return day.getMonth() === now.getMonth() && day.getFullYear() === now.getFullYear();
+    return dayKey(post.scheduledFor).slice(0, 7) === dayKey(now).slice(0, 7);
   });
   const rows = month.length ? month : posts;
   const avg = rows.length ? Math.round(rows.reduce((sum, post) => sum + post.score, 0) / rows.length) : 0;

@@ -44,7 +44,7 @@ export function ReviewApprove({ token, postId }: { token: string; postId: string
 
   return (
     <span className="flex w-full flex-col gap-2">
-      <label className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase" htmlFor={`note-${postId}`}>
+      <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase" htmlFor={`note-${postId}`}>
         Comment
         <input id={`note-${postId}`} value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background/60 px-3 py-2 text-sm font-normal normal-case tracking-normal text-foreground focus:border-primary focus:outline-none" />
       </label>
@@ -56,7 +56,7 @@ export function ReviewApprove({ token, postId }: { token: string; postId: string
           {busy ? "Saving…" : "Approve"}
         </button>
       </span>
-      {error ? <span className="text-[11px] text-rose-400">{error}</span> : null}
+      {error ? <span className="text-xs text-rose-400">{error}</span> : null}
     </span>
   );
 }

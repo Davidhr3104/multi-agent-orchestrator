@@ -25,7 +25,7 @@ export function WorkspaceSwitcher({ session }: { session: ShellSession }) {
 
   return (
     <label className="block px-1">
-      <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Workspace</span>
+      <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Workspace</span>
       <select
         aria-label="Workspace"
         disabled={busy}

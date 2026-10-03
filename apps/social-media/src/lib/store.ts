@@ -12,6 +12,7 @@ import type { PollOptions } from "./social/meta-publish";
 import { publishEnv, publishGate, sendToNetwork } from "./social/publish";
 import { STOCK, stockById } from "./stock";
 import type { AccessRole, ApprovalMode, Brand, Channel, Comment, DeskRole, ExecutiveReport, LibraryAsset, MediaItem, Member, PlanId, Post, PostStatus, Readiness, Revision, WebhookDelivery, WebhookEndpoint } from "./types";
+import { addDaysKey, dayKey, keyToDate } from "./tz";
 
 /**
  * In-memory desks, one per workspace. Approving a post records a sign-off here and nothing is published.
@@ -754,27 +755,21 @@ export async function fillOpenDays(actor: string): Promise<number> {
   requireAccess("edit");
   const ws = ensure();
   const taken = new Set(
-    [...ws.posts.values()].map((post) => {
-      const day = new Date(post.scheduledFor);
-      return `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
-    })
+    [...ws.posts.values()].map((post) => dayKey(post.scheduledFor))
   );
   let made = 0;
   for (let offset = 0; offset < 3; offset += 1) {
-    const day = new Date();
-    day.setHours(0, 0, 0, 0);
-    day.setDate(day.getDate() + offset);
-    const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+    const key = addDaysKey(dayKey(new Date()), offset);
     if (taken.has(key)) continue;
     const channel: Channel = "instagram";
     const topic = `${ws.brand.name} update`;
     const body = composeDraft(ws.brand, channel, topic);
-    day.setHours(suggestSlot(channel, body.pillar).hour, 0, 0, 0);
+    const slot = keyToDate(key, suggestSlot(channel, body.pillar).hour);
     placeDraft(ws, {
       id: nid("gap"),
       channel,
       pillar: body.pillar,
-      scheduledFor: day.toISOString(),
+      scheduledFor: slot.toISOString(),
       caption: body.caption,
       hashtags: body.hashtags,
       asset: body.asset,

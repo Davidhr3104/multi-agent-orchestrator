@@ -128,7 +128,7 @@ export function CaptionCopilot({
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {selected ? "Actions apply to the selected text and follow the brand voice." : "Select a fragment to rewrite just that part. With nothing selected, the action covers the whole draft."}
       </p>
       <label htmlFor="caption-draft" className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">

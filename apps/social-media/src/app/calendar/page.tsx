@@ -4,7 +4,8 @@ import { AutopilotSwitch } from "@/components/autopilot-switch";
 import { CalendarBoard } from "@/components/calendar-board";
 import { channelLabel, PILLAR_LABEL, STATUS_LABEL } from "@/lib/format";
 import { FILTER_CHANNELS, FILTER_PILLARS, FILTER_STATUSES, matchesFilter, readCalendarFilter, type CalendarFilter } from "@/lib/filters";
-import { listPosts, autopilotEnabled } from "@/lib/store";
+import { autopilotEnabled, getBrand, listPosts } from "@/lib/store";
+import { dayKey } from "@/lib/tz";
 import type { Channel, Pillar, PostStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +45,7 @@ function Chip({ href, active, children }: { href: string; active: boolean; child
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "inline-flex min-h-7 items-center rounded-full border px-2.5 text-[11px] transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        "inline-flex min-h-10 items-center rounded-full border px-3 text-xs md:min-h-8 transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         active ? "border-primary/50 bg-primary/15 font-semibold text-primary" : "border-border text-muted-foreground hover:text-foreground"
       )}
     >
@@ -63,7 +64,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     pillar: typeof sp.pillar === "string" ? sp.pillar : undefined,
     status: typeof sp.status === "string" ? sp.status : undefined,
   });
-  const [all, autopilot] = await Promise.all([listPosts(), autopilotEnabled()]);
+  const [all, autopilot, brand] = await Promise.all([listPosts(), autopilotEnabled(), getBrand()]);
   const posts = all.filter((post) => matchesFilter(post, filter));
 
   return (
@@ -82,7 +83,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
             <a
               key={format}
               href={exportHref(format, filter)}
-              className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-semibold text-foreground uppercase hover:bg-accent"
+              className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-xs font-semibold text-foreground uppercase hover:bg-accent"
             >
               {format}
             </a>
@@ -90,7 +91,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
         </div>
       </header>
 
-      <div className="sticky top-0 z-10 space-y-1.5 rounded-xl border border-border bg-background/80 p-2 backdrop-blur">
+      <div className="space-y-1.5 rounded-xl md:sticky md:top-0 md:z-10 border border-border bg-background/80 p-2 backdrop-blur">
         <div className="flex flex-wrap gap-2" aria-label="Filter by channel">
           <Chip href={query(filter, { channel: null }, { view, cursor })} active={!filter.channel}>
             All channels
@@ -136,6 +137,8 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
         view={view}
         feed={feed}
         cursor={cursor}
+        todayKey={dayKey(new Date())}
+        brand={{ name: brand.name, handle: brand.handle }}
         search={[filter.channel && `channel=${filter.channel}`, filter.pillar && `pillar=${filter.pillar}`, filter.status && `status=${filter.status}`].filter(Boolean).join("&")}
         posts={posts.map((post) => ({
           id: post.id,
@@ -144,6 +147,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
           pillar: post.pillar,
           status: post.status,
           scheduledFor: post.scheduledFor,
+          hashtags: post.hashtags,
           mediaUrl: post.media?.find((item) => item.kind === "image")?.url,
         }))}
       />

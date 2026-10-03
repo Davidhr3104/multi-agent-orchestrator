@@ -130,7 +130,7 @@ export function MediaPanel({
       <button type="button" disabled={!!busy} onClick={() => void savePrompt()} className="mt-2 inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50">
         {busy === "prompt" ? "Saving…" : "Generate image"}
       </button>
-      <p className="mt-1 text-[11px] text-muted-foreground">Saves the prompt as the visual brief. FLUX, Midjourney and DALL-E are not connected, so no file is created.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Saves the prompt as the visual brief. FLUX, Midjourney and DALL-E are not connected, so no file is created.</p>
 
       <h3 className="mt-5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">Your file</h3>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">

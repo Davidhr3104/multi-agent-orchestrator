@@ -62,7 +62,7 @@ export function ApprovalQueue({ posts }: { posts: ScoredPost[] }) {
             aria-selected={filter === tab.id}
             onClick={() => setFilter(tab.id)}
             className={cn(
-              "shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold",
+              "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold",
               filter === tab.id ? "border-primary/50 bg-primary/15 text-primary" : "border-border text-muted-foreground hover:text-foreground"
             )}
           >
@@ -80,7 +80,7 @@ export function ApprovalQueue({ posts }: { posts: ScoredPost[] }) {
                 <ChannelBadge channel={post.channel} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-foreground">{snippet(post.caption, 72)}</span>
-                  <span className="text-[11px] text-muted-foreground">{formatSlot(post.scheduledFor)} · {PILLAR_LABEL[post.pillar]}</span>
+                  <span className="text-xs text-muted-foreground">{formatSlot(post.scheduledFor)} · {PILLAR_LABEL[post.pillar]}</span>
                 </span>
               </Link>
               <span className="tabular font-mono text-xs text-muted-foreground" aria-label={`Quality score ${post.readiness.score}`}>

@@ -117,7 +117,7 @@ export function DemoBanner({
   if (mode !== "demo") return null;
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/15 bg-white/[0.06] px-4 py-2.5 text-xs text-slate-200">
-      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold tracking-wider text-black uppercase">Demo data</span>
+      <span className="rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold tracking-wider text-black uppercase">Demo data</span>
       <p className="min-w-0 flex-1 text-slate-300">{message}</p>
       {error ? <span className="text-rose-400">{error}</span> : null}
       <button type="button" disabled={busy} onClick={() => void post("demo")} className="rounded-md border border-white/20 px-2.5 py-1 font-semibold hover:bg-white/10 disabled:opacity-50">

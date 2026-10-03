@@ -6,7 +6,7 @@ import type { Post } from "./types";
 
 function score(post: Post, brand: typeof DEMO_BRAND) {
   const fixed = autoFixDraft(post, brand);
-  return scoreReadiness({ ...post, ...fixed }, brand).score;
+  return scoreReadiness({ ...post, ...fixed, media: [{ id: "m", kind: "image", label: "Photo", url: "/x.jpg", source: "upload" }] }, brand).score;
 }
 
 describe("auto-fix", () => {

@@ -47,7 +47,7 @@ export function RealDataActions({ claude }: { claude: boolean }) {
           </button>
         ))}
       </div>
-      {!claude ? <p className="text-[11px] text-muted-foreground">Drafts and the weekly report need ANTHROPIC_API_KEY on this deployment.</p> : null}
+      {!claude ? <p className="text-xs text-muted-foreground">Drafts and the weekly report need ANTHROPIC_API_KEY on this deployment.</p> : null}
       {error ? (
         <p role="alert" className="text-xs text-rose-400">
           {error}

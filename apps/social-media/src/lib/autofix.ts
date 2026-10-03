@@ -78,8 +78,9 @@ export function autoFixDraft(post: Pick<Post, "caption" | "hashtags" | "asset" |
   if (!CTA.test(caption)) caption = fitLength(`${caption} ${CTA_LINE[post.channel]}`, tags, post.channel);
 
   const asset = post.asset.trim() || `${PILLAR_LABEL[post.pillar]} still for ${brand.name}`;
+  // Auto-fix only rewrites copy. Attaching the picture is a person's step, so the check assumes one is there.
   const check = scoreReadiness(
-    { id: "fix", channel: post.channel, pillar: post.pillar, scheduledFor: new Date().toISOString(), caption, hashtags: tags, asset, status: "draft", createdBy: "helix_ai", notes: [] },
+    { id: "fix", channel: post.channel, pillar: post.pillar, scheduledFor: new Date().toISOString(), caption, hashtags: tags, asset, status: "draft", createdBy: "helix_ai", notes: [], media: [{ id: "assumed", kind: "image", label: "assumed", url: "", source: "upload" }] },
     brand
   );
   if (check.score !== 100) {

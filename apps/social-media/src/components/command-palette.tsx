@@ -135,7 +135,7 @@ export function CommandPalette({ session, posts, showTrigger = true }: { session
         >
           <Search className="size-4" aria-hidden />
           <span className="flex-1 text-left">Search the desk</span>
-          <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">Ctrl K</kbd>
+          <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-xs">Ctrl K</kbd>
         </button>
       ) : null}
       {open ? (
@@ -177,7 +177,7 @@ export function CommandPalette({ session, posts, showTrigger = true }: { session
                     className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm ${index === cursor ? "bg-accent text-foreground" : "text-foreground"}`}
                   >
                     <span className="truncate">{item.label}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{item.hint}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{item.hint}</span>
                   </button>
                 </li>
               ))}

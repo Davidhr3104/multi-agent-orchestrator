@@ -29,7 +29,7 @@ export function DemoSandbox() {
           <ul className="grid gap-2 sm:grid-cols-3">
             {SAMPLE.map((row) => (
               <li key={row.label} className="rounded-lg border border-dashed border-border p-3">
-                <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{row.label}</p>
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{row.label}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{row.value}</p>
               </li>
             ))}

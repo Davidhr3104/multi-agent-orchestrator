@@ -56,10 +56,24 @@ function voiceFactor(p: Post, brand: Brand): ReadinessFactor {
     : { label: "Brand voice", points: 20, max: 20, detail: `No words from the brand's avoid list` };
 }
 
+/** Networks where a post without a picture or clip is not a post. Others can go out as text. */
+export const VISUAL_CHANNELS: Channel[] = ["instagram", "tiktok"];
+
+export function needsMedia(channel: Channel): boolean {
+  return VISUAL_CHANNELS.includes(channel);
+}
+
+/** A person attached an upload or explicitly picked a stock photo. A suggested cover in the UI does not count. */
+export function hasMedia(p: Pick<Post, "media">): boolean {
+  return Boolean(p.media && p.media.length > 0);
+}
+
 function assetFactor(p: Post): ReadinessFactor {
-  return p.asset.trim()
-    ? { label: "Visual brief", points: 15, max: 15, detail: `Brief: ${p.asset}` }
-    : { label: "Visual brief", points: 0, max: 15, detail: "No visual described yet" };
+  if (!p.asset.trim()) return { label: "Visual brief", points: 0, max: 15, detail: "No visual described yet" };
+  if (needsMedia(p.channel) && !hasMedia(p)) {
+    return { label: "Visual brief", points: 6, max: 15, detail: `Brief written, but no image attached. ${CHANNEL_RULES[p.channel].label} needs an upload or an approved stock photo before this is ready` };
+  }
+  return { label: "Visual brief", points: 15, max: 15, detail: `Brief: ${p.asset}` };
 }
 
 export const READY_AT = 85;
@@ -74,7 +88,8 @@ export function scoreReadiness(p: Post, brand: Brand): Readiness {
   const factors = [lengthFactor(p, rule), tagsFactor(p, rule), ctaFactor(p), voiceFactor(p, brand), assetFactor(p)];
   const score = factors.reduce((s, f) => s + f.points, 0);
   const blockers = hardBlockers(factors);
-  const ready = score >= READY_AT && factors.every((f) => f.points > 0);
+  const missingMedia = needsMedia(p.channel) && !hasMedia(p);
+  const ready = score >= READY_AT && factors.every((f) => f.points > 0) && !missingMedia;
   const weakest = [...factors].sort((a, b) => a.points / a.max - b.points / b.max)[0];
   const lc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
   const summary = blockers.length
