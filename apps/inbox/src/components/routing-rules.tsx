@@ -13,6 +13,24 @@ const EMPTY: CustomRule = {
   tagUrgent: true,
 };
 
+const ACTION: Record<CustomRule["then"], string> = {
+  urgent: "mark it urgent",
+  vip_route: "treat it as VIP",
+  block: "block it",
+  review: "send it to human review",
+  route: "route it",
+};
+
+/** A rule as a sentence a person would say, instead of `If "1000" → urgent`. */
+export function describeRule(rule: CustomRule): string {
+  const phrase = rule.ifContains.trim();
+  const amount = rule.minAmount ? `an amount of $${rule.minAmount.toLocaleString("en-US")} or more` : "";
+  const when = phrase && amount ? `an email mentions "${phrase}" and ${amount}` : phrase ? `an email mentions "${phrase}"` : amount ? `an email mentions ${amount}` : "any email arrives";
+  const dest = rule.then === "route" && rule.routeTo ? ` to ${rule.routeTo}` : rule.routeTo && rule.then !== "route" ? ` (${rule.routeTo})` : "";
+  const extra = rule.tagUrgent && rule.then !== "urgent" ? " and tag it urgent" : "";
+  return `When ${when}, ${ACTION[rule.then] ?? rule.then}${dest}${extra}.`;
+}
+
 export function RoutingRules() {
   const [rules, setRules] = useState<CustomRule[]>([]);
   const [draft, setDraft] = useState<CustomRule>({ ...EMPTY, id: "rule-new" });
@@ -36,7 +54,7 @@ export function RoutingRules() {
   }
 
   return (
-    <section className="glass-panel mb-6 rounded-xl p-5">
+    <section className="glass-panel mb-6 min-w-0 rounded-xl p-4 sm:p-5">
       <h2 className="text-sm font-semibold text-foreground">Routing rules</h2>
       <p className="mt-1 text-xs text-muted-foreground">
         If the mail contains a phrase and the amount is over the threshold, route it and optionally mark it urgent.
@@ -44,13 +62,8 @@ export function RoutingRules() {
       <ul className="mt-3 space-y-2">
         {rules.map((rule) => (
           <li key={rule.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-xs">
-            <span>
-              If “{rule.ifContains || "any text"}”
-              {rule.minAmount ? ` and amount > $${rule.minAmount}` : ""} → {rule.then}
-              {rule.routeTo ? ` · ${rule.routeTo}` : ""}
-              {rule.tagUrgent ? " · URGENT" : ""}
-            </span>
-            <button type="button" className="text-red-500" onClick={() => void save(rules.filter((r) => r.id !== rule.id))}>
+            <span className="min-w-0">{describeRule(rule)}</span>
+            <button type="button" className="min-h-10 px-2 text-red-500 md:min-h-8" onClick={() => void save(rules.filter((r) => r.id !== rule.id))}>
               Remove
             </button>
           </li>
@@ -60,25 +73,25 @@ export function RoutingRules() {
         <input
           value={draft.ifContains}
           onChange={(e) => setDraft({ ...draft, ifContains: e.target.value })}
-          placeholder="Contains"
-          className="rounded-md border border-border bg-transparent px-2 py-1.5 text-xs"
+          placeholder="Contains (optional)" aria-label="Email contains"
+          className="min-h-10 rounded-md border border-border bg-transparent px-2 py-1.5 text-xs md:min-h-8"
         />
         <input
           type="number"
           value={draft.minAmount ?? ""}
           onChange={(e) => setDraft({ ...draft, minAmount: Number(e.target.value) || undefined })}
-          placeholder="Min amount"
-          className="rounded-md border border-border bg-transparent px-2 py-1.5 text-xs"
+          placeholder="Min amount ($)" aria-label="Minimum amount"
+          className="min-h-10 rounded-md border border-border bg-transparent px-2 py-1.5 text-xs md:min-h-8"
         />
         <input
           value={draft.routeTo ?? ""}
           onChange={(e) => setDraft({ ...draft, routeTo: e.target.value })}
-          placeholder="Route to"
-          className="rounded-md border border-border bg-transparent px-2 py-1.5 text-xs"
+          placeholder="Route to" aria-label="Route to"
+          className="min-h-10 rounded-md border border-border bg-transparent px-2 py-1.5 text-xs md:min-h-8"
         />
         <button
           type="button"
-          className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+          className="min-h-10 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white md:min-h-8"
           onClick={() => {
             const next = [...rules, { ...draft, id: `rule-${Date.now()}`, then: "route" as const, enabled: true }];
             void save(next);

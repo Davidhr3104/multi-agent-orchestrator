@@ -1,164 +1,148 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { AreaChart, ChartCard, Donut, DemoChip, HBarList, Heatmap, KpiCard } from "@helix/ui";
+import { Clock3, Gauge as GaugeIcon, Inbox, UserCheck } from "lucide-react";
 import type { InboxMessage } from "@/lib/types";
 import { downloadCsv, printReport } from "@/lib/download";
+import {
+  CATEGORY_COLOR,
+  HEAT_COLUMNS,
+  HEAT_ROWS,
+  STATUS_COLOR,
+  categoryName,
+  confidenceHistogram,
+  countBy,
+  dailyVolume,
+  deskCounts,
+  hourDayMatrix,
+  statusLabel,
+} from "@/lib/desk-metrics";
+import { ColumnChart, GhostButton, Grid, PageFrame, SOURCE_DESK, VIOLET, useDeskMode, useNow, useTzOffset } from "@/components/desk-kit";
+import { inWindow } from "@/lib/sla";
 
 export default function InboxAnalyticsPage() {
   const [messages, setMessages] = useState<InboxMessage[]>([]);
+  const [vip, setVip] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState<7 | 14>(14);
+  const now = useNow();
+  const mode = useDeskMode();
+  const tz = useTzOffset();
+  const demo = mode === "demo";
 
   useEffect(() => {
-    void fetch("/api/messages")
-      .then((r) => r.json())
-      .then((d: { messages?: InboxMessage[] }) => {
-        setMessages(d.messages ?? []);
-        setLoading(false);
+    void Promise.all([
+      fetch("/api/messages").then((r) => r.json() as Promise<{ messages?: InboxMessage[] }>),
+      fetch("/api/preferences").then((r) => r.json() as Promise<{ preferences?: { vipSenders?: string[] } }>).catch(() => ({ preferences: undefined })),
+    ])
+      .then(([m, p]) => {
+        setMessages(m.messages ?? []);
+        setVip(p.preferences?.vipSenders ?? []);
       })
-      .catch(() => setLoading(false));
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
   }, []);
 
-  const byCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const m of messages) {
-      map.set(m.category, (map.get(m.category) ?? 0) + 1);
-    }
-    return [...map.entries()].map(([name, count]) => ({ name, count }));
-  }, [messages]);
+  const view = useMemo(() => {
+    const at = now ?? 0;
+    const rows = messages.filter((m) => inWindow(m, days, at));
+    const counts = deskCounts(messages, { vipSenders: vip, now: at, windowDays: days });
+    const daily = dailyVolume(messages, days, at, tz);
+    const status = [...countBy(rows, (m) => m.status).entries()].map(([k, v]) => ({ label: statusLabel(k as InboxMessage["status"]), value: v, color: STATUS_COLOR[k as InboxMessage["status"]] }));
+    const category = [...countBy(rows, (m) => m.category).entries()].map(([k, v]) => ({ label: categoryName(k as InboxMessage["category"]), value: v, color: CATEGORY_COLOR[k as InboxMessage["category"]] }));
+    const route = [...countBy(rows.filter((m) => m.category !== "spam"), (m) => m.routeTo || "Unrouted").entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, value]) => ({ label, value }));
+    return {
+      rows,
+      counts,
+      daily,
+      status,
+      category,
+      route,
+      hist: confidenceHistogram(rows.map((m) => m.aiConfidence)),
+      heat: hourDayMatrix(messages, tz, days, at),
+    };
+  }, [messages, vip, days, now, tz]);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const m of messages) {
-      const day = m.createdAt.slice(0, 10);
-      map.set(day, (map.get(day) ?? 0) + 1);
-    }
-    return [...map.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([day, volume]) => ({ day, volume }));
-  }, [messages]);
+  if (loading) return <div className="p-8 text-muted-foreground">Loading analytics…</div>;
 
-  const avgConfidence = useMemo(() => {
-    if (!messages.length) return 0;
-    return Math.round(messages.reduce((s, m) => s + m.aiConfidence, 0) / messages.length);
-  }, [messages]);
-
-  const hitlRate = useMemo(() => {
-    if (!messages.length) return 0;
-    return Math.round((messages.filter((m) => m.needsReview).length / messages.length) * 100);
-  }, [messages]);
-
-  if (loading) {
-    return <div className="p-8 text-muted-foreground">Loading analytics…</div>;
-  }
+  const { counts, daily } = view;
+  const windowLabel = `last ${days} days`;
 
   return (
-    <div className="space-y-6 p-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-        <p className="text-sm text-muted-foreground">Volume, category mix, and review load for this desk</p>
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-border px-3 py-1.5 text-xs"
+    <PageFrame
+      title="Analytics"
+      subtitle={`Volume, mix and review load for this desk over the ${windowLabel}. Every number counts spam as a thread and is timed by when the email was received.`}
+      chips={demo ? <DemoChip /> : null}
+      actions={
+        <>
+          <div role="group" aria-label="Time window" className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+            {([7, 14] as const).map((d) => (
+              <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)} className={`min-h-10 px-3 py-1.5 md:min-h-8 ${days === d ? "bg-accent/20 font-semibold text-foreground" : "text-muted-foreground"}`}>
+                {d} days
+              </button>
+            ))}
+          </div>
+          <GhostButton
             onClick={() =>
               downloadCsv(
                 "helix-inbox-analytics.csv",
-                messages.map((m) => ({
-                  subject: m.subject,
-                  from: m.fromEmail,
-                  category: m.category,
-                  status: m.status,
-                  confidence: m.aiConfidence,
-                  urgency: m.urgencyScore,
-                }))
+                view.rows.map((m) => ({ received: m.receivedAt, subject: m.subject, from: m.fromEmail, category: m.category, status: m.status, confidence: m.aiConfidence, urgency: m.urgencyScore }))
               )
             }
           >
             Export CSV
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-border px-3 py-1.5 text-xs"
+          </GhostButton>
+          <GhostButton
             onClick={() =>
               printReport("Helix for Inbox analytics", [
-                `Threads: ${messages.length}`,
-                `Avg confidence: ${avgConfidence}%`,
-                `HITL rate: ${hitlRate}%`,
-                ...byCategory.map((row) => `${row.name}: ${row.count}`),
+                `Window: ${windowLabel}`,
+                `Threads: ${counts.total}`,
+                `Avg confidence: ${counts.avgConfidence}%`,
+                `Hours saved: ${counts.hoursSaved}h`,
+                ...view.category.map((row) => `${row.label}: ${row.value}`),
               ])
             }
           >
             Print PDF
-          </button>
-        </div>
-      </div>
+          </GhostButton>
+        </>
+      }
+    >
+      <Grid cols={4}>
+        <KpiCard label={`Threads · ${days}d`} value={counts.total} hint={`${counts.spamBlocked} spam blocked`} icon={<Inbox className="size-4" />} accent={VIOLET} spark={daily.map((d) => d.total)} />
+        <KpiCard label="Hours saved" value={`${counts.hoursSaved}h`} hint={`${counts.minutesSaved} min estimated`} icon={<Clock3 className="size-4" />} accent="#34d399" spark={daily.map((d) => d.hoursSaved)} />
+        <KpiCard label="Avg AI confidence" value={`${counts.avgConfidence}%`} hint="mean over received threads" icon={<GaugeIcon className="size-4" />} accent="#38bdf8" spark={daily.map((d) => d.confidence)} />
+        <KpiCard label="Waiting on a person" value={counts.reviewCount} hint={`${counts.openCount} open · ${counts.breachCount} past SLA`} icon={<UserCheck className="size-4" />} accent="#fbbf24" />
+      </Grid>
 
-      <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
-        <p className="text-xs font-semibold tracking-wide text-emerald-800 uppercase dark:text-emerald-200">Return on this desk</p>
-        <p className="mt-2 text-sm leading-relaxed text-foreground">
-          Helix processed {messages.length} emails here, about {Math.max(1, Math.round((messages.length * 4) / 60))} hours of triage
-          at 4 minutes each. Urgent threads still open: {messages.filter((m) => m.priority === "urgent" && (m.status === "open" || m.status === "review")).length}.
-          Average model confidence is {avgConfidence}%.
-        </p>
-      </section>
+      <p className="text-sm text-muted-foreground">
+        Hours saved is an estimate: 3 minutes per spam email blocked plus 5 minutes per thread handled without review ({counts.spamBlocked} and {counts.autoHandled} in this window).
+      </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="glass-panel rounded-xl p-4">
-          <p className="text-xs text-muted-foreground uppercase">Threads</p>
-          <p className="mt-1 text-3xl font-bold text-foreground">{messages.length}</p>
-        </div>
-        <div className="glass-panel rounded-xl p-4">
-          <p className="text-xs text-muted-foreground uppercase">Avg AI confidence</p>
-          <p className="mt-1 text-3xl font-bold text-foreground">{avgConfidence}%</p>
-        </div>
-        <div className="glass-panel rounded-xl p-4">
-          <p className="text-xs text-muted-foreground uppercase">HITL rate</p>
-          <p className="mt-1 text-3xl font-bold text-amber-600 dark:text-amber-300">{hitlRate}%</p>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="glass-panel rounded-xl p-4">
-          <h2 className="mb-4 text-sm font-semibold text-foreground">Volume by day</h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={byDay.length ? byDay : [{ day: "—", volume: 0 }]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
-                <XAxis dataKey="day" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="volume" stroke="#6366F1" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-
-        <section className="glass-panel rounded-xl p-4">
-          <h2 className="mb-4 text-sm font-semibold text-foreground">By category</h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byCategory.length ? byCategory : [{ name: "—", count: 0 }]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
-                <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-      </div>
-    </div>
+      <Grid cols={2}>
+        <ChartCard title="Volume by day" subtitle="Threads received per day" demo={demo} source={SOURCE_DESK}>
+          <AreaChart points={daily.map((d, i) => ({ label: daily.length > 8 && i === daily.length - 2 ? "" : d.label, value: d.total, detail: `${d.label} · ${d.spam} spam blocked` }))} ariaLabel={`Threads received per day over the ${windowLabel}`} />
+        </ChartCard>
+        <ChartCard title="Status" subtitle="Where threads ended up" demo={demo} source={SOURCE_DESK}>
+          <Donut slices={view.status} centerValue={counts.total} centerLabel="threads" ariaLabel="Threads by status" />
+        </ChartCard>
+        <ChartCard title="AI confidence" subtitle="How sure the model was, per thread" demo={demo} source={SOURCE_DESK}>
+          <ColumnChart items={view.hist.map((b) => ({ label: b.label, parts: [{ name: "Threads", value: b.value, color: b.label === "90-100" ? "#34d399" : b.label === "<50" || b.label === "50-59" ? "#fbbf24" : VIOLET }] }))} ariaLabel="Histogram of AI confidence" />
+        </ChartCard>
+        <ChartCard title="Category mix" subtitle="What kind of email arrives" demo={demo} source={SOURCE_DESK}>
+          <Donut slices={view.category} centerValue={counts.total} centerLabel="threads" ariaLabel="Threads by category" />
+        </ChartCard>
+        <ChartCard title="When email arrives" subtitle="Weekday and 3-hour block, in your local time" demo={demo} source={SOURCE_DESK}>
+          <Heatmap rows={HEAT_ROWS} columns={HEAT_COLUMNS} cells={view.heat} color={VIOLET} ariaLabel="Heatmap of threads by weekday and hour" />
+        </ChartCard>
+        <ChartCard title="Routed to" subtitle="Where non-spam threads were sent" demo={demo} source={SOURCE_DESK}>
+          <HBarList items={view.route} colorAll={VIOLET} />
+        </ChartCard>
+      </Grid>
+    </PageFrame>
   );
 }

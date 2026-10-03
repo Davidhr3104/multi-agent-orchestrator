@@ -363,3 +363,51 @@ body {
   padding-top: 0.5rem !important;
   padding-bottom: 0.5rem !important;
 }
+
+/* Tables stack into cards on phones. Cells carry data-label; the header row is hidden. */
+@media (max-width: 639px) {
+  table.stack-table,
+  table.stack-table tbody,
+  table.stack-table tr,
+  table.stack-table td {
+    display: block;
+    width: 100%;
+  }
+  table.stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  table.stack-table tr {
+    padding: 0.75rem 0.25rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.7);
+  }
+  table.stack-table td {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding: 0.2rem 0.75rem !important;
+    text-align: right;
+  }
+  table.stack-table td::before {
+    content: attr(data-label);
+    flex: none;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+  }
+}
+
+/* Charts must never force horizontal scroll. */
+svg[role="img"] {
+  max-width: 100%;
+}
+
+/* Touch targets: dialog close buttons reach 40px on phones. */
+@media (max-width: 767px) {
+  [data-slot="sheet-close"] {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+}

@@ -11,6 +11,9 @@ import {
   type InboxSlaSummary,
 } from "@/lib/sla";
 import { cn } from "@/lib/utils";
+import { ChartCard, DemoChip, HBarList } from "@helix/ui";
+import { BucketGauge, GhostButton, PageFrame, SOURCE_DESK, VIOLET, useDeskMode, useNow } from "@/components/desk-kit";
+import { statusLabel } from "@/lib/desk-metrics";
 
 function formatAge(min: number): string {
   if (min < 60) return `${Math.round(min)}m`;
@@ -30,6 +33,8 @@ export function SlaDesk({
   const [threads, setThreads] = useState(initialThreads);
   const [sla, setSla] = useState(initialSla);
   const [filter, setFilter] = useState<"breach" | "open" | "all">("breach");
+  const demo = useDeskMode() === "demo";
+  const mountedAt = useNow();
 
   async function refresh() {
     const res = await fetch("/api/sla", { cache: "no-store" });
@@ -98,40 +103,50 @@ export function SlaDesk({
     return [...list].sort((a, b) => threadAgeMin(b) - threadAgeMin(a));
   }, [threads, filter, vipSenders]);
 
+  const ageBars = useMemo(() => {
+    if (mountedAt == null) return [];
+    const at = mountedAt;
+    return threads
+      .filter((t) => t.status === "open" || t.status === "review")
+      .map((t) => {
+        const bucket = slaBucketFor(t, vipSenders);
+        const target = sla.buckets.find((b) => b.id === bucket)?.targetMin ?? 0;
+        return { t, target, age: threadAgeMin(t, at) };
+      })
+      .filter((x) => x.target > 0)
+      .map((x) => ({ ...x, pct: (x.age / x.target) * 100 }))
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 8)
+      .map((x) => ({
+        label: x.t.subject,
+        value: x.pct,
+        hint: `${formatAge(x.age)} of ${formatAge(x.target)}`,
+        color: x.pct > 100 ? "#f87171" : x.pct > 75 ? "#fbbf24" : VIOLET,
+      }));
+  }, [threads, vipSenders, sla.buckets, mountedAt]);
+
   return (
-    <div className="space-y-6 p-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">SLA</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Time-to-first-human by urgency / VIP. Hours saved estimates ops time from auto-triage and
-            spam blocked — the story Inbox sells to EAs and founders.
-          </p>
-          <button
-            type="button"
-            className="mt-2 rounded-md border border-border px-2 py-1 text-[11px]"
+    <PageFrame
+      title="SLA"
+      chips={demo ? <DemoChip /> : null}
+      subtitle="Time to first human reply, by urgency and VIP. Hours saved is an estimate from auto-triage and spam blocked over the last 14 days."
+      actions={
+        <>
+          <GhostButton
             onClick={() => {
               if (typeof Notification !== "undefined") void Notification.requestPermission();
             }}
           >
             Enable browser SLA alerts
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            Refresh
-          </button>
-          <Link href="/hitl-queue" className="text-xs font-medium text-violet-400 hover:underline">
+          </GhostButton>
+          <GhostButton onClick={() => void refresh()}>Refresh</GhostButton>
+          <Link href="/hitl-queue" className="inline-flex min-h-10 items-center text-xs font-medium text-violet-400 hover:underline md:min-h-8">
             Open HITL →
           </Link>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        </>
+      }
+    >
+      <div className="grid min-w-0 grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4">
         <Stat
           label="SLA breaches"
           value={String(sla.breachCount)}
@@ -140,8 +155,8 @@ export function SlaDesk({
         />
         <Stat
           label="Hours saved"
-          value={String(sla.hoursSaved)}
-          hint={`${sla.minutesSaved} min · spam ${sla.spamBlocked} · auto ${sla.autoHandled}`}
+          value={`${sla.hoursSaved}h`}
+          hint={`last 14 days · ${sla.minutesSaved} min · spam ${sla.spamBlocked} · auto ${sla.autoHandled}`}
           good
         />
         <Stat
@@ -160,21 +175,28 @@ export function SlaDesk({
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {sla.buckets.map((b) => (
-          <div key={b.id} className="glass-panel rounded-xl px-3 py-3">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {b.label}
-            </p>
-            <p className="mt-1 text-lg font-semibold text-foreground">{b.open} open</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              <span className={b.breach ? "text-rose-400" : ""}>{b.breach} breach</span>
-              {" · "}
-              {b.atRisk} at risk
-            </p>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-5">
+        <ChartCard title="Breaches by bucket" subtitle="Gauge: past-target threads out of open threads (lower is better)" demo={demo} source={SOURCE_DESK} style={{ gridColumn: "1 / -1" }}>
+          <div className="grid grid-cols-2 justify-items-center gap-x-2 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+            {sla.buckets.map((b) => (
+              <BucketGauge
+                key={b.id}
+                label={b.label}
+                value={b.breach}
+                max={Math.max(1, b.open)}
+                size={132}
+                caption={b.open === 0 ? "No open threads" : `${b.open} open · ${b.atRisk} at risk · ${b.breach} past target`}
+              />
+            ))}
           </div>
-        ))}
+        </ChartCard>
       </div>
+
+      {ageBars.length > 0 ? (
+        <ChartCard title="Open threads against their target" subtitle="100% = the SLA target for that thread's bucket. Past the line is a breach." demo={demo} source={SOURCE_DESK}>
+          <HBarList items={ageBars} marker={100} markerLabel="SLA target (100%)" format={(n) => `${Math.round(n)}%`} />
+        </ChartCard>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {(
@@ -189,7 +211,7 @@ export function SlaDesk({
             type="button"
             onClick={() => setFilter(id)}
             className={cn(
-              "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
+              "min-h-10 rounded-lg border px-3 py-1.5 text-xs font-medium transition md:min-h-8",
               filter === id
                 ? "border-violet-500/40 bg-violet-500/10 text-violet-300"
                 : "border-border text-muted-foreground hover:text-foreground"
@@ -209,7 +231,7 @@ export function SlaDesk({
             No matching threads. Load demo in Settings or ingest mail, then refresh.
           </p>
         ) : (
-          <table className="w-full text-left text-xs">
+          <table className="stack-table w-full text-left text-xs">
             <thead className="border-b border-border/50 text-[10px] uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 font-medium">Subject</th>
@@ -236,7 +258,7 @@ export function SlaDesk({
                 const msg = toInboxMessage(t);
                 return (
                   <tr key={t.id} className="border-b border-border/30 hover:bg-white/[0.03]">
-                    <td className="px-4 py-2.5">
+                    <td data-label="Subject" className="px-4 py-2.5">
                       <Link
                         href="/hitl-queue"
                         className="font-medium text-foreground hover:text-violet-300"
@@ -247,9 +269,10 @@ export function SlaDesk({
                         <span className="ml-2 text-[10px] text-rose-400">urgent</span>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{t.fromEmail}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{categoryLabel(t.category)}</td>
+                    <td data-label="From" className="px-3 py-2.5 text-muted-foreground">{t.fromEmail}</td>
+                    <td data-label="Category" className="px-3 py-2.5 text-muted-foreground">{categoryLabel(t.category)}</td>
                     <td
+                      data-label="Age" suppressHydrationWarning
                       className={cn(
                         "px-3 py-2.5 font-semibold",
                         breached ? "text-rose-400" : "text-foreground"
@@ -257,10 +280,10 @@ export function SlaDesk({
                     >
                       {formatAge(age)}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
+                    <td data-label="Target" className="px-3 py-2.5 text-muted-foreground">
                       {bucket === "vip" ? "30m" : categoryTargetLabel(t.category)}
                     </td>
-                    <td className="px-3 py-2.5 capitalize text-muted-foreground">{t.status}</td>
+                    <td data-label="Status" className="px-3 py-2.5 text-muted-foreground">{statusLabel(t.status)}</td>
                   </tr>
                 );
               })}
@@ -268,7 +291,7 @@ export function SlaDesk({
           </table>
         )}
       </div>
-    </div>
+    </PageFrame>
   );
 }
 

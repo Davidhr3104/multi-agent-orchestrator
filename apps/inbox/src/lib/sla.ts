@@ -35,6 +35,35 @@ const TARGETS: Record<SlaBucketId, number> = {
   fyi: 1440,
 };
 
+/** Ops estimate used everywhere hours saved is shown: ~3 min per spam blocked, ~5 min per auto-handled thread. */
+export const MIN_PER_SPAM = 3;
+export const MIN_PER_AUTO = 5;
+
+export function estimateMinutesSaved(spamBlocked: number, autoHandled: number): number {
+  return spamBlocked * MIN_PER_SPAM + autoHandled * MIN_PER_AUTO;
+}
+
+/** A thread belongs to a window by its receivedAt (falling back to createdAt). windowDays <= 0 / undefined means "all". */
+export function inWindow(thread: EmailThread, windowDays: number | undefined, now: number): boolean {
+  if (!windowDays) return true;
+  const t = Date.parse(thread.receivedAt || thread.createdAt);
+  return Number.isFinite(t) && t >= now - windowDays * 86_400_000 && t <= now;
+}
+
+/** Spam the desk blocked. One definition for every page. */
+export function isSpamBlocked(t: EmailThread): boolean {
+  return t.category === "spam" || t.status === "blocked";
+}
+
+/** Handled without a person: not spam, not waiting on review. One definition for every page. */
+export function isAutoHandled(t: EmailThread): boolean {
+  return (
+    !t.needsReview &&
+    t.category !== "spam" &&
+    (t.status === "routed" || t.status === "sent" || t.status === "archived" || t.status === "open")
+  );
+}
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
@@ -77,7 +106,7 @@ function isOpenForSla(thread: EmailThread): boolean {
  */
 export function summarizeInboxSla(
   threads: EmailThread[],
-  opts?: { vipSenders?: string[]; now?: number }
+  opts?: { vipSenders?: string[]; now?: number; windowDays?: number }
 ): InboxSlaSummary {
   const vipSenders = opts?.vipSenders ?? [];
   const now = opts?.now ?? Date.now();
@@ -139,18 +168,11 @@ export function summarizeInboxSla(
     }
   }
 
-  const spamBlocked = threads.filter(
-    (t) => t.category === "spam" || t.status === "blocked"
-  ).length;
-  const autoHandled = threads.filter(
-    (t) =>
-      !t.needsReview &&
-      t.category !== "spam" &&
-      (t.status === "routed" || t.status === "sent" || t.status === "archived" || t.status === "open")
-  ).length;
-
-  // Ops estimate: ~3 min per spam blocked, ~5 min per auto-handled thread
-  const minutesSaved = spamBlocked * 3 + autoHandled * 5;
+  // Open/breach counts are "right now" (all open threads). Volume counts use the optional window.
+  const windowed = threads.filter((t) => inWindow(t, opts?.windowDays, now));
+  const spamBlocked = windowed.filter(isSpamBlocked).length;
+  const autoHandled = windowed.filter(isAutoHandled).length;
+  const minutesSaved = estimateMinutesSaved(spamBlocked, autoHandled);
 
   return {
     openCount: openAges.length,

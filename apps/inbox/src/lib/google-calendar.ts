@@ -65,7 +65,7 @@ export function normalizeGoogleEvent(raw: RawEvent): GoogleCalendarEvent | null 
   const declinedBySelf = attendees.some((a) => a.self && a.responseStatus === "declined");
   return {
     id: raw.id,
-    title: raw.summary?.trim() || "(sin título)",
+    title: raw.summary?.trim() || "(no title)",
     start: new Date(start).toISOString(),
     end: new Date(end).toISOString(),
     allDay,
@@ -97,16 +97,16 @@ export async function fetchGoogleCalendarEvents(
       signal: AbortSignal.timeout(10_000),
     });
   } catch (err) {
-    return { ok: false, error: `Google Calendar no respondió: ${err instanceof Error ? err.message : String(err)}`, needsReconnect: false };
+    return { ok: false, error: `Google Calendar did not respond: ${err instanceof Error ? err.message : String(err)}`, needsReconnect: false };
   }
   if (res.status === 401 || res.status === 403) {
     return {
       ok: false,
-      error: "Google no dio acceso al calendario. Reconecta Google en Integraciones para aceptar el permiso de Calendar (solo lectura).",
+      error: "Google did not grant calendar access. Reconnect Google in Integrations to accept the read-only Calendar permission.",
       needsReconnect: true,
     };
   }
-  if (!res.ok) return { ok: false, error: `Google Calendar respondió ${res.status}.`, needsReconnect: false };
+  if (!res.ok) return { ok: false, error: `Google Calendar responded with ${res.status}.`, needsReconnect: false };
   const data = (await res.json().catch(() => ({}))) as { items?: RawEvent[]; timeZone?: string };
   const events = (data.items ?? []).map(normalizeGoogleEvent).filter((e): e is GoogleCalendarEvent => e !== null);
   return { ok: true, timeZone: calendarTimeZone(data.timeZone), events };

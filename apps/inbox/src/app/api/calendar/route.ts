@@ -1,7 +1,7 @@
 import { getSecret } from "@helix/core";
 import { fetchCalendlyAgenda } from "@/lib/calendly";
 import { googleEventToAgenda, loadGoogleCalendar } from "@/lib/google-calendar";
-import { deskAgenda, planShowing, type AgendaMeeting } from "@/lib/showing-schedule";
+import { deskAgenda } from "@/lib/showing-schedule";
 import { currentDeskMode, listAllThreads } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -10,25 +10,10 @@ export async function GET(req: Request) {
   const header = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
   const token = getSecret("CALENDLY_TOKEN") || header;
   const now = new Date();
-  const threads = await listAllThreads();
+  await listAllThreads(); // resolves demo vs live before we read the mode
   const demo = currentDeskMode() === "demo";
-  // The sample showings are demo data; a live desk only shows real calendars.
+  // The sample meetings are demo data; a live desk only shows real calendars.
   const desk = demo ? deskAgenda(now) : [];
-  const booked: AgendaMeeting[] = [];
-  for (const thread of threads) {
-    const plan = planShowing({ fromName: thread.fromName, subject: thread.subject, body: thread.body, now });
-    if (plan?.status !== "book" || !plan.event) continue;
-    booked.push({
-      id: `book-${thread.id}`,
-      source: "desk",
-      title: plan.event.title,
-      start: plan.event.start,
-      end: plan.event.end,
-      location: plan.event.location,
-      href: plan.event.mapsUrl,
-      hrefLabel: "Mapa",
-    });
-  }
   const [calendly, google] = await Promise.all([
     token
       ? fetchCalendlyAgenda(token, now)
@@ -37,7 +22,7 @@ export async function GET(req: Request) {
       ? Promise.resolve({ connected: false, error: null, timeZone: "", events: [], needsReconnect: false })
       : loadGoogleCalendar(now),
   ]);
-  const events = [...desk, ...booked, ...calendly.events, ...google.events.map(googleEventToAgenda)].sort((a, b) =>
+  const events = [...desk, ...calendly.events, ...google.events.map(googleEventToAgenda)].sort((a, b) =>
     a.start.localeCompare(b.start)
   );
   return Response.json({

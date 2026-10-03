@@ -3,13 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { QueueTable } from "@/components/queue-table";
 import { ActiveInspector } from "@/components/active-inspector";
-import { EducationalEmpty } from "@/components/educational-empty";
 import type { InboxMessage } from "@/lib/types";
-
-const EMPTY_FOLLOWUP = {
-  title: "No overdue followups",
-  body: "When a sent thread passes the wait in Agent Studio, Helix leaves a follow-up draft here for approval.",
-};
+import { Avatar } from "@helix/ui";
+import { Clock } from "lucide-react";
+import { IllustratedEmpty, PageFrame } from "@/components/desk-kit";
 
 export default function FollowupQueuePage() {
   const [threads, setThreads] = useState<InboxMessage[]>([]);
@@ -41,21 +38,34 @@ export default function FollowupQueuePage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-foreground">Followups overdue</h1>
-        <p className="text-sm text-muted-foreground">
-          No reply after the wait you set in Agent Studio (default 48 hours). Opening this page drafts the nudge. Nothing sends until you approve it.
-        </p>
-      </div>
-
+    <PageFrame
+      title="Followups overdue"
+      subtitle="No reply after the wait you set in Agent Studio (default 48 hours). Opening this page drafts the nudge. Nothing sends until you approve it."
+    >
       {threads.length === 0 ? (
-        <div className="glass-panel rounded-xl">
-          <EducationalEmpty copy={EMPTY_FOLLOWUP} />
-        </div>
+        <IllustratedEmpty
+          title="No overdue followups"
+          body="When a sent thread passes the wait set in Agent Studio without an answer, Helix leaves a follow-up draft here for you to approve."
+          icon={<Clock className="size-7" aria-hidden />}
+          colors={["#172554", "#6d28d9"]}
+          exampleLabel="What a followup looks like"
+          example={
+            <div className="min-w-0 space-y-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar name="Tom Okafor" size={32} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">Contract redline for review</p>
+                  <p className="truncate text-xs text-muted-foreground">Tom Okafor · reply sent 3 days ago · no answer</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-500">72h</span>
+              </div>
+              <p className="rounded-md bg-surface-muted p-2 text-xs text-muted-foreground">Draft: &ldquo;Hi Tom, circling back on the redline. Happy to jump on a quick call if that is easier.&rdquo;</p>
+            </div>
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="min-w-0 lg:col-span-2">
             <QueueTable
               threads={threads}
               selectedId={selected?.id ?? null}
@@ -64,7 +74,7 @@ export default function FollowupQueuePage() {
             {selected ? (
               <button
                 type="button"
-                className="mt-3 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+                className="mt-3 min-h-10 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white md:min-h-8"
                 onClick={() => {
                   void fetch(`/api/messages/${selected.id}`, {
                     method: "PATCH",
@@ -77,9 +87,9 @@ export default function FollowupQueuePage() {
               </button>
             ) : null}
           </div>
-          <div>{selected ? <ActiveInspector thread={selected} onUpdate={() => void fetchThreads()} /> : null}</div>
+          <div className="min-w-0">{selected ? <ActiveInspector thread={selected} onUpdate={() => void fetchThreads()} /> : null}</div>
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

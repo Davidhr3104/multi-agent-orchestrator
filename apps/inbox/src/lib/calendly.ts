@@ -34,12 +34,12 @@ export async function fetchCalendlyAgenda(token: string, now = new Date()): Prom
   const empty: CalendlyAgenda = { connected: false, name: null, schedulingUrl: null, events: [], error: null };
   if (!token.trim()) return empty;
   const meRes = await calendlyGet(token, "https://api.calendly.com/users/me").catch(() => null);
-  if (!meRes) return { ...empty, error: "Calendly no respondió." };
-  if (meRes.status === 401 || meRes.status === 403) return { ...empty, error: "El token de Calendly no es válido." };
-  if (!meRes.ok) return { ...empty, error: `Calendly respondió ${meRes.status}.` };
+  if (!meRes) return { ...empty, error: "Calendly did not respond." };
+  if (meRes.status === 401 || meRes.status === 403) return { ...empty, error: "The Calendly token is not valid." };
+  if (!meRes.ok) return { ...empty, error: `Calendly responded with ${meRes.status}.` };
   const me = (await meRes.json()) as { resource?: { uri?: string; name?: string; scheduling_url?: string } };
   const user = me.resource?.uri;
-  if (!user) return { ...empty, error: "Calendly no devolvió el usuario." };
+  if (!user) return { ...empty, error: "Calendly did not return the user." };
 
   const min = now.toISOString();
   const max = new Date(now.getTime() + 14 * 86_400_000).toISOString();
@@ -51,7 +51,7 @@ export async function fetchCalendlyAgenda(token: string, now = new Date()): Prom
       name: me.resource?.name ?? null,
       schedulingUrl: me.resource?.scheduling_url ?? null,
       events: [],
-      error: "No pude leer las reuniones de Calendly.",
+      error: "Could not read the Calendly meetings.",
     };
   }
   const list = (await listRes.json()) as { collection?: CalendlyEvent[] };
@@ -68,12 +68,12 @@ export async function fetchCalendlyAgenda(token: string, now = new Date()): Prom
       return {
         id: `calendly-${id}`,
         source: "calendly" as const,
-        title: invitee?.name ? `${event.name || "Reunión"} · ${invitee.name}` : event.name || "Reunión Calendly",
+        title: invitee?.name ? `${event.name || "Meeting"} · ${invitee.name}` : event.name || "Calendly meeting",
         start: event.start_time || min,
         end: event.end_time || min,
         location: place,
         href,
-        hrefLabel: join ? "Entrar" : "Calendly",
+        hrefLabel: join ? "Join" : "Calendly",
       };
     })
   );

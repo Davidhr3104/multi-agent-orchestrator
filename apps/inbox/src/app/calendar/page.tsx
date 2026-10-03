@@ -19,7 +19,7 @@ type Payload = {
 const SOURCE_LABEL: Record<AgendaMeeting["source"], string> = {
   google: "Google Calendar",
   calendly: "Calendly",
-  desk: "Helix (propuesta del desk)",
+  desk: "Helix (desk sample)",
 };
 
 const SOURCE_CHIP: Record<AgendaMeeting["source"], string> = {
@@ -105,15 +105,15 @@ function mondayOf(date: Date): Date {
 }
 
 function clock(iso: string): string {
-  return new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(iso));
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: false, timeZone: TZ }).format(new Date(iso));
 }
 
 function monthTitle(date: Date): string {
-  const raw = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric", timeZone: TZ }).format(date);
+  const raw = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: TZ }).format(date);
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<AgendaMeeting[]>([]);
@@ -173,36 +173,36 @@ export default function CalendarPage() {
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, index) => HOUR_START + index);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col px-4 py-4">
+    <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col px-3 py-4 sm:px-4 md:h-[calc(100vh-4rem)] md:min-h-0">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-foreground">{cursor ? monthTitle(cursor) : "Calendario"}</h1>
-          <button type="button" className="rounded-md border border-border px-2 py-1 text-xs" onClick={() => setCursor(new Date())}>
-            Hoy
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-lg font-semibold text-foreground sm:text-xl">{cursor ? monthTitle(cursor) : "Calendar"}</h1>
+          <button type="button" className="min-h-10 min-w-10 rounded-md border border-border px-2 py-1 text-xs md:min-h-0 md:min-w-0" onClick={() => setCursor(new Date())}>
+            Today
           </button>
-          <button type="button" className="rounded-md border border-border px-2 py-1 text-xs" onClick={() => cursor && setCursor(view === "month" ? shiftMonth(cursor, -1) : shiftWeek(cursor, -1))} aria-label="Anterior">
+          <button type="button" className="min-h-10 min-w-10 rounded-md border border-border px-2 py-1 text-xs md:min-h-0 md:min-w-0" onClick={() => cursor && setCursor(view === "month" ? shiftMonth(cursor, -1) : shiftWeek(cursor, -1))} aria-label="Previous">
             ‹
           </button>
-          <button type="button" className="rounded-md border border-border px-2 py-1 text-xs" onClick={() => cursor && setCursor(view === "month" ? shiftMonth(cursor, 1) : shiftWeek(cursor, 1))} aria-label="Siguiente">
+          <button type="button" className="min-h-10 min-w-10 rounded-md border border-border px-2 py-1 text-xs md:min-h-0 md:min-w-0" onClick={() => cursor && setCursor(view === "month" ? shiftMonth(cursor, 1) : shiftWeek(cursor, 1))} aria-label="Next">
             ›
           </button>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-border p-0.5 text-xs">
-            <button type="button" className={cn("rounded-md px-3 py-1", view === "month" && "bg-accent text-white")} onClick={() => setView("month")}>
-              Mes
+            <button type="button" className={cn("min-h-10 rounded-md px-3 py-1 md:min-h-0", view === "month" && "bg-accent text-white")} onClick={() => setView("month")}>
+              Month
             </button>
-            <button type="button" className={cn("rounded-md px-3 py-1", view === "week" && "bg-accent text-white")} onClick={() => setView("week")}>
-              Semana
+            <button type="button" className={cn("min-h-10 rounded-md px-3 py-1 md:min-h-0", view === "week" && "bg-accent text-white")} onClick={() => setView("week")}>
+              Week
             </button>
           </div>
           {calendly?.schedulingUrl ? (
             <a href={calendly.schedulingUrl} target="_blank" rel="noreferrer" className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white">
-              Abrir Calendly
+              Open Calendly
             </a>
           ) : (
-            <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs" onClick={() => setConnectOpen((open) => !open)}>
-              {calendly?.connected ? "Calendly" : "Conectar Calendly"}
+            <button type="button" className="min-h-10 rounded-md border border-border px-3 py-1.5 text-xs md:min-h-0" onClick={() => setConnectOpen((open) => !open)}>
+              {calendly?.connected ? "Calendly" : "Connect Calendly"}
             </button>
           )}
         </div>
@@ -217,9 +217,9 @@ export default function CalendarPage() {
             void load(token.trim());
           }}
         >
-          <p className="text-xs text-muted-foreground">{calendly?.error || (calendly?.connected ? `Conectado${calendly.name ? ` como ${calendly.name}` : ""}.` : "Token de Calendly para traer reuniones con su enlace.")}</p>
-          <input type="password" value={token} placeholder="Token de Calendly" onChange={(e) => setToken(e.target.value)} className="min-w-[200px] flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs" />
-          <button type="submit" className="rounded-md border border-border px-2 py-1 text-xs font-semibold">Conectar</button>
+          <p className="text-xs text-muted-foreground">{calendly?.error || (calendly?.connected ? `Connected${calendly.name ? ` as ${calendly.name}` : ""}.` : "Paste a Calendly token to bring in your meetings with their join links.")}</p>
+          <input type="password" value={token} placeholder="Calendly token" aria-label="Calendly token" onChange={(e) => setToken(e.target.value)} className="min-w-[200px] flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs" />
+          <button type="submit" className="rounded-md border border-border px-2 py-1 text-xs font-semibold">Connect</button>
         </form>
       ) : null}
 
@@ -228,27 +228,29 @@ export default function CalendarPage() {
           <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.google)} />
           Google Calendar ·{" "}
           {demo
-            ? "no se usa en el desk demo"
+            ? "not read on the demo desk. Switch to live data to see your real events"
             : google?.connected
-              ? `conectado (${google.count} eventos, solo lectura)`
+              ? `connected (${google.count} events, read-only)`
               : google?.error
                 ? google.error
-                : "no conectado — conecta Gmail/Google en Integraciones"}
+                : "not connected. Connect Google in Integrations"}
         </span>
         <span className="flex items-center gap-1.5">
           <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.calendly)} />
-          Calendly · {calendly?.connected ? "conectado" : "no conectado"}
+          Calendly · {calendly?.connected ? "connected" : "not connected"}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.desk)} />
-          {demo ? "Helix · datos de demo" : "Helix · propuestas desde correos (no están en tu calendario)"}
-        </span>
+        {demo ? (
+          <span className="flex items-center gap-1.5">
+            <span className={cn("inline-block size-2.5 rounded-sm", SOURCE_CHIP.desk)} />
+            Helix · sample meetings (Demo)
+          </span>
+        ) : null}
       </div>
 
       {loading || !cursor ? (
-        <p className="text-sm text-muted-foreground">Cargando calendario…</p>
+        <p className="text-sm text-muted-foreground">Loading calendar…</p>
       ) : view === "month" ? (
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="grid min-h-[26rem] min-w-0 flex-1 grid-rows-[auto_1fr] overflow-hidden rounded-xl border border-border bg-surface">
           <div className="grid grid-cols-7 border-b border-border">
             {WEEKDAYS.map((label) => (
               <div key={label} className="px-2 py-2 text-center text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -264,7 +266,7 @@ export default function CalendarPage() {
               const rows = byDay.get(id) ?? [];
               return (
                 <div key={id + (inMonth ? "" : "-out")} className={cn("min-h-0 border-t border-r border-border/80 p-1", !inMonth && "bg-surface-muted/40")}>
-                  <button type="button" className={cn("mb-1 flex size-6 items-center justify-center rounded-full text-[11px]", id === todayId ? "bg-accent font-semibold text-white" : "text-muted-foreground")} onClick={() => { setCursor(day); setView("week"); }}>
+                  <button type="button" className={cn("mb-1 flex size-8 items-center justify-center rounded-full text-[11px] md:size-6", id === todayId ? "bg-accent font-semibold text-white" : "text-muted-foreground")} onClick={() => { setCursor(day); setView("week"); }}>
                     {p.d}
                   </button>
                   <div className="space-y-0.5">
@@ -272,7 +274,7 @@ export default function CalendarPage() {
                       <a
                         key={event.id}
                         href={event.href}
-                        target="_blank"
+                        target={event.source === "desk" ? undefined : "_blank"}
                         rel="noreferrer"
                         title={`${event.title} · ${SOURCE_LABEL[event.source]} · ${event.hrefLabel}`}
                         className={cn("block truncate rounded px-1 py-0.5 text-[10px] font-medium leading-4", SOURCE_CHIP[event.source])}
@@ -288,8 +290,8 @@ export default function CalendarPage() {
           </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-surface">
-          <div className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] border-b border-border">
+        <div className="min-h-[26rem] min-w-0 flex-1 overflow-auto rounded-xl border border-border bg-surface">
+          <div className="grid min-w-[640px] grid-cols-[52px_repeat(7,minmax(0,1fr))] border-b border-border">
             <div />
             {weekDays.map((day, index) => {
               const p = mxParts(day);
@@ -302,7 +304,7 @@ export default function CalendarPage() {
               );
             })}
           </div>
-          <div className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))]">
+          <div className="grid min-w-[640px] grid-cols-[52px_repeat(7,minmax(0,1fr))]">
             <div>
               {hours.map((hour) => (
                 <div key={hour} className="h-14 border-b border-border/60 pr-2 text-right text-[10px] text-muted-foreground">
@@ -330,7 +332,7 @@ export default function CalendarPage() {
                       <a
                         key={event.id}
                         href={event.href}
-                        target="_blank"
+                        target={event.source === "desk" ? undefined : "_blank"}
                         rel="noreferrer"
                         title={`${SOURCE_LABEL[event.source]}${event.location ? ` · ${event.location}` : ""}`}
                         className={cn("absolute right-1 left-1 overflow-hidden rounded-md px-1.5 py-1 text-[10px] leading-tight", SOURCE_BLOCK[event.source])}

@@ -17,7 +17,6 @@ import { readKnowledgeLinks } from "@/lib/knowledge-links";
 import type { InboxPersona } from "@/lib/agent-profile";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { DraftDiff } from "@/components/draft-diff";
-import { ShowingCard } from "@/components/showing-card";
 import { DashboardPanorama } from "@/components/dashboard-panorama";
 import { ActiveInspector } from "@/components/active-inspector";
 import Link from "next/link";
@@ -95,6 +94,7 @@ export function InboxDashboard() {
   const [persistence, setPersistence] = useState<"memory" | "supabase">("memory");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [templates, setTemplates] = useState<{ id: string; name: string; body: string }[]>([]);
+  const [vipSenders, setVipSenders] = useState<string[]>([]);
   const [form, setForm] = useState({
     fromName: "",
     fromEmail: "",
@@ -159,8 +159,9 @@ export function InboxDashboard() {
     void refresh();
     void fetch("/api/preferences")
       .then((r) => r.json())
-      .then((d: { preferences?: { templates?: { id: string; name: string; body: string }[] } }) => {
+      .then((d: { preferences?: { templates?: { id: string; name: string; body: string }[]; vipSenders?: string[] } }) => {
         setTemplates(d.preferences?.templates ?? []);
+        setVipSenders(d.preferences?.vipSenders ?? []);
       })
       .catch(() => undefined);
     function onHash() {
@@ -369,24 +370,24 @@ export function InboxDashboard() {
   }
 
   return (
-    <main className="bg-[#0b0e14] px-4 py-5 text-slate-100 md:px-6">
+    <main className="min-w-0 bg-[#0b0e14] px-3 py-4 text-slate-100 sm:px-4 md:px-6 md:py-5">
       {toast ? (
         <div className="fixed right-6 bottom-6 z-50 rounded-lg border border-violet-400/30 bg-[#121520] px-4 py-2 text-xs font-medium text-violet-100 shadow-xl">
           {toast}
         </div>
       ) : null}
       <div className="mx-auto mb-4 flex max-w-[1600px] items-center justify-between gap-3">
-        <div>
-          <p className="font-mono text-[11px] tracking-wide text-slate-500 uppercase">
-            Autonomous ingestion / Priority stream / <span className="font-semibold text-violet-300">Panoramic triage</span>
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Inbox command center</h1>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-slate-500">
+            <span className="hidden sm:inline">Priority stream · </span>Desk data · {persistence}{loading ? " · loading" : ""}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Desk data · {persistence}{loading ? " · loading" : ""}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" disabled={loading} onClick={() => void refresh()} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300">
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" disabled={loading} onClick={() => void refresh()} className="min-h-10 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 md:min-h-8">
             Refresh
           </button>
-          <button type="button" onClick={() => setIngestOpen((open) => !open)} className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white">
+          <button type="button" onClick={() => setIngestOpen((open) => !open)} className="min-h-10 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white md:min-h-8">
             New thread
           </button>
         </div>
@@ -416,6 +417,7 @@ export function InboxDashboard() {
         onDispatch={(id) => void act(id, "approve")}
         onSnooze={(id) => void act(id, "snooze")}
         query={query}
+        vipSenders={vipSenders}
       />
       {selected ? (
         <div className="mx-auto mt-4 max-w-[1600px]">

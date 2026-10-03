@@ -226,6 +226,7 @@ export default function SettingsPage() {
             <button
               type="button"
               aria-pressed={preferences.autoTriage}
+              aria-label="Auto-triage incoming emails"
               onClick={() => setPreferences({ ...preferences, autoTriage: !preferences.autoTriage })}
               className={`h-6 w-11 rounded-full transition-colors ${
                 preferences.autoTriage ? "bg-accent" : "bg-[#374151]"

@@ -25,11 +25,11 @@ export function ExportWeekly() {
   }
 
   return (
-    <div className="flex gap-2">
-      <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs" onClick={() => void csv()}>
+    <div className="flex flex-wrap gap-2">
+      <button type="button" className="min-h-10 rounded-md border border-border px-3 py-1.5 text-xs md:min-h-8" onClick={() => void csv()}>
         Export CSV
       </button>
-      <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs" onClick={() => void pdf()}>
+      <button type="button" className="min-h-10 rounded-md border border-border px-3 py-1.5 text-xs md:min-h-8" onClick={() => void pdf()}>
         Print PDF
       </button>
     </div>

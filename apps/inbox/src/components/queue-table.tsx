@@ -53,13 +53,14 @@ export function QueueTable({
                 }
               }}
               className={cn(
-                "flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors",
+                "flex w-full min-w-0 items-center gap-3 px-3 py-3.5 text-left transition-colors sm:px-4",
                 on ? "bg-[#8B5CF6]/12" : "hover:bg-surface-muted"
               )}
             >
               {onToggle ? (
                 <input
                   type="checkbox"
+                  className="size-5 shrink-0 accent-violet-500"
                   checked={checkedIds?.has(thread.id) ?? false}
                   aria-label={`Select ${thread.subject}`}
                   onClick={(e) => e.stopPropagation()}
@@ -87,6 +88,15 @@ export function QueueTable({
                   <span className={cn("font-mono", BAND[confidenceBand(thread.aiConfidence)])}>
                     {Math.round(thread.aiConfidence)}%
                   </span>
+                </div>
+                <div className="mt-1.5 h-1 max-w-48 overflow-hidden rounded-full bg-foreground/10" role="img" aria-label={`AI confidence ${Math.round(thread.aiConfidence)} percent`}>
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.max(3, Math.min(100, thread.aiConfidence))}%`,
+                      background: thread.aiConfidence >= 85 ? "#34d399" : thread.aiConfidence >= 70 ? "#8b5cf6" : "#fbbf24",
+                    }}
+                  />
                 </div>
               </div>
               <div className="shrink-0 text-right">

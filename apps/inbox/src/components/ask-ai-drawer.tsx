@@ -134,6 +134,14 @@ export function AskAiDrawer({
   seed?: number;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
   const [question, setQuestion] = useState("");
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [busy, setBusy] = useState(false);
@@ -394,7 +402,8 @@ export function AskAiDrawer({
     <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
       <SheetContent
         side="right"
-        showOverlay={false}
+        // On a phone the drawer covers the whole screen, so dim the page behind it. On desktop it stays a side panel you can work beside.
+        showOverlay={narrow}
         style={THEME.vars}
         className={`flex h-full w-full min-h-0 flex-col overflow-hidden border-l ${border} bg-[var(--ai-bg)] sm:max-w-md`}
       >
@@ -409,11 +418,11 @@ export function AskAiDrawer({
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {isDemo ? (
-                <button type="button" onClick={() => void resetDemo()} disabled={locked} aria-label="Reset demo data" title="Reset demo data" className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-50`}>
+                <button type="button" onClick={() => void resetDemo()} disabled={locked} aria-label="Reset demo data" title="Reset demo data" className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-50`}>
                   ↺
                 </button>
               ) : null}
-              <button type="button" onClick={startNew} disabled={turns.length === 0 || locked} className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-40`}>
+              <button type="button" onClick={startNew} disabled={turns.length === 0 || locked} className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-40`}>
                 + New
               </button>
               <button
@@ -421,7 +430,7 @@ export function AskAiDrawer({
                 onClick={() => setHistoryOpen((v) => !v)}
                 aria-label="View past conversations"
                 title="History"
-                className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] font-medium transition ${historyOpen ? "bg-[var(--ai-accent-soft)] text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
+                className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium transition ${historyOpen ? "bg-[var(--ai-accent-soft)] text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
               >
                 🕘
               </button>

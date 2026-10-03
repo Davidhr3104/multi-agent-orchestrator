@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@helix/core", "@helix/help"],
+  transpilePackages: ["@helix/core", "@helix/help", "@helix/ui"],
   experimental: {
     supportsImmutableAssets: false,
   },

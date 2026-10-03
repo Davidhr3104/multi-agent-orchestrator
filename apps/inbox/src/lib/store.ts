@@ -31,6 +31,7 @@ import {
 } from "@/lib/supabase-desk";
 import type { ThreadPatch } from "@/lib/desk-state-cookie";
 import { matchThread, type MatchableThread, type MatchableMessage, type ParsedEml } from "@helix/core/inbox/eml";
+import { buildDemoHistory } from "@/lib/demo-history";
 import { shouldClearFollowup } from "@helix/core/inbox/followup";
 
 export type { InboxMessage, EmailThread, ThreadMessage, AiActionLog, UserPreferences } from "@/lib/types";
@@ -55,7 +56,9 @@ const DEFAULT_PREFS: UserPreferences = {
   customRules: [
     {
       id: "rule-amount",
-      ifContains: "1000",
+      // An amount threshold, not a text phrase: it used to be stored as the text "1000", which rendered as `If "1000"`.
+      ifContains: "",
+      minAmount: 1000,
       then: "urgent",
       enabled: true,
     },
@@ -190,36 +193,36 @@ function applyDemoCatalog() {
     >
   > = [
     {
-      fromName: "Camila Soto",
-      fromEmail: "camila.soto@gmail.com",
-      subject: "WhatsApp · Apartamento Polanco",
-      body: "Hola, ¿cuándo puedo ir a ver el apartamento en Polanco? Estoy libre el jueves por la tarde.",
+      fromName: "Elena Marsh",
+      fromEmail: "elena.marsh@halcyoncap.com",
+      subject: "Board dinner: please confirm attendance by Friday",
+      body: "Hi, the board dinner is next Thursday at 7pm. Could you confirm whether you and your partner will attend so we can finalize the seating?",
       category: "meeting",
       sentiment: "positive",
       urgencyScore: 90,
       aiConfidence: 93,
-      routeTo: "Agente · Deveku",
+      routeTo: "Executive · Sarah",
       draftReply: "",
       status: "review",
-      reasoning: "Quiere visitar Polanco el jueves por la tarde.",
+      reasoning: "Asks for an attendance confirmation by Friday for the board dinner.",
       needsReview: true,
-      leadIntent: true,
+      leadIntent: false,
     },
     {
-      fromName: "Andrés Vega",
-      fromEmail: "andres.vega@email.com",
-      subject: "SMS · Casa Coyoacán",
-      body: "Confirmo el viernes a las 11:00 para ver la casa en Coyoacán. Presupuesto 8 millones, necesitamos 3 recámaras.",
+      fromName: "Marcus Webb",
+      fromEmail: "marcus@orbitaltravel.co",
+      subject: "Confirm Friday 11:00 — investor lunch, 8 attendees",
+      body: "Confirming Friday at 11:00 for the investor lunch. Budget is $8,000 and we need a private room for 8 guests. Please approve the booking.",
       category: "meeting",
       sentiment: "positive",
       urgencyScore: 86,
       aiConfidence: 95,
-      routeTo: "Agente · Deveku",
+      routeTo: "Executive · Sarah",
       draftReply: "",
       status: "review",
-      reasoning: "Confirmó visita el viernes 11:00 en Coyoacán.",
+      reasoning: "Needs approval to book Friday 11:00 for 8 attendees.",
       needsReview: true,
-      leadIntent: true,
+      leadIntent: false,
     },
     {
       fromName: "Maya Chen",
@@ -347,6 +350,13 @@ function applyDemoCatalog() {
       },
     ]);
   });
+
+  // Deterministic 14-day sample history (closed threads) so the demo charts have a real shape.
+  const history = buildDemoHistory(Date.now());
+  for (const row of history.threads) {
+    mem.threads.set(row.id, makeThread({ ...row, snoozeUntil: null, engine: "heuristic", isRead: true }));
+  }
+  mem.aiLogs.push(...history.logs.map((l) => ({ ...l, workspaceId: DEFAULT_WORKSPACE_ID })));
 }
 
 export function currentDeskMode(): "demo" | "live" {
@@ -607,6 +617,12 @@ export async function ingestMessage(input: {
   for (const rule of mem.prefs.customRules.filter((r) => r.enabled && (r.ifContains.trim() || (r.minAmount ?? 0) > 0))) {
     if (rule.ifContains.trim() && !hay.includes(rule.ifContains.toLowerCase())) continue;
     if ((rule.minAmount ?? 0) > 0 && maxAmount < (rule.minAmount ?? 0)) continue;
+    const when = [
+      rule.ifContains.trim() ? `contains “${rule.ifContains.trim()}”` : "",
+      (rule.minAmount ?? 0) > 0 ? `amount ≥ $${(rule.minAmount ?? 0).toLocaleString("en-US")}` : "",
+    ]
+      .filter(Boolean)
+      .join(" and ");
     if (rule.then === "urgent") {
       thread = {
         ...thread,
@@ -614,7 +630,7 @@ export async function ingestMessage(input: {
         sentiment: "urgent",
         needsReview: true,
         status: "review",
-        reasoning: `${thread.reasoning} · Rule: urgent if contains “${rule.ifContains}”`,
+        reasoning: `${thread.reasoning} · Rule: urgent if ${when}`,
       };
     } else if (rule.then === "vip_route") {
       thread = {
@@ -623,7 +639,7 @@ export async function ingestMessage(input: {
         needsReview: true,
         status: "review",
         urgencyScore: Math.max(thread.urgencyScore, 75),
-        reasoning: `${thread.reasoning} · Rule: VIP route if contains “${rule.ifContains}”`,
+        reasoning: `${thread.reasoning} · Rule: VIP route if ${when}`,
       };
     } else if (rule.then === "block") {
       thread = {
@@ -632,14 +648,14 @@ export async function ingestMessage(input: {
         category: "spam",
         needsReview: false,
         routeTo: "Spam",
-        reasoning: `${thread.reasoning} · Rule: block if contains “${rule.ifContains}”`,
+        reasoning: `${thread.reasoning} · Rule: block if ${when}`,
       };
     } else if (rule.then === "review") {
       thread = {
         ...thread,
         needsReview: true,
         status: "review",
-        reasoning: `${thread.reasoning} · Rule: force review if contains “${rule.ifContains}”`,
+        reasoning: `${thread.reasoning} · Rule: force review if ${when}`,
       };
     } else if (rule.then === "route") {
       thread = {
@@ -650,7 +666,7 @@ export async function ingestMessage(input: {
         ...(rule.tagUrgent
           ? { sentiment: "urgent" as const, urgencyScore: Math.max(thread.urgencyScore, 90) }
           : {}),
-        reasoning: `${thread.reasoning} · Rule: route to ${rule.routeTo || "Finance"} if “${rule.ifContains || "amount"}”`,
+        reasoning: `${thread.reasoning} · Rule: route to ${rule.routeTo || "Finance"} if ${when}`,
       };
     }
   }

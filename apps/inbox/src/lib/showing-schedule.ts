@@ -1,4 +1,4 @@
-/** Real-estate showing desk. Times are America/Mexico_City (UTC−6). */
+/** Slot planner for meeting requests. Times are America/Mexico_City (UTC−6). Not used by the visible desk UI; kept for the scheduling engine and its tests. */
 
 const MX_OFFSET_MS = 6 * 60 * 60 * 1000;
 const BUFFER_MIN = 40;
@@ -92,9 +92,9 @@ const WEEKDAYS: Record<string, number> = {
 type Busy = { start: number; end: number; zone: PropertyZone; title: string };
 
 const BUSY_TEMPLATE: Array<{ dow: number; startHour: number; endHour: number; zone: PropertyZone; title: string }> = [
-  { dow: 4, startHour: 15, endHour: 16, zone: "polanco", title: "Visita Polanco · Ana López" },
-  { dow: 5, startHour: 9, endHour: 10, zone: "coyoacan", title: "Visita Coyoacán · Jorge Díaz" },
-  { dow: 2, startHour: 11, endHour: 12, zone: "roma", title: "Recorrido Roma Norte" },
+  { dow: 4, startHour: 15, endHour: 16, zone: "polanco", title: "Investor prep · Priya Shah" },
+  { dow: 5, startHour: 9, endHour: 10, zone: "coyoacan", title: "Board call · Elena Marsh" },
+  { dow: 2, startHour: 11, endHour: 12, zone: "roma", title: "Weekly sync · Finance" },
 ];
 
 type MxParts = { y: number; m: number; d: number; h: number; min: number; dow: number };
@@ -287,25 +287,24 @@ export type AgendaMeeting = {
   hrefLabel: string;
 };
 
-const ZONE_PROPERTY: Record<PropertyZone, (typeof PROPERTIES)[number]> = {
-  polanco: PROPERTIES[0],
-  coyoacan: PROPERTIES[1],
-  roma: PROPERTIES[2],
+const DESK_ROOMS: Record<PropertyZone, string> = {
+  polanco: "Boardroom, 12th floor",
+  coyoacan: "Video call",
+  roma: "Conference room B",
 };
 
-/** Upcoming visits already on the agent desk, each with a map link. */
+/** Sample meetings on the demo desk. */
 export function deskAgenda(now = new Date()): AgendaMeeting[] {
   return busyBlocks(now).map((block) => {
-    const property = ZONE_PROPERTY[block.zone];
     return {
       id: `desk-${block.start}`,
       source: "desk",
       title: block.title,
       start: new Date(block.start).toISOString(),
       end: new Date(block.end).toISOString(),
-      location: property.address,
-      href: property.mapsUrl,
-      hrefLabel: "Mapa",
+      location: DESK_ROOMS[block.zone],
+      href: "/hitl-queue",
+      hrefLabel: "Open queue",
     };
   });
 }

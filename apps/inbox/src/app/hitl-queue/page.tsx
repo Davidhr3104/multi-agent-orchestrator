@@ -7,6 +7,9 @@ import { EducationalEmpty } from "@/components/educational-empty";
 import type { InboxMessage } from "@/lib/types";
 import { rememberFocus } from "@/lib/desk-ui";
 import { EMPTY_INBOX } from "@helix/help";
+import { ChartCard, DemoChip, HBarList } from "@helix/ui";
+import { ColumnChart, Grid, PageFrame, SOURCE_DESK, VIOLET, useDeskMode } from "@/components/desk-kit";
+import { urgencyHistogram } from "@/lib/desk-metrics";
 
 export default function HITLQueuePage() {
   const [threads, setThreads] = useState<InboxMessage[]>([]);
@@ -15,6 +18,7 @@ export default function HITLQueuePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const demo = useDeskMode() === "demo";
 
   const fetchThreads = useCallback(async () => {
     const res = await fetch("/api/threads?status=review");
@@ -71,23 +75,43 @@ export default function HITLQueuePage() {
     return <div className="p-8 text-muted-foreground">Loading HITL queue…</div>;
   }
 
+  const urgency = urgencyHistogram(threads.map((t) => t.urgencyScore));
+  const lowest = [...threads].sort((a, b) => a.aiConfidence - b.aiConfidence).slice(0, 5);
+
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-foreground">HITL Queue</h1>
-        <p className="text-sm text-muted-foreground">Human-in-the-Loop review for low-confidence AI decisions</p>
-      </div>
-      {notice ? <p className="mb-4 text-xs text-muted-foreground">{notice}</p> : null}
+    <PageFrame
+      title="HITL queue"
+      chips={demo ? <DemoChip /> : null}
+      subtitle="Human-in-the-loop review for the decisions the AI was least sure about."
+    >
+      {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
+      {threads.length > 0 ? (
+        <Grid cols={2}>
+          <ChartCard title="How urgent the queue is" subtitle={`${threads.length} thread${threads.length === 1 ? "" : "s"} waiting for a person`} demo={demo} source={SOURCE_DESK}>
+            <ColumnChart
+              height={140}
+              ariaLabel="Histogram of urgency scores for threads waiting on review"
+              items={urgency.map((b, i) => ({ label: b.label, parts: [{ name: "Threads", value: b.value, color: i >= 4 ? "#f87171" : i === 3 ? "#fbbf24" : VIOLET }] }))}
+            />
+          </ChartCard>
+          <ChartCard title="Least certain first" subtitle="AI confidence of the threads most worth a second look" demo={demo} source={SOURCE_DESK}>
+            <HBarList
+              items={lowest.map((t) => ({ label: t.subject, value: Math.round(t.aiConfidence), color: t.aiConfidence >= 85 ? "#34d399" : t.aiConfidence >= 70 ? VIOLET : "#fbbf24" }))}
+              format={(n) => `${n}%`}
+            />
+          </ChartCard>
+        </Grid>
+      ) : null}
       {checked.size > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{checked.size} selected</span>
-          <button type="button" disabled={busy != null} className="btn-tactile h-8 rounded-md bg-accent px-3 text-[11px] font-semibold text-white disabled:opacity-50" onClick={() => void bulk("approve")}>
+          <button type="button" disabled={busy != null} className="btn-tactile min-h-10 rounded-md bg-accent px-3 text-[11px] font-semibold text-white disabled:opacity-50 md:min-h-8" onClick={() => void bulk("approve")}>
             {busy === "approve" ? "…" : "Approve drafts"}
           </button>
-          <button type="button" disabled={busy != null} className="btn-tactile h-8 rounded-md border border-border px-3 text-[11px] disabled:opacity-50" onClick={() => void bulk("route")}>
+          <button type="button" disabled={busy != null} className="btn-tactile min-h-10 rounded-md border border-border px-3 text-[11px] disabled:opacity-50 md:min-h-8" onClick={() => void bulk("route")}>
             {busy === "route" ? "…" : "Mark routed"}
           </button>
-          <button type="button" disabled={busy != null} className="btn-tactile h-8 rounded-md border border-red-500/30 px-3 text-[11px] text-red-600 disabled:opacity-50" onClick={() => void bulk("block")}>
+          <button type="button" disabled={busy != null} className="btn-tactile min-h-10 rounded-md border border-red-500/30 px-3 text-[11px] text-red-600 disabled:opacity-50 md:min-h-8" onClick={() => void bulk("block")}>
             {busy === "block" ? "…" : "Block spam"}
           </button>
         </div>
@@ -98,8 +122,8 @@ export default function HITLQueuePage() {
           <EducationalEmpty copy={EMPTY_INBOX.hitl} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="min-w-0 lg:col-span-2">
             <QueueTable
               threads={threads}
               selectedId={selected?.id ?? null}
@@ -108,9 +132,9 @@ export default function HITLQueuePage() {
               onToggle={toggle}
             />
           </div>
-          <div>{selected ? <ActiveInspector thread={selected} onUpdate={() => void fetchThreads()} /> : null}</div>
+          <div className="min-w-0">{selected ? <ActiveInspector thread={selected} onUpdate={() => void fetchThreads()} /> : null}</div>
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

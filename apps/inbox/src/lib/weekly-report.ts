@@ -1,5 +1,5 @@
 import type { EmailThread } from "@/lib/types";
-import { summarizeInboxSla } from "@/lib/sla";
+import { inWindow, summarizeInboxSla } from "@/lib/sla";
 
 export type WeeklyReport = {
   periodStart: string;
@@ -14,11 +14,6 @@ export type WeeklyReport = {
   topSenders: { email: string; count: number }[];
 };
 
-function inWeek(thread: EmailThread, start: number, end: number): boolean {
-  const t = Date.parse(thread.receivedAt || thread.createdAt);
-  return Number.isFinite(t) && t >= start && t < end;
-}
-
 /**
  * A week's worth of "what Helix for Inbox did for you" — the story an EA or
  * founder can hand to their boss. periodEnd is exclusive; defaults to the
@@ -32,8 +27,9 @@ export function summarizeWeek(
   const periodEndMs = now;
   const periodStartMs = now - 7 * 86_400_000;
 
-  const weekThreads = allThreads.filter((t) => inWeek(t, periodStartMs, periodEndMs));
-  const sla = summarizeInboxSla(weekThreads, { vipSenders: opts?.vipSenders, now });
+  // Same definition of "thread" and the same estimate as every other page: windowed by receivedAt.
+  const weekThreads = allThreads.filter((t) => inWindow(t, 7, now));
+  const sla = summarizeInboxSla(allThreads, { vipSenders: opts?.vipSenders, now, windowDays: 7 });
 
   const senderCounts = new Map<string, number>();
   for (const t of weekThreads) {
@@ -67,7 +63,7 @@ export function formatWeeklyReportText(report: WeeklyReport): string {
     `Weekly Inbox report — ${start} to ${end}`,
     `${report.threadsHandled} threads handled · ${report.hoursSaved}h saved`,
     `${report.spamBlocked} spam blocked · ${report.autoHandled} auto-handled · ${report.handedOffToLeads} handed off to Leads`,
-    report.breachCount > 0 ? `${report.breachCount} SLA breaches this week` : "No SLA breaches this week",
+    report.breachCount > 0 ? `${report.breachCount} open threads past their SLA target` : "No open thread is past its SLA target",
   ];
   return lines.join("\n");
 }
