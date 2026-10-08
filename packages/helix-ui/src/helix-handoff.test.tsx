@@ -30,6 +30,12 @@ describe("HelixHandoffPanel shows one Helix contacting others", () => {
     expect(HELIX_DESK_NAMES["real-estate"]).toBe("Helix for Real Estate");
   });
 
+  it("ends the request bar with a decorative send arrow, hidden from assistive tech and not a real control", () => {
+    const out = html(<HelixHandoffPanel from="commerce" request="Promote the bundle" steps={steps} />);
+    expect(out).toMatch(/<span[^>]*data-handoff-send="true"[^>]*aria-hidden="true"/);
+    expect(out).not.toContain("<button");
+  });
+
   it("is a polite live region so screen readers hear progress", () => {
     const out = html(<HelixHandoffPanel from="commerce" request="x" steps={steps} />);
     expect(out).toContain('role="status"');
@@ -63,6 +69,12 @@ describe("every step status is readable without color", () => {
     expect(out).toContain('aria-label="held for a human"');
     expect(out).toContain("helix-avatar is-unsure");
   });
+  it("declined is a labelled cross but a calm face: refusing is a decision, not a failure", () => {
+    const out = one("declined");
+    expect(out).toContain('aria-label="declined"');
+    expect(out).toContain("helix-avatar is-idle");
+    expect(out).not.toContain("helix-avatar is-error");
+  });
   it("error is a labelled cross, in the error face, and never silent", () => {
     const out = one("error");
     expect(out).toContain('aria-label="failed"');
@@ -85,6 +97,11 @@ describe("handoffOverallState summarises the requester's face from the steps", (
   it("error beats everything", () => expect(handoffOverallState([s("working"), s("error"), s("held")], true)).toBe("error"));
   it("anything still working means thinking", () => expect(handoffOverallState([s("done"), s("working")], false)).toBe("thinking"));
   it("a held step means the whole thing waits on a human", () => expect(handoffOverallState([s("done"), s("held")], false)).toBe("unsure"));
+  it("a declined step settles to a calm face once nothing else is pending", () => {
+    expect(handoffOverallState([s("done"), s("declined")], true)).toBe("idle");
+    expect(handoffOverallState([s("declined"), s("held")], true)).toBe("unsure");
+    expect(handoffOverallState([s("declined"), s("working")], false)).toBe("thinking");
+  });
   it("all done with a result is done", () => expect(handoffOverallState([s("done")], true)).toBe("done"));
   it("all done but no result yet stays calm", () => expect(handoffOverallState([s("done")], false)).toBe("idle"));
   it("no steps is idle", () => expect(handoffOverallState([], false)).toBe("idle"));

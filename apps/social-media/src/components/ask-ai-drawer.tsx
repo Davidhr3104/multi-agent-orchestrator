@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
-import { HelixAvatar, HelixWelcome, useHelixAvatarState } from "@helix/ui";
+import { HelixAvatar, HelixHandoffDemo, HelixWelcome, useHelixAvatarState } from "@helix/ui";
 
 type Attachment = { type: "image"; data: string; mediaType: string };
 type Engine = "claude" | "fallback";
@@ -376,6 +376,13 @@ export function AskAiDrawer({
     (lastAssistant?.proposal && lastAssistant.proposalStatus === "confirmed") ||
       (lastAssistant?.executed && lastAssistant.executed.done.length > 0 && !lastAssistant.undone)
   );
+  // the scripted "one Helix hands work to another" demo; it steps aside as soon as a real chat starts
+  const [handoffDemo, setHandoffDemo] = useState(false);
+  const [seenTurns, setSeenTurns] = useState(turns.length);
+  if (turns.length !== seenTurns) {
+    setSeenTurns(turns.length);
+    if (turns.length > 0) setHandoffDemo(false);
+  }
   const avatarState = useHelixAvatarState(busy, Boolean(error), needsHuman, taskDone);
   if (!open) return null;
 
@@ -445,6 +452,9 @@ export function AskAiDrawer({
         <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4 sm:px-8">
           <div className="mx-auto max-w-3xl space-y-3">
           {turns.length === 0 ? (
+            handoffDemo ? (
+              <HelixHandoffDemo from="social" onClose={() => setHandoffDemo(false)} />
+            ) : (
             <HelixWelcome desk="social" title="What should we post next?">
               <p className="text-sm text-slate-500">{THEME.emptyHint}</p>
               {isDemo ? (
@@ -452,7 +462,11 @@ export function AskAiDrawer({
                   <span aria-hidden>▶</span> Watch Helix work
                 </button>
               ) : null}
+              <button type="button" onClick={() => setHandoffDemo(true)} className="flex items-center gap-1.5 rounded-lg border border-[color:var(--ai-accent)] bg-[var(--ai-accent-soft)] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:brightness-125 disabled:opacity-60">
+                <span aria-hidden>⇄</span> Watch a handoff
+              </button>
             </HelixWelcome>
+            )
           ) : null}
 
           {turns.map((t, i) => (

@@ -38,3 +38,13 @@ export {
   type HandoffStep,
 } from "./helix-handoff";
 export { HelixWelcome, displayNameFromEmail, greetingFor } from "./helix-welcome";
+export {
+  HANDOFF_DEMOS,
+  HelixHandoffDemo,
+  handoffFrameAt,
+  handoffTotalMs,
+  type HandoffApproval,
+  type HandoffDecision,
+  type HandoffDemoStep,
+  type HandoffScenario,
+} from "./helix-handoff-demo";

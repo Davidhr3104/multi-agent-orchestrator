@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { Sparkles, X } from "lucide-react";
-import { HelixAvatar, HelixWelcome, useHelixAvatarState } from "@helix/ui";
+import { HelixAvatar, HelixHandoffDemo, HelixWelcome, useHelixAvatarState } from "@helix/ui";
 
 export function AskAiDrawer() {
   return (
@@ -26,6 +26,13 @@ export function AskAiWorkspace({ datasetId }: { datasetId?: string }) {
   const [busy, setBusy] = useState(false);
   const [turns, setTurns] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   // failures here are shown as an assistant turn, so there is no separate error flag to pass
+  // the scripted "one Helix hands work to another" demo; it steps aside as soon as a real chat starts
+  const [handoffDemo, setHandoffDemo] = useState(false);
+  const [seenTurns, setSeenTurns] = useState(turns.length);
+  if (turns.length !== seenTurns) {
+    setSeenTurns(turns.length);
+    if (turns.length > 0) setHandoffDemo(false);
+  }
   const avatarState = useHelixAvatarState(busy, false);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -121,11 +128,18 @@ export function AskAiWorkspace({ datasetId }: { datasetId?: string }) {
       </header>
       <div ref={scroller} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-8">
         {turns.length === 0 ? (
+          handoffDemo ? (
+            <HelixHandoffDemo from="data" onClose={() => setHandoffDemo(false)} />
+          ) : (
           <HelixWelcome desk="data" title="What shall we look at on the grid?">
             <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
             Try “What is pending HITL?” or “Explain E3”. Nothing is rewritten until you approve.
           </p>
+            <button type="button" onClick={() => setHandoffDemo(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-surface-muted">
+              <span aria-hidden>⇄</span> Watch a handoff
+            </button>
           </HelixWelcome>
+          )
         ) : null}
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
           {turns.map((t, i) => (

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import type { DemoSuggestion } from "@/lib/demo-assistant";
-import { HelixAvatar, HelixWelcome, displayNameFromEmail, useHelixAvatarState } from "@helix/ui";
+import { HelixAvatar, HelixHandoffDemo, HelixWelcome, displayNameFromEmail, useHelixAvatarState } from "@helix/ui";
 
 type AskAiAttachment = { type: "image"; data: string; mediaType: string };
 type AskAiMessage = { role: "user" | "assistant"; content: string; attachments?: AskAiAttachment[] };
@@ -509,6 +509,13 @@ export function AskAiWorkspace() {
     (lastAssistant?.proposal && lastAssistant.proposalStatus === "confirmed") ||
       (lastAssistant?.executed && lastAssistant.executed.done.length > 0 && !lastAssistant.undone)
   );
+  // the scripted "one Helix hands work to another" demo; it steps aside as soon as a real chat starts
+  const [handoffDemo, setHandoffDemo] = useState(false);
+  const [seenTurns, setSeenTurns] = useState(turns.length);
+  if (turns.length !== seenTurns) {
+    setSeenTurns(turns.length);
+    if (turns.length > 0) setHandoffDemo(false);
+  }
   const avatarState = useHelixAvatarState(busy, Boolean(error), needsHuman, taskDone);
   if (!open) return null;
 
@@ -597,6 +604,9 @@ export function AskAiWorkspace() {
       <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-8">
         <div className="mx-auto w-full max-w-3xl space-y-3">
           {turns.length === 0 ? (
+            handoffDemo ? (
+              <HelixHandoffDemo from="leads" onClose={() => setHandoffDemo(false)} />
+            ) : (
             <HelixWelcome desk="leads" name={welcomeName} title="What shall we look at in your pipeline?">
               <p className="text-sm text-on-surface-variant">
                 Ask about your whole pipeline — trends, stale leads, or the review queue. Confirmed actions update the
@@ -612,7 +622,11 @@ export function AskAiWorkspace() {
                   <span aria-hidden>▶</span> Watch Helix work
                 </button>
               ) : null}
+              <button type="button" onClick={() => setHandoffDemo(true)} className="flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60">
+                <span aria-hidden>⇄</span> Watch a handoff
+              </button>
             </HelixWelcome>
+            )
           ) : null}
           {turns.map((turn, i) => (
             <div key={i} className={turn.message.role === "user" ? "space-y-2" : "relative space-y-2 pl-16"}>

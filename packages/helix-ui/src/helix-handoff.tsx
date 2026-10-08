@@ -21,17 +21,19 @@ export const HELIX_DESK_NAMES: Record<HelixAvatarDesk, string> = {
   inbox: "Helix for Inbox",
 };
 
-export type HandoffStatus = "working" | "done" | "held" | "error";
+/** declined = a person said no: a decision, not a failure, so it keeps a calm face */
+export type HandoffStatus = "working" | "done" | "held" | "declined" | "error";
 export type HandoffStep = { desk: HelixAvatarDesk; text: string; status: HandoffStatus };
 export type HandoffResult = { desk: HelixAvatarDesk; text: string; state?: HelixAvatarState };
 
-const STEP_FACE: Record<HandoffStatus, HelixAvatarState> = { working: "thinking", done: "idle", held: "unsure", error: "error" };
+const STEP_FACE: Record<HandoffStatus, HelixAvatarState> = { working: "thinking", done: "idle", held: "unsure", declined: "idle", error: "error" };
 
 /** The requester's face summarises the steps: a failure, then work in flight, then a human hold. */
 export function handoffOverallState(steps: HandoffStep[], hasResult: boolean): HelixAvatarState {
   if (steps.some((s) => s.status === "error")) return "error";
   if (steps.some((s) => s.status === "working")) return "thinking";
   if (steps.some((s) => s.status === "held")) return "unsure";
+  if (steps.some((s) => s.status === "declined")) return "idle";
   if (steps.length > 0 && hasResult) return "done";
   return "idle";
 }
@@ -62,6 +64,13 @@ function StatusMark({ status }: { status: Exclude<HandoffStatus, "working"> }) {
         <path d="M6.3 5.5v5M9.7 5.5v5" stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
+  if (status === "declined")
+    return (
+      <svg {...common} aria-label="declined">
+        <circle cx="8" cy="8" r="7" stroke="#9a9aa8" strokeWidth="1.4" />
+        <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#9a9aa8" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    );
   return (
     <svg {...common} aria-label="failed">
       <circle cx="8" cy="8" r="7" stroke="#f87171" strokeWidth="1.4" />
@@ -74,6 +83,7 @@ const TEXT_COLOR: Record<HandoffStatus, string> = {
   working: "rgba(255,255,255,0.62)",
   done: "rgba(255,255,255,0.72)",
   held: "#f59e0b",
+  declined: "rgba(255,255,255,0.5)",
   error: "#f87171",
 };
 
@@ -109,7 +119,17 @@ export function HelixHandoffPanel({
         }}
       >
         <HelixAvatar desk={from} state={handoffOverallState(steps, Boolean(result))} size={48} decorative />
-        <span style={{ fontSize: 16, lineHeight: 1.4 }}>{request}</span>
+        <span style={{ fontSize: 16, lineHeight: 1.4, flex: 1, minWidth: 0 }}>{request}</span>
+        {/* decorative, like the send button of the chat bar this mirrors; it is not a control */}
+        <span
+          data-handoff-send="true"
+          aria-hidden="true"
+          style={{ display: "grid", placeItems: "center", width: 36, height: 36, flex: "none", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </div>
 
       <ol style={{ listStyle: "none", margin: "14px 4px 0", padding: 0, display: "grid", gap: 2 }}>
