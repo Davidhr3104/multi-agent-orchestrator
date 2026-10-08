@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build --workspace=helix-social-media",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "cd ../.. && npm run build --workspace=helix-social-media",
   "outputDirectory": ".next",
   "crons": [
     { "path": "/api/cron/social?task=refresh", "schedule": "0 12 * * *" },

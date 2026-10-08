@@ -4,6 +4,7 @@ import type { SecretField } from "./secret-fields";
 export type { SecretField };
 export {
   KEYS_COMMERCE,
+  KEYS_DATA,
   KEYS_INBOX,
   KEYS_LEADS,
   KEYS_LEGAL,
@@ -144,11 +145,13 @@ export function setSecrets(patch: SecretMap): void {
   for (const fn of listeners) fn();
 }
 
+/**
+ * Never returns a character of the secret: a first/last fragment of a short
+ * token is most of the token, and the status endpoint is readable by anyone.
+ */
 export function maskSecret(value: string): string | null {
-  const v = value.trim();
-  if (!v) return null;
-  if (v.length <= 8) return "••••";
-  return `${v.slice(0, 4)}…${v.slice(-4)}`;
+  if (!value.trim()) return null;
+  return "••••";
 }
 
 export function secretsPersistKind(): "file" | "memory" {
@@ -179,6 +182,14 @@ export async function keysGetResponse(fields: SecretField[]): Promise<Response> 
 }
 
 export async function keysPostResponse(req: Request, fields: SecretField[]): Promise<Response> {
+  // requireOperator() lets everything through when no operator key is set, which is right
+  // for a local desk but not for a hosted one: there, saving keys must fail closed.
+  if (process.env.VERCEL && !getSecret("HELIX_OPERATOR_KEY")) {
+    return Response.json(
+      { error: "Set HELIX_OPERATOR_KEY on this deployment before saving keys from the app." },
+      { status: 403 }
+    );
+  }
   const allowed = new Set(fields.map((f) => f.name));
   let body: Record<string, unknown> = {};
   try {

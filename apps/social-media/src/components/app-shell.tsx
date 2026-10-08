@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BarChart3, CalendarDays, CircleHelp, Images, KeyRound, LayoutDashboard, ListChecks, Menu, Palette, PanelLeft, Plug, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarDays, CircleHelp, GitBranch, Images, KeyRound, LayoutDashboard, ListChecks, Menu, Palette, PanelLeft, Plug, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { CommandPalette, type PalettePost } from "@/components/command-palette";
 import { CreditMeter } from "@/components/credit-meter";
@@ -20,6 +20,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/library", label: "Library", icon: Images },
   { href: "/team", label: "Team", icon: Users },
   { href: "/brand", label: "Brand voice", icon: Palette },
+  { href: "/from-helix", label: "From Helixes", icon: GitBranch },
   { href: "/connections", label: "Connections", icon: Plug },
   { href: "/help", label: "How to use", icon: CircleHelp },
   { href: "/operator", label: "Operator", icon: KeyRound },
@@ -109,7 +110,7 @@ export function AppShell({ children, session, posts }: { children: React.ReactNo
   );
 
   return (
-    <div className="flex min-h-dvh flex-col lg:flex-row">
+    <div className="flex h-dvh min-h-dvh flex-col overflow-hidden lg:flex-row">
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-sidebar-border bg-sidebar/95 px-3 backdrop-blur lg:hidden">
         <div className="flex items-center gap-1">
           <button type="button" aria-label="Open menu" aria-expanded={navOpen} onClick={() => setNavOpen(true)} className="grid size-11 cursor-pointer place-items-center rounded-lg text-foreground hover:bg-sidebar-accent/20">
@@ -176,14 +177,15 @@ export function AppShell({ children, session, posts }: { children: React.ReactNo
         )}
       </aside>
 
-      <main className="min-w-0 flex-1">
-        <div className="mx-auto w-full max-w-[1720px] space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-          <CommandPalette session={session} posts={posts} showTrigger={pathname !== "/"} />
-          {children}
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[1720px] space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+            <CommandPalette session={session} posts={posts} showTrigger={pathname !== "/"} />
+            {children}
+          </div>
         </div>
+        <AskAiDrawer open={askOpen} onOpenChange={setAskOpen} initialQuestion={question} />
       </main>
-
-      <AskAiDrawer open={askOpen} onOpenChange={setAskOpen} initialQuestion={question} />
     </div>
   );
 }

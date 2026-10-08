@@ -87,7 +87,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <CalendarDays className="size-4 text-secondary-foreground" aria-hidden />
             Open calendar
           </Link>
-          <AskHelixButton className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-semibold text-primary hover:bg-primary/20 lg:min-h-10">
+          <AskHelixButton
+            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-semibold text-primary hover:bg-primary/20 lg:min-h-10"
+            aria-label="Open Ask Helix AI on this desk"
+          >
             <Sparkles className="size-4" aria-hidden />
             Ask Helix AI
           </AskHelixButton>

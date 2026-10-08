@@ -16,6 +16,7 @@ Supported actions — targets must be thread ids copied from the desk snapshot b
 - "archive_threads": archive a thread.
 - "route_threads": route a thread to its owner.
 - "send_reply": send the drafted reply (emails a real person).
+- "create_automation": set up a routine that sends a message on a schedule. params: {"source":"inbox.daily_digest"|"inbox.sla_breaches","channel":"in_app"|"slack"|"whatsapp"|"sms","time":"HH:MM" (24h),"to":"+E164 phone, only when the agent gave one"}. The single target is a NEW id like "auto-abc123" with the routine name (it is not a thread id). Never invent a time, channel or phone number the agent did not say: ask instead.
 For any other question, answer normally in plain text; do not emit a json block.`;
 
 export const runtime = "nodejs";

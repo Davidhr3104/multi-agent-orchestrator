@@ -21,11 +21,12 @@ export const PILLAR_GRADIENT: Record<Pillar, readonly [string, string]> = {
   promo: ["#4c1d95", "#7e22ce"],
 };
 
-export const CHANNEL_ORDER: Channel[] = ["instagram", "linkedin", "x", "tiktok", "facebook"];
+export const CHANNEL_ORDER: Channel[] = ["instagram", "linkedin", "bluesky", "x", "tiktok", "facebook"];
 
 export const CHANNEL_COLOR: Record<Channel, string> = {
   instagram: "#f472b6",
   linkedin: "#38bdf8",
+  bluesky: "#7dd3fc",
   x: "#cbd5e1",
   tiktok: "#2dd4bf",
   facebook: "#60a5fa",

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { MorphPanel } from "@helix/ui";
 
 type AskAiMessage = { role: "user" | "assistant"; content: string };
 type AskAiEngine = "claude" | "fallback";
@@ -18,7 +19,6 @@ export function AskAiCard({
   rfpId?: string;
   onOpenDrawer?: (initialQuestion?: string) => void;
 }) {
-  const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,6 @@ export function AskAiCard({
 
     setError(null);
     setBusy(true);
-    setQuestion("");
 
     const nextHistory: AskAiMessage[] = [...history, { role: "user", content: trimmed }];
     setHistory(nextHistory);
@@ -54,16 +53,6 @@ export function AskAiCard({
     } finally {
       setBusy(false);
     }
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (onOpenDrawer) {
-      onOpenDrawer(question.trim() || undefined);
-      setQuestion("");
-      return;
-    }
-    void ask(question);
   }
 
   const statusLabel = engine === "fallback" ? "Limited Mode" : "Online & Ready";
@@ -115,56 +104,23 @@ export function AskAiCard({
             </p>
           </div>
 
-          <form onSubmit={onSubmit} className="relative flex w-full items-center">
-            <div
-              className="flex w-full items-center rounded-xl p-1.5"
-              style={{
-                background: "rgba(9, 11, 16, 0.85)",
-                border: "1px solid rgba(226, 232, 240, 0.18)",
-                boxShadow: "inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 4px 20px rgba(0, 0, 0, 0.4)",
-              }}
-            >
-              <span className="material-symbols-outlined px-3 text-[20px] text-slate-400">smart_toy</span>
-              <input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask AI e.g. why is this RFP flagged for review?"
-                disabled={busy}
-                className="w-full min-w-0 border-none bg-transparent px-1 text-sm text-white placeholder:text-slate-500 outline-none"
-              />
-              <button
-                type="submit"
-                disabled={busy || !question.trim()}
-                className="flex shrink-0 items-center gap-1.5 rounded-lg px-5 py-2 text-[13px] font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                style={{
-                  background: "linear-gradient(180deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%)",
-                  color: "#090a0f",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.9)",
-                  border: "1px solid rgba(255,255,255,0.5)",
-                }}
-              >
-                <span>{busy ? "Asking…" : "Ask Helix"}</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </button>
-            </div>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="mr-1 text-[11px] font-medium tracking-wider text-slate-400 uppercase">Suggested:</span>
-            {QUICK_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                disabled={busy}
-                onClick={() => void ask(chip.question)}
-                className="flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] text-slate-300 transition-all hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                style={{ background: "rgba(226, 232, 240, 0.06)", border: "1px solid rgba(226, 232, 240, 0.12)" }}
-              >
-                <span className="material-symbols-outlined text-[14px] text-slate-400">{chip.icon}</span>
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          <MorphPanel
+            title="Ask Helix for Legal"
+            logoSrc="/helix-legal-icon.png"
+            avatarDesk="legal"
+            accent="#f59e0b"
+            accentInk="#0a1322"
+            placeholder="Ask AI e.g. why is this RFP flagged for review?"
+            busy={busy}
+            chips={QUICK_CHIPS}
+            onAsk={(text) => {
+              if (onOpenDrawer) {
+                onOpenDrawer(text);
+                return;
+              }
+              void ask(text);
+            }}
+          />
 
           {error ? <p className="text-xs text-rose-400">{error}</p> : null}
 
@@ -187,14 +143,13 @@ export function AskAiCard({
           ) : null}
         </div>
 
-        <div className="hidden justify-center lg:flex lg:col-span-5 lg:justify-end">
-          <div
-            role="button"
-            tabIndex={0}
+        <div className="flex justify-center lg:col-span-5 lg:justify-end">
+          <button
+            type="button"
             aria-label="Open Ask Helix AI assistant"
-            onClick={() => onOpenDrawer?.()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onOpenDrawer?.();
+            onClick={() => {
+              if (onOpenDrawer) onOpenDrawer();
+              else window.dispatchEvent(new CustomEvent("helix-legal-ask", { detail: "" }));
             }}
             className="group relative w-full max-w-sm cursor-pointer overflow-hidden rounded-xl p-1"
             style={{
@@ -231,11 +186,11 @@ export function AskAiCard({
                     color: "#f8fafc",
                   }}
                 >
-                  v4.2 PRO
+                  Ask Helix →
                 </span>
               </div>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </section>

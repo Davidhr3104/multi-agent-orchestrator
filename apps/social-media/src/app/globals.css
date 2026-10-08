@@ -219,3 +219,23 @@
 .helix-driver-popover .driver-popover-arrow-side-right { border-top-color: transparent !important; border-bottom-color: transparent !important; border-left-color: transparent !important; }
 .helix-driver-popover .driver-popover-arrow-side-top { border-left-color: transparent !important; border-right-color: transparent !important; border-bottom-color: transparent !important; }
 .helix-driver-popover .driver-popover-arrow-side-bottom { border-left-color: transparent !important; border-right-color: transparent !important; border-top-color: transparent !important; }
+
+.helix-ask-workspace {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 80;
+  display: flex;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .helix-ask-workspace {
+    left: 18rem;
+  }
+}

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StoredLead } from "@helix/core";
 import { AskAiCard } from "@/components/ask-ai-card";
-import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { isOperatorLocked, OperatorLockedNotice } from "@/components/operator-locked";
 import { AttentionQueue } from "./AttentionQueue";
 import { KpiStrip } from "./KpiStrip";
@@ -22,9 +21,6 @@ export function TriageOverview() {
   const [deskMode, setDeskMode] = useState<"demo" | "live" | null>(null);
   const [flashIds, setFlashIds] = useState<string[]>([]);
   const [simBusy, setSimBusy] = useState(false);
-  const [askAiDrawerOpen, setAskAiDrawerOpen] = useState(false);
-  const [askAiInitialQuestion, setAskAiInitialQuestion] = useState<string | undefined>(undefined);
-
   const refresh = useCallback(async () => {
     const [res, desk] = await Promise.all([fetch("/api/leads"), fetch("/api/settings/desk").catch(() => null)]);
     const data = (await res.json()) as { leads?: StoredLead[] };
@@ -225,18 +221,8 @@ export function TriageOverview() {
       ) : null}
 
       <div data-tour="leads-ask">
-        <AskAiCard
-          onOpenDrawer={(initialQuestion) => {
-            setAskAiInitialQuestion(initialQuestion);
-            setAskAiDrawerOpen(true);
-          }}
-        />
+        <AskAiCard />
       </div>
-      <AskAiDrawer
-        open={askAiDrawerOpen}
-        onOpenChange={setAskAiDrawerOpen}
-        initialQuestion={askAiInitialQuestion}
-      />
 
       {loading ? (
         <p className="text-sm text-outline">Loading triage…</p>

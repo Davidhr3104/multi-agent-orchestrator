@@ -193,6 +193,10 @@ export const KEYS_SOCIAL: SecretField[] = [
   cronSecretField(),
 ];
 
+export const KEYS_DATA: SecretField[] = [
+  ...KEYS_SHARED,
+];
+
 export const KEYS_REAL_ESTATE: SecretField[] = [
   ...KEYS_SHARED,
   { name: "RESEND_API_KEY", label: "Resend", hint: "Sends approved buyer alerts by email, one confirmation per message." },

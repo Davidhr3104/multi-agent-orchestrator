@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
+import { MorphPanel } from "@helix/ui";
 
 type AskAiMessage = { role: "user" | "assistant"; content: string };
 type AskAiEngine = "claude" | "fallback";
+
+function openAsk(question?: string) {
+  window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question: question ?? "" } }));
+}
 
 const QUICK_CHIPS = [
   { label: "Analyze pipeline velocity", question: "How is the lead pipeline moving right now?" },
@@ -12,7 +17,6 @@ const QUICK_CHIPS = [
 ];
 
 export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: string) => void }) {
-  const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +36,6 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
 
     setError(null);
     setBusy(true);
-    setQuestion("");
 
     const nextHistory: AskAiMessage[] = [...history, { role: "user", content: trimmed }];
     setHistory(nextHistory);
@@ -56,16 +59,6 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
     } finally {
       setBusy(false);
     }
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (onOpenDrawer) {
-      onOpenDrawer(question.trim() || undefined);
-      setQuestion("");
-      return;
-    }
-    void ask(question);
   }
 
   // Real state: no Claude key means the rules-based demo assistant answers, not a live model.
@@ -119,44 +112,36 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
           </div>
 
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-on-surface">Ask Helix AI</h2>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenDrawer?.();
+                openAsk();
+              }}
+              className="text-left text-xl font-bold tracking-tight text-on-surface hover:text-primary"
+            >
+              Ask Helix AI
+            </button>
             <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
               Query your pipeline heuristics, audit scoring decisions, and understand how the
               triage engine reached its conclusions — in real-time natural language.
             </p>
           </div>
 
-          <form onSubmit={onSubmit} className="flex items-center gap-2">
-            <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask AI e.g. why did lead scoring change this week?"
-              disabled={busy}
-              className="h-10 w-full min-w-0 rounded-lg border border-outline-variant/40 bg-surface px-3 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={busy || !question.trim()}
-              className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg bg-primary-container px-4 text-xs font-bold text-on-primary-container transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {busy ? "Asking…" : "Ask Helix →"}
-            </button>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-outline">Quick chips:</span>
-            {QUICK_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                disabled={busy}
-                onClick={() => void ask(chip.question)}
-                className="rounded-full border border-outline-variant/40 px-2.5 py-1 text-xs text-on-surface-variant transition hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          <MorphPanel
+            title="Ask Helix for Leads"
+            logoSrc="/helix-leads-icon.png"
+            avatarDesk="leads"
+            accent="#06b6d4"
+            accentInk="#042f2e"
+            placeholder="Ask AI e.g. why did lead scoring change this week?"
+            busy={busy}
+            chips={QUICK_CHIPS}
+            onAsk={(text) => {
+              onOpenDrawer?.(text);
+              openAsk(text);
+            }}
+          />
 
           {error ? <p className="text-xs text-error">{error}</p> : null}
 
@@ -180,12 +165,14 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
           ) : null}
         </div>
 
-        <div className="relative hidden shrink-0 lg:block">
+        <div className="relative mx-auto shrink-0 lg:mx-0">
           <button
             type="button"
-            onClick={() => onOpenDrawer?.()}
-            disabled={!onOpenDrawer}
-            className="group relative block rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100"
+            onClick={() => {
+              onOpenDrawer?.();
+              openAsk();
+            }}
+            className="group relative block cursor-pointer rounded-lg transition-transform hover:scale-[1.02]"
             aria-label="Open Ask Helix AI assistant"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -194,22 +181,10 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
               alt=""
               className="h-44 w-auto rounded-lg object-contain"
             />
-            {onOpenDrawer ? (
-              <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
-                Ask Helix <span aria-hidden>→</span>
-              </span>
-            ) : null}
+            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+              Ask Helix <span aria-hidden>→</span>
+            </span>
           </button>
-          {onOpenDrawer ? (
-            <button
-              type="button"
-              onClick={() => onOpenDrawer()}
-              aria-label="Open Ask Helix AI assistant"
-              className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-primary text-on-primary-container shadow-md transition hover:brightness-110"
-            >
-              <span aria-hidden className="text-sm">→</span>
-            </button>
-          ) : null}
         </div>
       </div>
     </div>

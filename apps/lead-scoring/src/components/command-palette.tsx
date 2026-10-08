@@ -48,6 +48,7 @@ export function CommandPalette({
 
   const items = useMemo(() => {
     const actions: Item[] = [
+      { id: "ask", label: "Ask Helix AI", hint: "Ask", run: () => { onClose(); window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question: "" } })); } },
       { id: "new", label: "Create new lead", hint: "N", run: () => { router.push("/"); onClose(); window.setTimeout(() => window.dispatchEvent(new Event("helix:new-lead")), 80); } },
       { id: "csv", label: "Export CSV", hint: "Action", run: () => { exportCsv(leads); onClose(); } },
       { id: "dash", label: "Go to Dashboard", hint: "Page", run: () => { router.push("/"); onClose(); } },

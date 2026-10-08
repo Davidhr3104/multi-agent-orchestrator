@@ -3,6 +3,11 @@ import type { EmailThread, ThreadCategory, ThreadStatus } from "@/lib/types";
 import { sendThreadReply } from "@/lib/reply-send";
 import { guardrailReason } from "@/lib/agent-profile";
 import { currentDeskMode, getThread, patchMessage, regenerateSmartReply, snoozeThread } from "@/lib/store";
+import { validationContext, SOURCES } from "@/lib/automations/catalog";
+import { buildSpec } from "@/lib/automations/parse";
+import { chatReply, createAutomation, removeAutomation } from "@/lib/automations/service";
+import { deskConnections, type AutomationAccess } from "@/lib/automations/storage";
+import { isE164, parseClock, type AutomationSpec, type Channel, type Validation } from "@helix/core/automations";
 
 /**
  * What Helix AI may do on the Inbox desk, and when it may do it alone.
@@ -12,10 +17,11 @@ import { currentDeskMode, getThread, patchMessage, regenerateSmartReply, snoozeT
  *   archive_threads move out of the queue                        -> auto unless urgent / awaiting review (+Undo)
  *   route_threads   hand to the responsible person               -> auto unless awaiting review (+Undo)
  *   send_reply      emails a real person, cannot be recalled     -> always ask
+ *   create_automation  sets up a message that will be sent on a schedule -> always ask (+Undo deletes it)
  * `touched` lets the route write the changes into the desk cookie, which is how Inbox survives serverless.
  */
 
-export type InboxCtx = { actor: string; touched: Set<string>; heuristicOnly?: boolean };
+export type InboxCtx = { actor: string; touched: Set<string>; heuristicOnly?: boolean; automations?: AutomationAccess };
 
 const STATUSES: ThreadStatus[] = ["open", "review", "routed", "sent", "blocked", "archived"];
 const CATEGORIES: ThreadCategory[] = ["action_required", "fyi", "meeting", "spam"];
@@ -203,6 +209,51 @@ export const inboxActions: DeskActionRegistry<InboxCtx> = {
         : `Sent ${plural(done.length, "reply")}.${failed ? ` ${failed} failed.` : ""}`,
     announce: (l) => `Helix AI sent a reply to ${names(l)}`,
   },
+  // Creating a routine is a promise to send something later, so it is always confirmed by the person first.
+  // The sentence has already been parsed into {source, channel, time, to}; nothing here comes from a guess.
+  create_automation: {
+    name: "create_automation",
+    validate: (p) => {
+      if (typeof p.source !== "string" || !SOURCES[p.source]) return "Unknown automation source";
+      if (!["in_app", "slack", "whatsapp", "sms"].includes(String(p.channel))) return "Unknown channel";
+      if (typeof p.time !== "string" || !parseClock(p.time)) return "Time must be HH:MM (24h)";
+      if (p.to !== undefined && !isE164(String(p.to))) return "Phone must be in international format";
+      return null;
+    },
+    assess: async () => ({ level: "confirm", reasons: ["It sets up a message that will be sent on a schedule"] }),
+    // The target is a new id, so there is nothing to put back except "it did not exist".
+    snapshot: async () => ({ existed: false }),
+    apply: async (id, p, ctx) => {
+      if (!ctx.automations) throw new Error("Automations are not available on this request.");
+      const access = ctx.automations;
+      const state = await access.load();
+      const now = new Date();
+      const spec = buildSpec(
+        { source: String(p.source), channel: p.channel as Channel, channelWasDefault: false, time: String(p.time), to: p.to === undefined ? undefined : String(p.to) },
+        { tz: state.timezone, now, id }
+      );
+      const created = createAutomation(state, { ...spec, createdBy: "chat" }, validationContext(deskConnections(), state.timezone), { confirm: true, now, limit: access.limit });
+      await access.save(created.state);
+      automationOutcomes.set(id, { spec: created.spec, validation: created.validation });
+      return true;
+    },
+    restore: async (id, data, ctx) => {
+      if (!ctx.automations) throw new Error("Automations are not available on this request.");
+      if (!data || typeof data !== "object" || (data as { existed?: unknown }).existed !== false) throw new Error("Invalid undo data");
+      const state = await ctx.automations.load();
+      if (!state.automations.some((a) => a.id === id)) return false;
+      await ctx.automations.save(removeAutomation(state, id));
+      return true;
+    },
+    resultText: (done) => {
+      const outcome = done[0] ? automationOutcomes.get(done[0]) : undefined;
+      return outcome ? chatReply(outcome.spec, outcome.validation) : "I could not create the automation.";
+    },
+    announce: (l) => `Helix AI created the automation ${names(l)}`,
+  },
 };
+
+/** What apply() decided, read by resultText() in the same request: the chat must say what the facts say. */
+const automationOutcomes = new Map<string, { spec: AutomationSpec; validation: Validation }>();
 
 export { label as threadLabel };

@@ -20,6 +20,8 @@ export type MetaConfig = {
 
 export type LinkedInConfig = { token: string; organizationUrn: string; version: string };
 
+export type BlueskyEnv = { identifier: string; appPassword: string; service: string };
+
 export function metaConfig(): MetaConfig | null {
   const token = read("HELIX_META_ACCESS_TOKEN");
   if (!token) return null;
@@ -39,6 +41,14 @@ export function linkedInConfig(): LinkedInConfig | null {
   const organizationUrn = /^\d+$/.test(raw) ? `urn:li:organization:${raw}` : raw;
   if (!/^urn:li:organization:\d+$/.test(organizationUrn)) return null;
   return { token, organizationUrn, version: read("HELIX_LINKEDIN_VERSION") || DEFAULT_LINKEDIN_VERSION };
+}
+
+export function blueskyConfig(): BlueskyEnv | null {
+  const identifier = read("HELIX_BLUESKY_IDENTIFIER") || read("HELIX_BLUESKY_HANDLE");
+  const appPassword = read("HELIX_BLUESKY_APP_PASSWORD");
+  if (!identifier || !appPassword) return null;
+  const service = (read("HELIX_BLUESKY_SERVICE") || "https://bsky.social").replace(/\/$/, "");
+  return { identifier, appPassword, service };
 }
 
 export function publishSwitchOn(): boolean {

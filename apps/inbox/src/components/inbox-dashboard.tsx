@@ -418,7 +418,7 @@ export function InboxDashboard() {
         messages={messages}
         selectedId={selectedId}
         onSelect={setSelectedId}
-        onAsk={(text) => window.dispatchEvent(new CustomEvent("helix:ask", { detail: text }))}
+        onAsk={(text) => window.dispatchEvent(new CustomEvent("helix:ask", { detail: text ?? "" }))}
         onDispatch={(id) => void act(id, "approve")}
         onSnooze={(id) => void act(id, "snooze")}
         query={query}

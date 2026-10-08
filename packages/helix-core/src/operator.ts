@@ -102,12 +102,14 @@ export function operatorProductLinks(): HelixProductLink[] {
   const inbox = process.env.HELIX_INBOX_URL?.trim() || "http://localhost:43151";
   const commerce = process.env.HELIX_COMMERCE_URL?.trim() || "http://localhost:43150";
   const marketing = process.env.HELIX_MARKETING_URL?.trim() || "http://localhost:43152";
+  const data = process.env.HELIX_DATA_URL?.trim() || "http://localhost:43155";
   return [
     { name: "Helix for Leads", href: leads, className: "text-cyan-400" },
     { name: "Helix for Legal", href: legal, className: "text-amber-300" },
     { name: "Helix for Inbox", href: inbox, className: "text-blue-400" },
     { name: "Helix for Commerce", href: commerce, className: "text-emerald-400" },
     { name: "Helix for Marketing", href: marketing, className: "text-orange-400" },
+    { name: "Helix Data", href: data, className: "text-teal-400" },
     { name: "Helix for Video", href: "#", className: "text-red-400/50" },
     { name: "Helix for Social", href: "#", className: "text-pink-400/50" },
     { name: "Helix for Edit", href: "#", className: "text-violet-400/50" },

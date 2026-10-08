@@ -1,0 +1,169 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: 0 0% 98%;
+  --foreground: 0 0% 4%;
+  --surface: 0 0% 100%;
+  --surface-muted: 160 20% 96%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 4%;
+  --muted: 160 16% 94%;
+  --muted-foreground: 160 8% 38%;
+  --border: 160 10% 88%;
+  --accent: 174 78% 47%;
+  --accent-foreground: 0 0% 4%;
+  --ring: 174 78% 47%;
+  --primary: 174 85% 27%;
+  --primary-foreground: 0 0% 100%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 4%;
+  --secondary: 160 16% 94%;
+  --secondary-foreground: 0 0% 4%;
+  --destructive: 0 72% 51%;
+  --input: 160 10% 88%;
+  --glass-bg: 0 0% 100% / 0.4;
+  --glass-border: 0 0% 100% / 0.55;
+  --glass-shadow: 0 10px 30px -12px rgb(15 23 42 / 0.12);
+  --page-gradient: linear-gradient(180deg, #fafafa 0%, #f4fffc 40%, #e8f7f4 100%);
+  --scrollbar-track: #f4f4f5;
+  --scrollbar-thumb: rgb(26 212 196 / 0.4);
+  --hitl: 38 92% 50%;
+  --teal: #1ad4c4;
+  --teal-deep: #0a7d73;
+}
+
+.dark {
+  --background: 200 28% 6%;
+  --foreground: 0 0% 96%;
+  --surface: 200 24% 9%;
+  --surface-muted: 200 22% 8%;
+  --card: 174 20% 8% / 0.55;
+  --card-foreground: 0 0% 96%;
+  --muted: 174 18% 12% / 0.7;
+  --muted-foreground: 170 10% 70%;
+  --border: 174 40% 40% / 0.22;
+  --accent: 174 78% 47%;
+  --accent-foreground: 0 0% 4%;
+  --ring: 174 78% 47%;
+  --primary: 174 78% 47%;
+  --primary-foreground: 0 0% 4%;
+  --popover: 200 24% 9%;
+  --popover-foreground: 0 0% 96%;
+  --secondary: 174 18% 12%;
+  --secondary-foreground: 0 0% 96%;
+  --destructive: 0 84% 63%;
+  --input: 174 40% 40% / 0.22;
+  --glass-bg: 174 20% 8% / 0.45;
+  --glass-border: 0 0% 100% / 0.08;
+  --glass-shadow:
+    0 10px 30px -10px rgb(0 0 0 / 0.5),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --page-gradient:
+    radial-gradient(ellipse 70% 15% at 50% 100%, rgba(10, 125, 115, 0.12) 0%, transparent 70%),
+    radial-gradient(circle 500px at 70% 92%, rgba(26, 212, 196, 0.08) 0%, transparent 65%),
+    linear-gradient(180deg, #0b0f1a 0%, #0a1214 55%, #061210 100%);
+  --scrollbar-track: rgb(11 15 26 / 0.85);
+  --scrollbar-thumb: rgb(26 212 196 / 0.35);
+  --hitl: 38 92% 50%;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-surface: hsl(var(--surface));
+  --color-surface-muted: hsl(var(--surface-muted));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-ring: hsl(var(--ring));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-input: hsl(var(--input));
+  --color-teal: #1ad4c4;
+  --color-teal-deep: #0a7d73;
+  --color-hitl: #f59e0b;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--page-gradient);
+  background-attachment: fixed;
+  color: hsl(var(--foreground));
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+.cosmic-gradient-bg {
+  background: var(--page-gradient);
+  background-attachment: fixed;
+}
+
+.paper-plate {
+  background: color-mix(in srgb, white 40%, transparent);
+  border: 1px solid hsl(var(--border));
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(16px);
+}
+
+.dark .paper-plate {
+  background: hsl(var(--glass-bg));
+  border-color: hsl(var(--glass-border));
+}
+
+.hitl-badge {
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #b45309;
+}
+.dark .hitl-badge {
+  color: #fbbf24;
+}
+
+.helix-ask-fill {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 80;
+  display: flex;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0b1114;
+}
+@media (min-width: 768px) {
+  .helix-ask-fill {
+    left: 240px;
+  }
+}

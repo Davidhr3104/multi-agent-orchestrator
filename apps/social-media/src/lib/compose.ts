@@ -7,6 +7,7 @@ const CHANNELS: [RegExp, Channel][] = [
   [/\b(tiktok)\b/i, "tiktok"],
   [/\b(twitter|tweet|\bx\b)/i, "x"],
   [/\b(facebook)\b/i, "facebook"],
+  [/\b(bluesky|bsky)\b/i, "bluesky"],
 ];
 
 /** Pulls a channel and a topic out of a command. Returns null when no channel is named. */
@@ -17,7 +18,7 @@ export function parseCompose(raw: string): { channel: Channel; topic: string; su
   if (!channel) return null;
   const submit = /\b(review|revisi[oó]n|queue|approval)\b/i.test(text);
   const topic = text
-    .replace(/\b(crea|create|draft|write|post|publicaci[oó]n|para|for|sobre|about|and|send|m[aá]ndalo|mandalo|it|to|review|revisi[oó]n|linkedin|instagram|insta|tiktok|twitter|tweet|facebook)\b/gi, " ")
+    .replace(/\b(crea|create|draft|write|post|publicaci[oó]n|para|for|sobre|about|and|send|m[aá]ndalo|mandalo|it|to|review|revisi[oó]n|linkedin|instagram|insta|tiktok|twitter|tweet|facebook|bluesky|bsky)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
   return { channel, topic: (topic.length >= 4 ? topic : text).slice(0, 180), submit };

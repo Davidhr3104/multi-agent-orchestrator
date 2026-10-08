@@ -27,7 +27,7 @@ export type InboxSlaSummary = {
   buckets: SlaBucket[];
 };
 
-const TARGETS: Record<SlaBucketId, number> = {
+export const TARGETS: Record<SlaBucketId, number> = {
   vip: 30,
   urgent: 60,
   action: 60,

@@ -97,6 +97,17 @@ export function MarketingDashboard() {
   const [metaReady, setMetaReady] = useState(false);
   const [locked, setLocked] = useState(false);
 
+  useEffect(() => {
+    function onAsk(event: Event) {
+      const detail = (event as CustomEvent<{ question?: string } | string>).detail;
+      const question = typeof detail === "string" ? detail : detail?.question;
+      setAskAiQuestion(question?.trim() || undefined);
+      setAskAiOpen(true);
+    }
+    window.addEventListener("helix:open-ask", onAsk);
+    return () => window.removeEventListener("helix:open-ask", onAsk);
+  }, []);
+
   function showToast(msg: string, err = false) {
     setToast({ msg, err });
     window.setTimeout(() => setToast(null), 2800);

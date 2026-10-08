@@ -5,7 +5,6 @@ import type { ReorderRequest, StoredOrder, StoredProduct } from "@helix/core";
 import { Boxes, ShieldAlert, ShoppingCart, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { AskAiCard } from "@/components/ask-ai-card";
-import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import { MetricCard } from "@/components/metric-card";
 import { Sparkline } from "@/components/sparkline";
@@ -49,8 +48,6 @@ const EMPTY_RISK: RiskSummary = {
 };
 
 export function CommerceDashboard() {
-  const [askAiOpen, setAskAiOpen] = useState(false);
-  const [askAiQuestion, setAskAiQuestion] = useState<string | undefined>(undefined);
   const [orders, setOrders] = useState<StoredOrder[]>([]);
   const [products, setProducts] = useState<StoredProduct[]>([]);
   const [reorders, setReorders] = useState<ReorderRequest[]>([]);
@@ -154,11 +151,9 @@ export function CommerceDashboard() {
       <DemoBanner message="You are exploring a sample store. Connect Shopify and this desk switches to your real orders — the samples disappear." connectHref="/settings" connectLabel="Connect Shopify →" />
       <div data-tour="commerce-ask">
         <AskAiCard orderId={selected?.id} onOpenDrawer={(q) => {
-            setAskAiQuestion(q);
-            setAskAiOpen(true);
+            window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question: q ?? "" } }));
           }} />
       </div>
-      <AskAiDrawer open={askAiOpen} onOpenChange={setAskAiOpen} initialQuestion={askAiQuestion} />
       <AiToast message={toast} />
 
       <section data-tour="commerce-metrics" className="animate-enter delay-2 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

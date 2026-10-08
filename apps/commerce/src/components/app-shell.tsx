@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { StoredOrder, StoredProduct } from "@helix/core";
 import { SIDEBAR_BACKGROUND, Sidebar, SidebarContent } from "@/components/sidebar";
 import { AppHeader } from "@/components/app-header";
+import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { DeskModeProvider } from "@/components/desk-mode";
 import { OVERLAY_OPEN_EVENT } from "@/lib/overlay-events";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -14,6 +15,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [ordersNeedingReview, setOrdersNeedingReview] = useState(0);
   const [inventoryAlerts, setInventoryAlerts] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askQuestion, setAskQuestion] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     void (async () => {
@@ -38,6 +41,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event(OVERLAY_OPEN_EVENT));
     setMenuOpen(true);
   }
+
+  useEffect(() => {
+    function onAsk(event: Event) {
+      const detail = (event as CustomEvent<{ question?: string } | string>).detail;
+      const question = typeof detail === "string" ? detail : detail?.question;
+      setAskQuestion(question?.trim() || undefined);
+      setAskOpen(true);
+    }
+    window.addEventListener("helix:open-ask", onAsk);
+    return () => window.removeEventListener("helix:open-ask", onAsk);
+  }, []);
+
+  useEffect(() => {
+    setAskOpen(false);
+  }, [pathname]);
 
   return (
     <DeskModeProvider>
@@ -72,6 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             {children}
           </main>
+          <AskAiDrawer open={askOpen} onOpenChange={setAskOpen} initialQuestion={askQuestion} />
         </div>
       </div>
     </DeskModeProvider>

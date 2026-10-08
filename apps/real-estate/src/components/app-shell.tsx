@@ -185,7 +185,7 @@ export function AppShell({ children, badges = {}, notices = [], mode = "demo" }:
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 hidden h-16 items-center justify-between gap-4 bg-background/85 px-6 shadow-[0_1px_8px_rgba(0,0,0,0.25)] backdrop-blur-xl lg:flex lg:px-8">
           <HeaderSearch />
           <div className="flex items-center gap-2">
@@ -211,8 +211,8 @@ export function AppShell({ children, badges = {}, notices = [], mode = "demo" }:
         <main className="min-w-0 flex-1">
           <div className="mx-auto w-full max-w-[1440px] space-y-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
         </main>
+        <GlobalCopilot />
       </div>
-      <GlobalCopilot />
       <DeskRefresher />
     </div>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BarChart3, CalendarDays, ChevronLeft, CircleHelp, Clock, FileText, LayoutDashboard, Menu, Plug, Repeat2, Rows3, Send, Settings, ShieldOff, SlidersHorizontal, Sparkles, Timer, Users, ScrollText, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, ChevronLeft, CircleHelp, Clock, FileText, LayoutDashboard, Menu, Plug, Repeat2, Rows3, Send, Settings, ShieldOff, SlidersHorizontal, Sparkles, Timer, Users, ScrollText, Workflow, type LucideIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { DENSE_KEY } from "@/lib/desk-ui";
@@ -21,6 +21,7 @@ export type InboxNavId =
   | "sla"
   | "calendar"
   | "weekly-report"
+  | "automations"
   | "settings"
   | "help"
   | "analytics"
@@ -39,6 +40,7 @@ const NAV_ICON: Record<InboxNavId, LucideIcon> = {
   sla: Timer,
   calendar: CalendarDays,
   "weekly-report": FileText,
+  automations: Workflow,
   analytics: BarChart3,
   studio: SlidersHorizontal,
   integrations: Plug,
@@ -120,6 +122,7 @@ export function InboxChrome({
   if (navPath !== pathname) {
     setNavPath(pathname);
     setNavOpen(false);
+    setAskOpen(false);
   }
   const [askSeed, setAskSeed] = useState<{ text: string; n: number } | null>(null);
   const [modelLabel, setModelLabel] = useState("Claude");
@@ -204,6 +207,7 @@ export function InboxChrome({
     { id: "sla", label: "SLA", href: "/sla" },
     { id: "calendar", label: "Calendar", href: "/calendar" },
     { id: "weekly-report", label: "Weekly report", href: "/weekly-report" },
+    { id: "automations", label: "Automations", href: "/automations" },
     { id: "analytics", label: "Analytics", href: "/analytics" },
   ];
 
@@ -266,7 +270,6 @@ export function InboxChrome({
   return (
     <div data-density={dense ? "dense" : "comfortable"} className="relative flex min-h-screen text-sm text-foreground">
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onToggleDense={toggleDense} />
-      <AskAiDrawer open={askOpen} onOpenChange={setAskOpen} initialQuestion={askSeed?.text} seed={askSeed?.n} />
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetContent side="left" showCloseButton className="w-[18rem] max-w-[85vw] gap-0 overflow-y-auto border-r border-border bg-surface p-0 md:hidden dark:bg-[#0d0719]">
           <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
@@ -376,7 +379,8 @@ export function InboxChrome({
         </div>
       </aside>
 
-      <div className={cn("relative flex min-h-screen min-w-0 flex-1 flex-col", offset)}>
+      <div className={cn("relative flex min-h-screen min-w-0 flex-1 flex-col", offset, askOpen && "h-screen overflow-hidden")}>
+        <AskAiDrawer open={askOpen} onOpenChange={setAskOpen} initialQuestion={askSeed?.text} seed={askSeed?.n} />
         <header className="z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/90 px-3 backdrop-blur-xl sm:px-4 md:h-16 md:px-6 dark:border-white/[0.08] dark:bg-[rgba(12,6,26,0.72)]">
           <div className="flex min-w-0 items-center gap-2">
             <button

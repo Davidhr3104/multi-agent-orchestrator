@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { usePathname } from "next/navigation";
 import type { DemoSuggestion } from "@/lib/demo-assistant";
+import { HelixAvatar, HelixWelcome, displayNameFromEmail, useHelixAvatarState } from "@helix/ui";
 
 type AskAiAttachment = { type: "image"; data: string; mediaType: string };
 type AskAiMessage = { role: "user" | "assistant"; content: string; attachments?: AskAiAttachment[] };
@@ -49,6 +50,27 @@ const QUICK_ACTIONS = [
   "What's in my review queue?",
   "What's my best next move?",
 ];
+
+export function openHelixAsk(question?: string) {
+  window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question: question ?? "" } }));
+}
+
+/** Header control. Opens the main-column Ask workspace without covering the sidebar. */
+export function AskAiDrawer() {
+  return (
+    <button
+      type="button"
+      onClick={() => openHelixAsk()}
+      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 text-xs font-bold text-on-surface transition hover:bg-surface-container-high"
+    >
+      <span className="material-symbols-outlined text-[18px]" aria-hidden>
+        auto_awesome
+      </span>
+      <span className="sm:hidden">Ask</span>
+      <span className="hidden sm:inline">Ask Helix AI</span>
+    </button>
+  );
+}
 
 // Scripted walkthrough for recording. Questions go through the real /api/ask-ai route
 // and the confirm/select steps run the real execute route, so every step changes real
@@ -159,15 +181,9 @@ function resultText(action: string, done: number, failed: number, targets: { lab
   return `Moved ${targets.map((t) => plainName(t.label)).join(", ")} to Contacted and logged the play.${failedNote}`;
 }
 
-export function AskAiDrawer({
-  open,
-  onOpenChange,
-  initialQuestion,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initialQuestion?: string;
-}) {
+export function AskAiWorkspace() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<DrawerTurn[]>([]);
   const [question, setQuestion] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState<AskAiAttachment | null>(null);
@@ -178,8 +194,9 @@ export function AskAiDrawer({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessionHistory, setSessionHistory] = useState<SavedSession[]>([]);
   const [isSandbox, setIsSandbox] = useState(false);
-  const lastAskedInitialQuestion = useRef<string | undefined>(undefined);
   const turnsRef = useRef<DrawerTurn[]>(turns);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const askRef = useRef<(text: string) => Promise<void>>(async () => {});
   turnsRef.current = turns;
 
   function commitTurns(next: DrawerTurn[]) {
@@ -256,13 +273,46 @@ export function AskAiDrawer({
     }
   }
 
+  askRef.current = ask;
+
   useEffect(() => {
-    if (!open || !initialQuestion) return;
-    if (lastAskedInitialQuestion.current === initialQuestion) return;
-    lastAskedInitialQuestion.current = initialQuestion;
-    void ask(initialQuestion);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialQuestion]);
+    function questionFrom(event: Event) {
+      const detail = (event as CustomEvent<{ question?: string } | string>).detail;
+      if (typeof detail === "string") return detail.trim();
+      return detail?.question?.trim() ?? "";
+    }
+    function onOpen(event: Event) {
+      const asked = questionFrom(event);
+      setOpen(true);
+      window.scrollTo({ top: 0 });
+      if (asked) void askRef.current(asked);
+    }
+    window.addEventListener("helix:open-ask", onOpen);
+    window.addEventListener("helix:ask", onOpen);
+    return () => {
+      window.removeEventListener("helix:open-ask", onOpen);
+      window.removeEventListener("helix:ask", onOpen);
+    };
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    inputRef.current?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   async function confirmProposal(turnIndex: number) {
     const proposal = turnsRef.current[turnIndex]?.proposal;
@@ -369,7 +419,7 @@ export function AskAiDrawer({
     try {
       // Start every recording from the same seed so the walkthrough is repeatable.
       await resetDemo();
-      lastAskedInitialQuestion.current = "__full_demo__";
+      // Marker so a concurrent open-ask event does not double-send the first scripted question.
       await wait(600);
 
       for (const step of FULL_DEMO_SCRIPT) {
@@ -439,123 +489,162 @@ export function AskAiDrawer({
         ? "Limited Mode"
         : "Online & Ready";
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
-      <SheetContent
-        side="right"
-        showOverlay={false}
-        className="flex h-full w-full min-h-0 flex-col overflow-hidden border-l border-sky-900/40 bg-[#04101c] sm:max-w-md"
-      >
-        <SheetHeader className="border-b border-sky-900/40 pb-3">
-          <div className="flex items-center justify-between gap-2 pr-8">
-            <div className="flex items-center gap-2">
-              <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/helix-leads-icon.png" alt="" className="h-full w-full object-contain" />
-              </div>
-              <SheetTitle className="text-slate-100">Ask Helix AI</SheetTitle>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {isSandbox ? (
-                <button
-                  type="button"
-                  onClick={() => void resetDemo()}
-                  disabled={busy || runningDemo}
-                  aria-label="Reset demo data"
-                  className="flex items-center gap-1 rounded-md border border-sky-900/50 px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-sky-900/20 hover:text-slate-200 disabled:opacity-50"
-                >
-                  <span aria-hidden>↺</span> Reset demo
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setHistoryOpen((v) => !v)}
-                aria-label="View past conversations"
-                className={
-                  "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition " +
-                  (historyOpen
-                    ? "border-sky-500 bg-sky-500/15 text-sky-200"
-                    : "border-sky-900/50 text-slate-400 hover:bg-sky-900/20 hover:text-slate-200")
-                }
-              >
-                <span aria-hidden>🕘</span> History
-              </button>
-            </div>
-          </div>
-          <p className="flex items-center gap-1 text-[11px] font-medium text-sky-400">
-            <span className="inline-block size-1.5 rounded-full bg-sky-400" />
-            {statusLabel}
-          </p>
-        </SheetHeader>
+  // the face follows the latest reply: speaking, then done; unsure while that reply waits for a human OK
+  const lastAssistantIdx = turns.reduce((acc, t, i) => (t.message.role === "user" ? acc : i), -1);
+  const lastAssistant = lastAssistantIdx >= 0 ? turns[lastAssistantIdx] : undefined;
+  const needsHuman = Boolean(
+    (lastAssistant?.proposal && lastAssistant.proposalStatus === "pending")
+  );
+  // the greeting only names the person when the session really has one
+  const [welcomeName, setWelcomeName] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/org")
+      .then((r) => r.json())
+      .then((s: { signedIn?: boolean; user?: { email?: string | null } }) => setWelcomeName(s.signedIn ? displayNameFromEmail(s.user?.email) : undefined))
+      .catch((err) => console.warn("Welcome: could not read the session, greeting without a name.", err));
+  }, [open]);
+  // a finished task (confirmed, applied or approved) keeps the done face until the next request
+  const taskDone = Boolean(
+    (lastAssistant?.proposal && lastAssistant.proposalStatus === "confirmed") ||
+      (lastAssistant?.executed && lastAssistant.executed.done.length > 0 && !lastAssistant.undone)
+  );
+  const avatarState = useHelixAvatarState(busy, Boolean(error), needsHuman, taskDone);
+  if (!open) return null;
 
-        {historyOpen ? (
-          <div className="thin-scrollbar max-h-56 space-y-1 overflow-y-auto border-b border-sky-900/40 px-4 py-3">
+  return (
+    <div
+      className="absolute top-0 right-0 bottom-0 left-0 z-50 flex h-dvh max-h-dvh min-h-0 flex-col bg-surface"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ask Helix AI"
+    >
+      <header className="flex h-20 shrink-0 items-center justify-between gap-3 border-b border-outline-variant/20 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <HelixAvatar desk="leads" state={avatarState} size={64} decorative />
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-on-surface">Ask Helix AI</h2>
+            <p className="flex items-center gap-1 truncate text-[11px] font-medium text-primary">
+              <span className="inline-block size-1.5 rounded-full bg-primary" />
+              {statusLabel}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {isSandbox ? (
             <button
               type="button"
-              onClick={startNewSession}
-              className="w-full rounded-md border border-sky-900/50 px-2.5 py-1.5 text-left text-[11px] font-medium text-sky-300 hover:bg-sky-900/20"
+              onClick={() => void resetDemo()}
+              disabled={busy || runningDemo}
+              aria-label="Reset demo data"
+              className="flex items-center gap-1 rounded-md border border-outline-variant/40 px-2 py-1 text-[11px] font-medium text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface disabled:opacity-50"
             >
-              + Start new conversation
+              <span aria-hidden>↺</span> Reset demo
             </button>
-            {sessionHistory.length === 0 ? (
-              <p className="px-1 py-2 text-[11px] text-slate-500">No past conversations yet.</p>
-            ) : (
-              sessionHistory.map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => restoreSession(session)}
-                  className="w-full rounded-md border border-sky-900/30 bg-[#0a1e30] px-2.5 py-1.5 text-left hover:border-sky-700 hover:bg-sky-900/20"
-                >
-                  <p className="truncate text-[11px] font-medium text-slate-200">{session.preview}</p>
-                  <p className="text-[10px] text-slate-500">
-                    {new Date(session.startedAt).toLocaleString()} · {session.turns.length} messages
-                  </p>
-                </button>
-              ))
-            )}
-          </div>
-        ) : null}
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            aria-label="View past conversations"
+            className={
+              "flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition " +
+              (historyOpen
+                ? "border-primary bg-primary/15 text-primary"
+                : "border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface")
+            }
+          >
+            <span aria-hidden>🕘</span> History
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-outline-variant/40 px-3 text-xs font-medium text-on-surface hover:bg-surface-container-high"
+            onClick={() => setOpen(false)}
+          >
+            Back to desk
+          </button>
+        </div>
+      </header>
 
-        <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4">
+      {historyOpen ? (
+        <div className="thin-scrollbar max-h-56 space-y-1 overflow-y-auto border-b border-outline-variant/20 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={startNewSession}
+            className="w-full rounded-md border border-outline-variant/40 px-2.5 py-1.5 text-left text-[11px] font-medium text-primary hover:bg-surface-container-high"
+          >
+            + Start new conversation
+          </button>
+          {sessionHistory.length === 0 ? (
+            <p className="px-1 py-2 text-[11px] text-outline">No past conversations yet.</p>
+          ) : (
+            sessionHistory.map((session) => (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => restoreSession(session)}
+                className="w-full rounded-md border border-outline-variant/25 bg-surface-container px-2.5 py-1.5 text-left hover:border-primary/40 hover:bg-surface-container-high"
+              >
+                <p className="truncate text-[11px] font-medium text-on-surface">{session.preview}</p>
+                <p className="text-[10px] text-outline">
+                  {new Date(session.startedAt).toLocaleString()} · {session.turns.length} messages
+                </p>
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-8">
+        <div className="mx-auto w-full max-w-3xl space-y-3">
           {turns.length === 0 ? (
-            <div className="space-y-3 pt-4">
-              <p className="text-sm text-slate-500">
-                Ask about your whole pipeline — trends, stale leads, or the review queue. Confirmed actions update the dashboard live.
+            <HelixWelcome desk="leads" name={welcomeName} title="What shall we look at in your pipeline?">
+              <p className="text-sm text-on-surface-variant">
+                Ask about your whole pipeline — trends, stale leads, or the review queue. Confirmed actions update the
+                dashboard live.
               </p>
               {isSandbox ? (
                 <button
                   type="button"
                   onClick={() => void runFullDemo()}
                   disabled={runningDemo}
-                  className="flex items-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 transition hover:border-sky-400 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span aria-hidden>▶</span> Watch Helix work
                 </button>
               ) : null}
-            </div>
+            </HelixWelcome>
           ) : null}
           {turns.map((turn, i) => (
-            <div key={i} className="space-y-2">
+            <div key={i} className={turn.message.role === "user" ? "space-y-2" : "relative space-y-2 pl-16"}>
+              {turn.message.role !== "user" ? (
+                <HelixAvatar
+                  desk="leads"
+                  state={i === lastAssistantIdx && !busy ? avatarState : "idle"}
+                  animated={i === lastAssistantIdx && !busy}
+                  size={52}
+                  decorative
+                  className="absolute top-0.5 left-0"
+                />
+              ) : null}
               <div
                 className={
                   turn.message.role === "user"
-                    ? "ml-auto max-w-[85%] rounded-lg bg-sky-500/15 px-3 py-2 text-sm text-sky-100"
-                    : "max-w-[90%] rounded-lg border border-sky-900/30 bg-[#0a1e30] px-3 py-2 text-sm whitespace-pre-line text-slate-200"
+                    ? "ml-auto max-w-[85%] rounded-lg bg-primary/15 px-3 py-2 text-sm text-on-surface"
+                    : "max-w-[90%] rounded-lg border border-outline-variant/25 bg-surface-container px-3 py-2 text-sm whitespace-pre-line text-on-surface-variant"
                 }
               >
                 {turn.message.attachments?.length ? (
-                  <p className="mb-1 text-[10px] text-sky-400">📎 attached image</p>
+                  <p className="mb-1 text-[10px] text-primary">📎 attached image</p>
                 ) : null}
                 {turn.message.content}
               </div>
 
               {turn.executed ? (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                  <p className="mb-1 text-xs font-semibold text-emerald-200">
+                <div className="rounded-lg border border-tertiary/30 bg-tertiary/5 p-3">
+                  <p className="mb-1 text-xs font-semibold text-tertiary">
                     {turn.undone ? "Undone" : turn.executed.done.length ? "Done automatically" : "Could not apply"}
                   </p>
-                  <p className="mb-2 text-xs text-slate-300">
+                  <p className="mb-2 text-xs text-on-surface-variant">
                     {turn.executed.done.length
                       ? resultText(turn.executed.action, turn.executed.done.length, turn.executed.failed.length, turn.executed.targets)
                       : turn.executed.failed[0]?.error ?? "Unknown error"}
@@ -564,7 +653,7 @@ export function AskAiDrawer({
                     <button
                       type="button"
                       onClick={() => void undoExecuted(i)}
-                      className="rounded-md border border-emerald-500/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/10"
+                      className="rounded-md border border-tertiary/40 px-3 py-1 text-[11px] font-semibold text-tertiary hover:bg-tertiary/10"
                     >
                       Undo
                     </button>
@@ -575,7 +664,7 @@ export function AskAiDrawer({
               {turn.proposal ? (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                   <p className="mb-2 text-xs font-semibold text-amber-200">Proposed action</p>
-                  <ul className="mb-2 space-y-0.5 text-xs text-slate-300">
+                  <ul className="mb-2 space-y-0.5 text-xs text-on-surface-variant">
                     {turn.proposal.targets.map((t) => (
                       <li key={t.id}>• {t.label}</li>
                     ))}
@@ -592,17 +681,17 @@ export function AskAiDrawer({
                       <button
                         type="button"
                         onClick={() => dismissProposal(i)}
-                        className="rounded-md border border-sky-900/50 px-3 py-1 text-[11px] text-slate-300 hover:bg-sky-900/20"
+                        className="rounded-md border border-outline-variant/40 px-3 py-1 text-[11px] text-on-surface-variant hover:bg-surface-container-high"
                       >
                         Dismiss
                       </button>
                     </div>
                   ) : turn.proposalStatus === "confirmed" ? (
-                    <p className="text-[11px] font-medium text-emerald-300">✓ {turn.proposalResult}</p>
+                    <p className="text-[11px] font-medium text-tertiary">✓ {turn.proposalResult}</p>
                   ) : turn.proposalStatus === "failed" ? (
-                    <p className="text-[11px] font-medium text-rose-400">{turn.proposalResult}</p>
+                    <p className="text-[11px] font-medium text-error">{turn.proposalResult}</p>
                   ) : (
-                    <p className="text-[11px] text-slate-500">Dismissed.</p>
+                    <p className="text-[11px] text-outline">Dismissed.</p>
                   )}
                 </div>
               ) : null}
@@ -621,24 +710,24 @@ export function AskAiDrawer({
                         className={
                           "w-full rounded-lg border p-3 text-left transition disabled:cursor-default " +
                           (isSelected
-                            ? "border-sky-400 bg-sky-500/20"
+                            ? "border-primary bg-primary/20"
                             : isDisabled
-                              ? "border-sky-900/20 bg-[#0a1e30] opacity-40"
+                              ? "border-outline-variant/20 bg-surface-container opacity-40"
                               : s.recommended
-                                ? "border-sky-500/50 bg-sky-500/10 hover:border-sky-400 hover:bg-sky-500/15"
-                                : "border-sky-900/30 bg-[#0a1e30] hover:border-sky-700 hover:bg-sky-900/20")
+                                ? "border-primary/50 bg-primary/10 hover:border-primary hover:bg-primary/15"
+                                : "border-outline-variant/25 bg-surface-container hover:border-primary/40 hover:bg-surface-container-high")
                         }
                       >
                         <div className="mb-1 flex items-center gap-1.5">
-                          <p className="text-xs font-semibold text-slate-100">{s.label}</p>
+                          <p className="text-xs font-semibold text-on-surface">{s.label}</p>
                           {s.recommended ? (
-                            <span className="rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#04101c] uppercase">
+                            <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-on-primary-container uppercase">
                               Recommended
                             </span>
                           ) : null}
-                          {isSelected ? <span className="text-[11px] text-sky-300">✓ Selected</span> : null}
+                          {isSelected ? <span className="text-[11px] text-primary">✓ Selected</span> : null}
                         </div>
-                        <p className="text-[11px] text-slate-400">{s.detail}</p>
+                        <p className="text-[11px] text-on-surface-variant">{s.detail}</p>
                       </button>
                     );
                   })}
@@ -647,16 +736,21 @@ export function AskAiDrawer({
             </div>
           ))}
           {busy ? (
-            <div className="flex items-center gap-1 rounded-lg border border-sky-900/30 bg-[#0a1e30] px-3 py-2.5 w-fit">
-              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-sky-400" style={{ animationDelay: "0ms" }} />
-              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-sky-400" style={{ animationDelay: "180ms" }} />
-              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-sky-400" style={{ animationDelay: "360ms" }} />
+            <div className="flex items-end gap-3">
+              <HelixAvatar desk="leads" state="thinking" size={52} decorative />
+              <div className="flex w-fit items-center gap-1 rounded-lg border border-outline-variant/25 bg-surface-container px-3 py-2.5">
+              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-primary" style={{ animationDelay: "0ms" }} />
+              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-primary" style={{ animationDelay: "180ms" }} />
+              <span className="ask-ai-typing-dot size-1.5 rounded-full bg-primary" style={{ animationDelay: "360ms" }} />
+              </div>
             </div>
           ) : null}
-          {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+          {error ? <p className="text-xs text-error">{error}</p> : null}
         </div>
+      </div>
 
-        <div className="space-y-2 border-t border-sky-900/40 px-4 pt-3">
+      <div className="space-y-2 border-t border-outline-variant/20 px-4 pt-3 sm:px-8">
+        <div className="mx-auto w-full max-w-3xl space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {QUICK_ACTIONS.map((action) => (
               <button
@@ -664,7 +758,7 @@ export function AskAiDrawer({
                 type="button"
                 disabled={busy || runningDemo}
                 onClick={() => void ask(action)}
-                className="rounded-full border border-sky-900/50 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-sky-900/20 disabled:opacity-50"
+                className="rounded-full border border-outline-variant/40 px-2.5 py-1 text-[11px] text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50"
               >
                 {action}
               </button>
@@ -672,40 +766,39 @@ export function AskAiDrawer({
           </div>
 
           {pendingAttachment ? (
-            <div className="flex items-center gap-2 rounded-md border border-sky-900/40 bg-[#0a1e30] px-2 py-1 text-[11px] text-slate-300">
+            <div className="flex items-center gap-2 rounded-md border border-outline-variant/25 bg-surface-container px-2 py-1 text-[11px] text-on-surface-variant">
               📎 image attached
-              <button type="button" onClick={() => setPendingAttachment(null)} className="text-slate-500 hover:text-slate-200">
+              <button type="button" onClick={() => setPendingAttachment(null)} className="text-outline hover:text-on-surface">
                 ×
               </button>
             </div>
           ) : null}
 
           <form onSubmit={onSubmit} className="flex items-center gap-2">
-            <label className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-sky-900/50 text-slate-400 hover:bg-sky-900/20">
+            <label className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-high">
               📎
               <input type="file" accept="image/*" className="hidden" onChange={(e) => void onAttachChange(e)} />
             </label>
             <input
+              ref={inputRef}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask Helix AI to summarize, find, or draft…"
               disabled={busy || runningDemo}
-              className="h-9 w-full min-w-0 rounded-md border border-sky-900/50 bg-[#0a1e30] px-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
+              className="h-11 w-full min-w-0 rounded-md border border-outline-variant/40 bg-surface-container-lowest px-2.5 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none"
             />
             <button
               type="submit"
               disabled={busy || runningDemo || (!question.trim() && !pendingAttachment)}
-              className="shrink-0 rounded-md bg-sky-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 rounded-md bg-primary-container px-3 py-2 text-xs font-bold text-on-primary-container hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Send
             </button>
           </form>
 
-          <p className="pb-3 text-[10px] text-slate-500">
-            Helix AI can make mistakes. Review the information before acting.
-          </p>
+          <p className="pb-3 text-[10px] text-outline">Helix AI can make mistakes. Review the information before acting.</p>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </div>
   );
 }

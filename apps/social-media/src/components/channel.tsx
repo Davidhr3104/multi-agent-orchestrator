@@ -36,6 +36,13 @@ export function ChannelMark({ channel, className = "size-3.5" }: { channel: Chan
       </svg>
     );
   }
+  if (channel === "bluesky") {
+    return (
+      <svg {...common}>
+        <path d="M7 8c1.8 2.2 3.4 5.4 5 8.8C13.6 13.4 15.2 10.2 17 8c1.2-1.4 2.4-2 3.2-2 .6 0 .8.5.8 1.2 0 3.2-2.2 6.6-5.2 8.4C18.6 17 21 19.4 21 21c0 .7-.6 1-1.2 1-1.4 0-3.2-1.2-4.8-3.2C13.6 20.4 12.8 21 12 21s-1.6-.6-3-2.2C7.4 20.8 5.6 22 4.2 22 3.6 22 3 21.7 3 21c0-1.6 2.4-4 5.2-5.4C5.2 13.8 3 10.4 3 7.2 3 6.5 3.2 6 3.8 6 4.6 6 5.8 6.6 7 8z" />
+      </svg>
+    );
+  }
   return (
     <svg {...common}>
       <path d="M13.5 20v-7h2.3l.4-2.8h-2.7V8.4c0-.8.3-1.4 1.4-1.4h1.4V4.5c-.3 0-1.1-.1-2.1-.1-2.1 0-3.5 1.3-3.5 3.6v2.2H8.4V13h2.3v7z" />
@@ -49,6 +56,7 @@ const CHANNEL_STYLE: Record<Channel, string> = {
   x: "bg-slate-300/10 text-slate-200 ring-slate-300/30",
   tiktok: "bg-teal-400/10 text-teal-300 ring-teal-400/30",
   facebook: "bg-blue-400/10 text-blue-300 ring-blue-400/30",
+  bluesky: "bg-sky-300/10 text-sky-200 ring-sky-300/30",
 };
 
 /** Network name with its mark, coloured per network. */

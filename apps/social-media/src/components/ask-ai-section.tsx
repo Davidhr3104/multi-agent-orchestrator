@@ -1,17 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { MorphPanel } from "@helix/ui";
 import { AiToast, DemoBanner, useAiDeskEvents } from "@/components/ai-desk-events";
 import { notifyDesk, postJson } from "@/components/notify-desk";
 import { parseCompose } from "@/lib/compose";
 
+function openAsk(question?: string) {
+  window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question } }));
+}
+
 const PROMPTS = [
-  { label: "Customer story · LinkedIn", text: "Create a LinkedIn post about a customer story and send it to review" },
-  { label: "This week's product · Instagram", text: "Draft an Instagram post about this week's product" },
-  { label: "How the team works · X", text: "Write an X post about how the team works" },
-  { label: "Behind the scenes · TikTok", text: "Create a TikTok post from a behind-the-scenes moment" },
+  { label: "Customer story · LinkedIn", question: "Create a LinkedIn post about a customer story and send it to review" },
+  { label: "This week's product · Instagram", question: "Draft an Instagram post about this week's product" },
+  { label: "How the team works · X", question: "Write an X post about how the team works" },
+  { label: "Behind the scenes · TikTok", question: "Create a TikTok post from a behind-the-scenes moment" },
 ];
 
 /** Refetches the server-rendered page whenever Helix AI, a review button or Reset demo changes the desk. */
@@ -32,21 +36,19 @@ export function DeskChrome({ brand }: { brand: string }) {
 
 export function AskAiSection() {
   const router = useRouter();
-  const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(event?: FormEvent) {
-    event?.preventDefault();
-    const query = text.trim();
-    if (!parseCompose(query)) {
-      window.dispatchEvent(new CustomEvent("helix:open-palette", { detail: { query } }));
+  async function run(query: string) {
+    const q = query.trim();
+    if (!q || busy) return;
+    if (!parseCompose(q)) {
+      openAsk(q);
       return;
     }
     setBusy(true);
     try {
-      const data = await postJson<{ href?: string; message?: string }>("/api/desk", { action: "compose", text: query });
+      const data = await postJson<{ href?: string; message?: string }>("/api/desk", { action: "compose", text: q });
       notifyDesk(data.message ?? "Draft saved. Nothing was published.");
-      setText("");
       if (data.href) router.push(data.href);
       router.refresh();
     } catch (err) {
@@ -67,66 +69,55 @@ export function AskAiSection() {
           </p>
           <div>
             <h2 id="ask-helix-title" className="font-[family-name:var(--font-sora)] text-[22px] leading-7 font-bold tracking-tight text-foreground">
-              Ask Helix
+              <button type="button" onClick={() => openAsk()} className="cursor-pointer text-left hover:text-primary">
+                Ask Helix
+              </button>
             </h2>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">
               Name a channel and what the post should say. Helix drafts it from the voice saved on this brand. A person still approves it, and nothing is published.
             </p>
           </div>
-          <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-2 rounded-xl bg-muted p-1.5 sm:flex-row sm:items-center">
-            <label htmlFor="ask-helix-input" className="sr-only">
-              Ask Helix to draft a post
-            </label>
-            <span className="hidden pl-2 text-secondary-foreground sm:inline-flex" aria-hidden>
-              <Sparkles className="size-4" />
-            </span>
-            <input
-              id="ask-helix-input"
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Create a LinkedIn post about a customer story and send it to review"
-              className="min-h-10 min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={busy}
-              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_0_16px_rgba(247,81,161,0.35)] disabled:opacity-50"
-            >
-              {busy ? "Drafting…" : "Draft"}
-            </button>
-          </form>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Prompts</span>
-            {PROMPTS.map((prompt) => (
-              <button
-                key={prompt.label}
-                type="button"
-                onClick={() => setText(prompt.text)}
-                className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground hover:bg-accent"
-              >
-                {prompt.label}
-              </button>
-            ))}
-          </div>
+          <MorphPanel
+            title="Ask Helix for Social"
+            logoSrc="/logo-icon.png"
+            avatarDesk="social"
+            accent="#f751a1"
+            accentInk="#570032"
+            placeholder="Create a LinkedIn post about a customer story and send it to review"
+            busy={busy}
+            chips={PROMPTS}
+            onAsk={(q) => void run(q)}
+          />
         </div>
         <figure className="relative lg:col-span-5">
-          <div className="overflow-hidden rounded-xl bg-background shadow-2xl">
+          <button
+            type="button"
+            onClick={() => openAsk()}
+            aria-label="Open Ask Helix AI"
+            className="group relative w-full cursor-pointer overflow-hidden rounded-xl bg-background text-left shadow-2xl transition-transform hover:scale-[1.01]"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/helix-desk.jpg" alt="" className="h-64 w-full object-cover lg:h-72" />
-            <figcaption className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-lg bg-background/80 px-2.5 py-2 text-xs text-foreground backdrop-blur">
+            <span className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2 rounded-lg bg-background/80 px-2.5 py-2 text-xs text-foreground backdrop-blur">
               <span>Drafts stay here until someone approves them.</span>
-            </figcaption>
-          </div>
+              <span className="shrink-0 font-semibold text-primary">Ask Helix →</span>
+            </span>
+          </button>
         </figure>
       </div>
     </section>
   );
 }
 
-/** Opens the Ask Helix AI drawer mounted in the app shell. */
-export function AskHelixButton({ question, children, className }: { question?: string; children: React.ReactNode; className?: string }) {
+/** Opens Ask Helix AI in the main column of the app shell. */
+export function AskHelixButton({
+  question,
+  children,
+  className,
+  ...rest
+}: { question?: string; children: ReactNode; className?: string } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "onClick">) {
   return (
-    <button type="button" className={className} onClick={() => window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question } }))}>
+    <button type="button" className={className} onClick={() => openAsk(question)} {...rest}>
       {children}
     </button>
   );

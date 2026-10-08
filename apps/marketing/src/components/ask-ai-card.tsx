@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { MorphPanel } from "@helix/ui";
 import { OPERATOR_LOCKED, OperatorLockNote } from "@/components/operator-lock-note";
 
 type AskAiMessage = { role: "user" | "assistant"; content: string };
@@ -13,7 +14,6 @@ const QUICK_CHIPS = [
 ];
 
 export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: string) => void }) {
-  const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<AskAiMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,6 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
 
     setError(null);
     setBusy(true);
-    setQuestion("");
 
     const nextHistory: AskAiMessage[] = [...history, { role: "user", content: trimmed }];
     setHistory(nextHistory);
@@ -49,16 +48,6 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
     } finally {
       setBusy(false);
     }
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (onOpenDrawer) {
-      onOpenDrawer(question.trim() || undefined);
-      setQuestion("");
-      return;
-    }
-    void ask(question);
   }
 
   const statusLabel = engine === "fallback" ? "Limited Mode" : "Online & Ready";
@@ -86,36 +75,23 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
             <span className="hidden text-xs text-on-surface-variant sm:inline">How spend quality, waste scoring and HITL decisions work on this desk.</span>
           </div>
 
-          <form onSubmit={onSubmit} className="flex items-center gap-2">
-            <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask AI e.g. what does spend on spam mean?"
-              disabled={busy}
-              className="h-10 w-full min-w-0 rounded-lg border border-[var(--border-hairline)] bg-surface-container-high px-3 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={busy || !question.trim()}
-              className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg bg-[#f97316] px-4 text-xs font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {busy ? "Asking…" : "Ask Helix →"}
-            </button>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-2">
-                        {QUICK_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                disabled={busy}
-                onClick={() => void ask(chip.question)}
-                className="inline-flex min-h-10 items-center rounded-full border border-[var(--border-hairline)] px-3 text-xs sm:min-h-8 text-on-surface-variant transition hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          <MorphPanel
+            title="Ask Helix for Marketing"
+            logoSrc="/logo-icon.png"
+            avatarDesk="marketing"
+            accent="#f97316"
+            accentInk="#552100"
+            placeholder="Ask AI e.g. what does spend on spam mean?"
+            busy={busy}
+            chips={QUICK_CHIPS}
+            onAsk={(text) => {
+              if (onOpenDrawer) {
+                onOpenDrawer(text);
+                return;
+              }
+              window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question: text } }));
+            }}
+          />
 
           {error === OPERATOR_LOCKED ? <OperatorLockNote /> : error ? <p className="text-xs text-rose-500">{error}</p> : null}
 
@@ -141,18 +117,18 @@ export function AskAiCard({ onOpenDrawer }: { onOpenDrawer?: (initialQuestion?: 
 
         <button
           type="button"
-          onClick={() => onOpenDrawer?.()}
-          disabled={!onOpenDrawer}
+          onClick={() => {
+            if (onOpenDrawer) onOpenDrawer();
+            else window.dispatchEvent(new CustomEvent("helix:open-ask", { detail: { question: "" } }));
+          }}
           aria-label="Open Ask Helix AI assistant"
-          className="group relative hidden shrink-0 rounded-lg transition-transform hover:scale-[1.02] disabled:cursor-default disabled:hover:scale-100 lg:block"
+          className="group relative mx-auto shrink-0 cursor-pointer rounded-lg transition-transform hover:scale-[1.02] lg:mx-0"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ask-ai/ask-ai-visual.png" alt="" className="h-36 w-auto rounded-lg object-contain" />
-          {onOpenDrawer ? (
-            <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
-              Ask Helix <span aria-hidden>→</span>
-            </span>
-          ) : null}
+          <span className="absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-md bg-black/70 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition-colors group-hover:bg-black/85">
+            Ask Helix <span aria-hidden>→</span>
+          </span>
         </button>
       </div>
     </div>

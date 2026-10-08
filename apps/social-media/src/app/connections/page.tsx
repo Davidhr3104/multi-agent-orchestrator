@@ -11,6 +11,7 @@ const NETWORK: Record<string, string> = {
   instagram: "Instagram Graph API · read insights and publish",
   facebook: "Facebook Pages API · read insights and publish",
   linkedin: "LinkedIn Posts API · publish as the organization",
+  bluesky: "AT Protocol · publish with an app password",
   x: "X API · token only, no adapter",
   tiktok: "TikTok Content Posting · token only, no adapter",
 };
@@ -61,9 +62,9 @@ export default async function ConnectionsPage() {
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           The live switch <span className="font-mono text-foreground">HELIX_SOCIAL_PUBLISH=live</span> is {report.publishSwitch ? "on" : "off"}.
           {report.publishSwitch
-            ? " Instagram, Facebook and LinkedIn posts can go out, one at a time, when a person approves a post and presses Publish on it."
+            ? " Instagram, Facebook, LinkedIn and Bluesky posts can go out, one at a time, when a person approves a post and presses Publish on it."
             : " Nothing can leave the desk until an operator sets it. Even then, each post needs a person's approval and a Publish press."}{" "}
-          Helix AI and the cron never publish. X and TikTok have no adapter.
+          Helix AI and the cron never publish. X and TikTok have no adapter. Calendar data lives in memory until a database is connected — approvals do not survive a cold start.
         </p>
       </section>
 

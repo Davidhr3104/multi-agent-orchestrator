@@ -6,12 +6,15 @@ import { applyRewrite, repurposeDraft, type RewriteAction } from "./copilot";
 import { PLANS } from "./plans";
 import { hardBlockers, scoreReadiness } from "./readiness";
 import { suggestSlot } from "./schedule";
+import { DEMO_INBOUND, type HelixInbound } from "./helix-inbound";
+import { classifyAudienceComment } from "./leads-from-comments";
 import { buildHarborPosts, buildSeedPosts, DEMO_BRAND, HARBOR_BRAND } from "./seed";
 import type { FetchLike } from "./social/config";
 import type { PollOptions } from "./social/meta-publish";
 import { publishEnv, publishGate, sendToNetwork } from "./social/publish";
 import { STOCK, stockById } from "./stock";
-import type { AccessRole, ApprovalMode, Brand, Channel, Comment, DeskRole, ExecutiveReport, LibraryAsset, MediaItem, Member, PlanId, Post, PostStatus, Readiness, Revision, WebhookDelivery, WebhookEndpoint } from "./types";
+import { loadDeskSnapshot, saveDeskSnapshot } from "./supabase-desk";
+import type { AccessRole, ApprovalMode, AudienceComment, Brand, Channel, Comment, DeskRole, ExecutiveReport, LibraryAsset, MediaItem, Member, PlanId, Post, PostStatus, Readiness, Revision, WebhookDelivery, WebhookEndpoint } from "./types";
 import { addDaysKey, dayKey, keyToDate } from "./tz";
 
 /**
@@ -31,6 +34,8 @@ type Workspace = {
   reports: ExecutiveReport[];
   reviewToken?: string;
   autopilot?: boolean;
+  inbound: HelixInbound[];
+  audience: AudienceComment[];
 };
 
 type Root = {
@@ -95,6 +100,36 @@ function lumenWorkspace(): Workspace {
     webhooks: [],
     outbox: [],
     reports: [],
+    inbound: DEMO_INBOUND.map((row) => ({ ...row })),
+    audience: [
+      {
+        id: "aud-1",
+        postId: "seed-ig-harvest-drop",
+        text: "How much for a 12oz bag and can I book a pickup this week?",
+        kind: "lead",
+        at: new Date().toISOString(),
+        demo: true,
+        handedToLeads: false,
+      },
+      {
+        id: "aud-2",
+        postId: "seed-ig-harvest-drop",
+        text: "Interested — DM me the price for two bags.",
+        kind: "lead",
+        at: new Date().toISOString(),
+        demo: true,
+        handedToLeads: false,
+      },
+      {
+        id: "aud-3",
+        postId: "seed-li-hiring-roaster",
+        text: "This is a scam, never again.",
+        kind: "complaint",
+        at: new Date().toISOString(),
+        demo: true,
+        handedToLeads: false,
+      },
+    ],
   };
 }
 
@@ -123,11 +158,13 @@ function harborWorkspace(): Workspace {
     webhooks: [],
     outbox: [],
     reports: [],
+    inbound: [],
+    audience: [],
   };
 }
 
 function emptyWorkspace(id: string, brand: Brand): Workspace {
-  return { id, posts: new Map(), brand: copyBrand(brand), approval: "manager", creditsUsed: 0, assets: [], members: [{ id: "you", name: "You", role: "owner" }], webhooks: [], outbox: [], reports: [] };
+  return { id, posts: new Map(), brand: copyBrand(brand), approval: "manager", creditsUsed: 0, assets: [], members: [{ id: "you", name: "You", role: "owner" }], webhooks: [], outbox: [], reports: [], inbound: [], audience: [] };
 }
 
 function applyDemo() {
@@ -174,6 +211,69 @@ function spendCredit(ws: Workspace) {
 function record(ws: Workspace, event: string, payload: Record<string, unknown>) {
   ws.outbox.unshift({ id: nid("wh"), at: new Date().toISOString(), event, payload });
   ws.outbox = ws.outbox.slice(0, 30);
+  queuePersist();
+}
+
+type DeskSnapshot = {
+  activeId: string;
+  sessionRole: AccessRole;
+  plan: PlanId;
+  workspaces: Array<Omit<Workspace, "posts"> & { posts: Post[] }>;
+};
+
+function snapshotOf(r: Root): DeskSnapshot {
+  return {
+    activeId: r.activeId,
+    sessionRole: r.sessionRole,
+    plan: r.plan,
+    workspaces: [...r.workspaces.values()].map((ws) => ({
+      ...ws,
+      posts: [...ws.posts.values()].map((p) => clone(p)),
+      brand: copyBrand(ws.brand),
+      inbound: (ws.inbound ?? []).map((row) => ({ ...row })),
+      audience: (ws.audience ?? []).map((row) => ({ ...row })),
+    })),
+  };
+}
+
+function applySnapshot(raw: DeskSnapshot) {
+  const r = root();
+  r.activeId = raw.activeId;
+  r.sessionRole = raw.sessionRole;
+  r.plan = raw.plan;
+  r.workspaces = new Map(
+    raw.workspaces.map((ws) => [
+      ws.id,
+      {
+        ...ws,
+        posts: new Map((ws.posts ?? []).map((p) => [p.id, clone(p)])),
+        inbound: ws.inbound ?? [],
+        audience: ws.audience ?? [],
+      },
+    ]),
+  );
+  r.seeded = true;
+}
+
+function queuePersist() {
+  if (demoAvailable()) return;
+  const r = root();
+  if (!r.seeded) return;
+  void saveDeskSnapshot(snapshotOf(r)).catch(() => undefined);
+}
+
+async function hydrateOnce() {
+  const g = globalThis as typeof globalThis & { __helixSocialHydrated?: boolean };
+  if (g.__helixSocialHydrated) return;
+  g.__helixSocialHydrated = true;
+  if (demoAvailable()) return;
+  try {
+    const snap = await loadDeskSnapshot();
+    if (!snap || typeof snap !== "object") return;
+    applySnapshot(snap as DeskSnapshot);
+  } catch {
+    /* stay on the in-memory desk */
+  }
 }
 
 export type ScoredPost = Post & { readiness: Readiness };
@@ -183,6 +283,7 @@ export function currentDeskMode(): DeskMode {
 }
 
 export async function getBrand(): Promise<Brand> {
+  await hydrateOnce();
   return ensure().brand;
 }
 
@@ -191,11 +292,13 @@ function scored(p: Post, brand: Brand): ScoredPost {
 }
 
 export async function listPosts(): Promise<ScoredPost[]> {
+  await hydrateOnce();
   const d = ensure();
   return [...d.posts.values()].map((p) => scored(p, d.brand)).sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor));
 }
 
 export async function getPost(id: string): Promise<ScoredPost | null> {
+  await hydrateOnce();
   const d = ensure();
   const p = d.posts.get(id);
   return p ? scored(p, d.brand) : null;
@@ -208,7 +311,9 @@ export async function getPostRaw(id: string): Promise<Post | null> {
 }
 
 export async function putPost(p: Post): Promise<void> {
+  await hydrateOnce();
   ensure().posts.set(p.id, clone(p));
+  queuePersist();
 }
 
 const NOTE_MAX = 400;
@@ -574,6 +679,7 @@ export type ShellSession = {
 };
 
 export async function shellSession(): Promise<ShellSession> {
+  await hydrateOnce();
   const ws = ensure();
   const r = root();
   const plan = PLANS[r.plan];
@@ -975,3 +1081,64 @@ export async function approveFromReviewToken(token: string, id: string): Promise
   record(ws, "post.approved", { id, actor: "Client link" });
   return true;
 }
+
+export async function listInbound(): Promise<HelixInbound[]> {
+  await hydrateOnce();
+  return (ensure().inbound ?? []).map((row) => ({ ...row }));
+}
+
+export async function acceptInbound(id: string, actor: string): Promise<ScoredPost | null> {
+  requireAccess("edit");
+  await hydrateOnce();
+  const ws = ensure();
+  const row = ws.inbound.find((item) => item.id === id);
+  if (!row || row.status !== "waiting") return null;
+  row.status = "accepted";
+  const slot = suggestSlot(row.channel, "product");
+  const draft: Post = {
+    id: nid("hx"),
+    channel: row.channel,
+    pillar: "product",
+    scheduledFor: slot.iso,
+    caption: row.caption,
+    hashtags: [],
+    asset: row.title,
+    status: "needs_review",
+    createdBy: "helix_ai",
+    notes: [`${actor}: Draft from ${row.cite}. Other Helixes do not publish; this desk still needs a person.`],
+    comments: [],
+    revisions: [],
+    media: [],
+  };
+  record(ws, "inbound.accepted", { id });
+  return placeDraft(ws, draft);
+}
+
+export async function dismissInbound(id: string): Promise<boolean> {
+  requireAccess("edit");
+  await hydrateOnce();
+  const ws = ensure();
+  const row = ws.inbound.find((item) => item.id === id);
+  if (!row) return false;
+  row.status = "dismissed";
+  record(ws, "inbound.dismissed", { id });
+  return true;
+}
+
+export async function listAudienceComments(): Promise<AudienceComment[]> {
+  await hydrateOnce();
+  return (ensure().audience ?? []).map((row) => ({ ...row }));
+}
+
+export async function handCommentToLeads(id: string, actor: string): Promise<boolean> {
+  requireAccess("edit");
+  await hydrateOnce();
+  const ws = ensure();
+  const row = ws.audience.find((item) => item.id === id);
+  if (!row || row.kind !== "lead") return false;
+  row.handedToLeads = true;
+  record(ws, "leads.handoff", { id, actor, demo: row.demo });
+  return true;
+}
+
+export { classifyAudienceComment };

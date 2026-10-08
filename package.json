@@ -10,6 +10,7 @@
     "apps/marketing",
     "apps/real-estate",
     "apps/social-media",
+    "apps/data",
     "packages/helix-core",
     "packages/helix-help",
     "packages/helix-ui"
@@ -23,7 +24,8 @@
     "dev:marketing": "npm run dev --workspace=helix-marketing",
     "test": "npm test --workspace=@helix/core",
     "dev:realestate": "npm run dev --workspace=helix-real-estate",
-    "dev:social": "npm run dev --workspace=helix-social-media"
+    "dev:social": "npm run dev --workspace=helix-social-media",
+    "dev:data": "npm run dev --workspace=helix-data"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

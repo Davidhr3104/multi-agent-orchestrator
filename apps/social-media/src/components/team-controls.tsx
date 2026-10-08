@@ -5,7 +5,7 @@ import { useState } from "react";
 import { notifyDesk, postJson } from "@/components/notify-desk";
 import { ROLE_LABEL } from "@/lib/access";
 import type { ShellSession } from "@/lib/store";
-import type { AccessRole, ApprovalMode, PlanId } from "@/lib/types";
+import type { AccessRole, ApprovalMode } from "@/lib/types";
 
 const ROLES: AccessRole[] = ["owner", "manager", "creator", "client"];
 
@@ -81,21 +81,7 @@ export function TeamControls({ session }: { session: ShellSession }) {
         <p className="mt-1 text-sm text-foreground">
           {session.plan === "pro" ? "Pro" : "Starter"} · {session.creditsUsed}/{session.creditsLimit} AI credits · {session.accountLimit} connected accounts · {session.workspaces.length}/{session.workspaceLimit} workspaces
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">Changing the plan updates these limits on the desk. No card is charged.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(["starter", "pro"] as PlanId[]).map((plan) => (
-            <button
-              key={plan}
-              type="button"
-              aria-pressed={session.plan === plan}
-              disabled={!!busy}
-              onClick={() => void run("plan", { action: "plan", plan }, `Plan set to ${plan}.`)}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${session.plan === plan ? "border-primary/50 bg-primary/15 text-primary" : "border-border text-muted-foreground"}`}
-            >
-              {plan}
-            </button>
-          ))}
-        </div>
+        <p className="mt-1 text-xs text-muted-foreground">Plan changes wait for Stripe. This desk does not charge a card and does not show a fake Upgrade.</p>
       </section>
 
       <section className="rounded-xl border border-border bg-card/80 p-5">

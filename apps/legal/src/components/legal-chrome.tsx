@@ -406,7 +406,7 @@ export function LegalChrome({
         </div>
       </aside>
 
-      <div className={cn("flex min-w-0 flex-1 flex-col bg-[#0a1322]", offset)}>
+      <div className={cn("relative flex min-h-screen min-w-0 flex-1 flex-col bg-[#0a1322]", offset)}>
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[#1b2a45] bg-[#0a1322] px-3 sm:gap-4 sm:px-5">
           <button
             type="button"

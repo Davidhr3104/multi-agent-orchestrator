@@ -53,6 +53,10 @@ export type UserPreferences = {
   theme: DeskTheme;
   customRules: CustomRule[];
   templates: EmailTemplate[];
+  /** Helix Automations on a live desk (a demo desk keeps them in a cookie). Stored inside the same JSON bag as rules. */
+  automations?: import("@helix/core/automations").AutomationSpec[];
+  automationRuns?: import("@helix/core/automations").AutomationRun[];
+  automationTimezone?: string | null;
 };
 
 export type CustomRule = {

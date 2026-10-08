@@ -58,6 +58,10 @@ export function DeskShell({
   }, [router]);
 
   useEffect(() => {
+    setAskOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
     function onAsk(event: Event) {
       const detail = (event as CustomEvent<string>).detail;
       setAskQuestion(detail || undefined);

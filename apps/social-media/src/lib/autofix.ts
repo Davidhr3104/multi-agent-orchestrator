@@ -11,6 +11,7 @@ const CTA_LINE: Record<Channel, string> = {
   x: "Reply if you want the details.",
   tiktok: "Comment and save this.",
   facebook: "Learn more and tell us you're in.",
+  bluesky: "Reply if you want the details.",
 };
 
 const TAGS: Record<Pillar, string[]> = {

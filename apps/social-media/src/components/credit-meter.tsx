@@ -1,33 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { notifyDesk, postJson } from "@/components/notify-desk";
 import { ROLE_LABEL } from "@/lib/access";
 import { PLANS } from "@/lib/plans";
 import type { ShellSession } from "@/lib/store";
 
 export function CreditMeter({ session }: { session: ShellSession }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const used = Math.min(session.creditsUsed, session.creditsLimit);
   const width = session.creditsLimit ? Math.round((used / session.creditsLimit) * 100) : 0;
-  const onPro = session.plan === "pro";
-
-  async function upgrade() {
-    setBusy(true);
-    setError(null);
-    try {
-      await postJson("/api/workspace", { action: "plan", plan: "pro" });
-      notifyDesk(`Plan set to Pro. ${PLANS.pro.credits} AI credits, no card charged.`);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2">
@@ -44,25 +23,8 @@ export function CreditMeter({ session }: { session: ShellSession }) {
         {session.creditsUsed} / {session.creditsLimit} credits used
       </p>
       <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
-        {PLANS[session.plan].label} plan. Nothing is posted from this desk. No card is charged.
+        {PLANS[session.plan].label} limits on this desk. Checkout is not live — there is no Upgrade until Stripe is connected.
       </p>
-      {onPro ? (
-        <p className="mt-2 text-xs font-semibold text-primary">Pro · {session.creditsLimit} credits</p>
-      ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void upgrade()}
-          className="mt-2 inline-flex min-h-8 cursor-pointer items-center rounded-full border border-primary/40 px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
-        >
-          {busy ? "Updating…" : "Upgrade to Pro"}
-        </button>
-      )}
-      {error ? (
-        <p role="alert" className="mt-1 text-xs text-rose-400">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

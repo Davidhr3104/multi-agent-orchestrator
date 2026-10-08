@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { X } from "lucide-react";
 import { ErrorText, isOperatorLocked, OPERATOR_HINT } from "@/components/operator-notice";
+import { HelixAvatar, HelixWelcome, useHelixAvatarState } from "@helix/ui";
 
 type Attachment = { type: "image"; data: string; mediaType: string };
 type Engine = "claude" | "fallback";
@@ -60,12 +61,12 @@ const THEME = {
   quick: ["What's urgent right now?","Which emails need a reply?","What can I ignore?","Draft a reply to Maya Chen"] as string[],
   demoScript: ["What's urgent right now?","Which emails need a reply?","Draft a reply to Maya Chen","Snooze Priya Shah's email","Archive the HVAC Weekly newsletter","Send Maya Chen the reply","__CONFIRM_LAST_PROPOSAL__"] as string[],
   vars: {
-    "--ai-accent": "#8b5cf6",
-    "--ai-accent-soft": "rgba(139,92,246,0.18)",
-    "--ai-accent-ink": "#ffffff",
-    "--ai-bg": "#0c0818",
-    "--ai-panel": "#171029",
-    "--ai-border": "rgba(139,92,246,0.28)",
+    "--ai-accent": "#1ad4c4",
+    "--ai-accent-soft": "rgba(26,212,196,0.16)",
+    "--ai-accent-ink": "#042f2e",
+    "--ai-bg": "hsl(var(--background))",
+    "--ai-panel": "hsl(var(--surface))",
+    "--ai-border": "hsl(var(--border))",
   } as CSSProperties,
 };
 
@@ -135,14 +136,6 @@ export function AskAiDrawer({
   seed?: number;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const sync = () => setNarrow(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
   const [question, setQuestion] = useState("");
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [busy, setBusy] = useState(false);
@@ -174,6 +167,15 @@ export function AskAiDrawer({
         .catch(() => setIsDemo(false));
     } else if (turnsRef.current.length > 0) saveSession(turnsRef.current);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -400,31 +402,43 @@ export function AskAiDrawer({
   const border = "border-[color:var(--ai-border)]";
   const locked = busy || runningDemo;
 
+  // the face follows the latest reply: speaking, then done; unsure while that reply waits for a human OK
+  const lastAssistantIdx = turns.reduce((acc, t, i) => (t.role === "user" ? acc : i), -1);
+  const lastAssistant = lastAssistantIdx >= 0 ? turns[lastAssistantIdx] : undefined;
+  const needsHuman = Boolean(
+    (lastAssistant?.proposal && lastAssistant.proposalStatus === "pending") ||
+      lastAssistant?.agentStatus === "pending"
+  );
+  // a finished task (confirmed, applied or approved) keeps the done face until the next request
+  const taskDone = Boolean(
+    (lastAssistant?.proposal && lastAssistant.proposalStatus === "confirmed") ||
+      (lastAssistant?.executed && lastAssistant.executed.done.length > 0 && !lastAssistant.undone) ||
+      lastAssistant?.agentStatus === "approved"
+  );
+  const avatarState = useHelixAvatarState(busy, Boolean(error), needsHuman, taskDone);
+  if (!open) return null;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
-      <SheetContent
-        side="right"
-        // On a phone the drawer covers the whole screen, so dim the page behind it. On desktop it stays a side panel you can work beside.
-        showOverlay={narrow}
-        style={THEME.vars}
-        className={`flex h-full w-full min-h-0 flex-col overflow-hidden border-l ${border} bg-[var(--ai-bg)] sm:max-w-md`}
-      >
-        <SheetHeader className={`border-b ${border} pb-3`}>
-          <div className="flex items-center justify-between gap-2 pr-8">
+    <div
+      className="absolute inset-0 z-50 flex min-h-0 flex-col overflow-hidden bg-[var(--ai-bg)] text-foreground"
+      style={THEME.vars}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ask Helix AI"
+    >
+        <header className={`border-b ${border} px-4 py-3 sm:px-6`}>
+          <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={THEME.icon} alt="" className="h-full w-full object-contain" />
-              </div>
-              <SheetTitle className="truncate whitespace-nowrap text-slate-100">Ask Helix AI</SheetTitle>
+              <HelixAvatar desk="inbox" state={avatarState} size={52} decorative />
+              <h2 className="truncate whitespace-nowrap text-sm font-semibold text-foreground">Ask Helix AI</h2>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {isDemo ? (
-                <button type="button" onClick={() => void resetDemo()} disabled={locked} aria-label="Reset demo data" title="Reset demo data" className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-50`}>
+                <button type="button" onClick={() => void resetDemo()} disabled={locked} aria-label="Reset demo data" title="Reset demo data" className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-50`}>
                   ↺
                 </button>
               ) : null}
-              <button type="button" onClick={startNew} disabled={turns.length === 0 || locked} className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium text-slate-400 transition hover:text-slate-200 disabled:opacity-40`}>
+              <button type="button" onClick={startNew} disabled={turns.length === 0 || locked} className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40`}>
                 + New
               </button>
               <button
@@ -432,52 +446,71 @@ export function AskAiDrawer({
                 onClick={() => setHistoryOpen((v) => !v)}
                 aria-label="View past conversations"
                 title="History"
-                className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium transition ${historyOpen ? "bg-[var(--ai-accent-soft)] text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
+                className={`rounded-md border ${border} whitespace-nowrap px-2 py-1 text-[11px] max-md:min-h-10 max-md:min-w-10 font-medium transition ${historyOpen ? "bg-[var(--ai-accent-soft)] text-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 🕘
               </button>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-muted"
+              >
+                <X className="size-3.5" aria-hidden />
+                Back to desk
+              </button>
             </div>
           </div>
-          <p className="flex items-center gap-1 text-[11px] font-medium text-[var(--ai-accent)]">
+          <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[#0a7d73]">
             <span className="inline-block size-1.5 rounded-full bg-[var(--ai-accent)]" />
             {status}
           </p>
-        </SheetHeader>
+        </header>
 
         {historyOpen ? (
           <div className={`thin-scrollbar max-h-56 space-y-1 overflow-y-auto border-b ${border} px-4 py-3`}>
             {sessions.length === 0 ? (
-              <p className="px-1 py-2 text-[11px] text-slate-500">No past conversations yet.</p>
+              <p className="px-1 py-2 text-[11px] text-muted-foreground">No past conversations yet.</p>
             ) : (
               sessions.map((s) => (
                 <button key={s.id} type="button" onClick={() => restore(s)} className={`w-full rounded-md border ${border} bg-[var(--ai-panel)] px-2.5 py-1.5 text-left hover:bg-[var(--ai-accent-soft)]`}>
-                  <p className="truncate text-[11px] font-medium text-slate-200">{s.preview}</p>
-                  <p className="text-[10px] text-slate-500">{new Date(s.startedAt).toLocaleString()} · {s.turns.length} messages</p>
+                  <p className="truncate text-[11px] font-medium text-foreground">{s.preview}</p>
+                  <p className="text-[10px] text-muted-foreground">{new Date(s.startedAt).toLocaleString()} · {s.turns.length} messages</p>
                 </button>
               ))
             )}
           </div>
         ) : null}
 
-        <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4">
+        <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4 sm:px-8">
           {turns.length === 0 ? (
-            <div className="space-y-3 pt-4">
-              <p className="text-sm text-slate-500">{THEME.emptyHint}</p>
+            <HelixWelcome desk="inbox" title="What should we triage?">
+              <p className="text-sm text-muted-foreground">{THEME.emptyHint}</p>
               {isDemo ? (
-                <button type="button" onClick={() => void runDemo()} disabled={runningDemo} className="flex items-center gap-1.5 rounded-lg border border-[color:var(--ai-accent)] bg-[var(--ai-accent-soft)] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:brightness-125 disabled:opacity-60">
+                <button type="button" onClick={() => void runDemo()} disabled={runningDemo} className="flex items-center gap-1.5 rounded-lg border border-[color:var(--ai-accent)] bg-[var(--ai-accent-soft)] px-3 py-2 text-xs font-semibold text-foreground transition hover:brightness-125 disabled:opacity-60">
                   <span aria-hidden>▶</span> Watch Helix work
                 </button>
               ) : null}
-            </div>
+            </HelixWelcome>
           ) : null}
 
+          <div className="mx-auto max-w-3xl space-y-3">
           {turns.map((t, i) => (
-            <div key={i} className="space-y-2">
+            <div key={i} className={t.role === "user" ? "space-y-2" : "relative space-y-2 pl-16"}>
+              {t.role !== "user" ? (
+                <HelixAvatar
+                  desk="inbox"
+                  state={i === lastAssistantIdx && !busy ? avatarState : "idle"}
+                  animated={i === lastAssistantIdx && !busy}
+                  size={52}
+                  decorative
+                  className="absolute top-0.5 left-0"
+                />
+              ) : null}
               <div
                 className={
                   t.role === "user"
-                    ? "ml-auto max-w-[85%] rounded-lg bg-[var(--ai-accent-soft)] px-3 py-2 text-sm text-slate-100"
-                    : `max-w-[90%] rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2 text-sm whitespace-pre-line text-slate-200`
+                    ? "ml-auto max-w-[85%] rounded-lg bg-[var(--ai-accent-soft)] px-3 py-2 text-sm text-foreground"
+                    : `max-w-[90%] rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2 text-sm whitespace-pre-line text-foreground`
                 }
               >
                 {t.attachments?.length ? <p className="mb-1 text-[10px] text-[var(--ai-accent)]">📎 attached image</p> : null}
@@ -487,7 +520,7 @@ export function AskAiDrawer({
               {t.agent?.steps.length ? (
                 <ul className={`space-y-0.5 rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2 text-[11px]`}>
                   {t.agent.steps.map((s, k) => (
-                    <li key={k} className={s.status === "executed" ? "text-slate-300" : s.status === "denied" ? "text-amber-300" : "text-rose-400"}>
+                    <li key={k} className={s.status === "executed" ? "text-muted-foreground" : s.status === "denied" ? "text-amber-300" : "text-rose-400"}>
                       {s.status === "executed" ? "✓" : s.status === "denied" ? "⊘" : "✕"} {s.summary}
                       {s.error ? ` — ${s.error}` : s.status === "denied" && s.reasons?.length ? ` — ${s.reasons.join("; ")}` : ""}
                     </li>
@@ -501,13 +534,13 @@ export function AskAiDrawer({
                   <p className="mb-1 text-xs font-semibold text-amber-200">
                     {t.agentStatus === "approved" ? "Approved" : t.agentStatus === "declined" ? "Declined" : t.agentStatus === "failed" ? "Could not apply" : "Needs your OK"}
                   </p>
-                  <p className="mb-1 text-xs text-slate-300">{t.agent.pending.summary}</p>
+                  <p className="mb-1 text-xs text-muted-foreground">{t.agent.pending.summary}</p>
                   {t.agent.pending.reasons.length && t.agentStatus === "pending" ? (
                     <p className="mb-2 text-[11px] text-amber-100/70">{t.agent.pending.reasons.join(" · ")}</p>
                   ) : null}
                   {t.agent.pending.preview ? (
-                    <div className={`mb-2 rounded-md border ${border} bg-[var(--ai-bg)] p-2 text-[11px] text-slate-300`}>
-                      <p className="mb-1 text-slate-500">To: {t.agent.pending.preview.to}</p>
+                    <div className={`mb-2 rounded-md border ${border} bg-[var(--ai-bg)] p-2 text-[11px] text-muted-foreground`}>
+                      <p className="mb-1 text-muted-foreground">To: {t.agent.pending.preview.to}</p>
                       <p className="whitespace-pre-line">{t.agent.pending.preview.text || "(empty draft)"}</p>
                     </div>
                   ) : null}
@@ -517,7 +550,7 @@ export function AskAiDrawer({
                         <button type="button" disabled={busy} onClick={() => void decideAgent(i, true)} className="rounded-md bg-amber-500 px-3 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-amber-400 disabled:opacity-50">
                           {t.agent.pending.tool === "send_reply" || t.agent.pending.tool === "send_message" ? "Approve & send" : "Approve"}
                         </button>
-                        <button type="button" disabled={busy} onClick={() => void decideAgent(i, false)} className={`rounded-md border ${border} px-3 py-1 text-[11px] text-slate-300 hover:bg-[var(--ai-accent-soft)] disabled:opacity-50`}>
+                        <button type="button" disabled={busy} onClick={() => void decideAgent(i, false)} className={`rounded-md border ${border} px-3 py-1 text-[11px] text-muted-foreground hover:bg-[var(--ai-accent-soft)] disabled:opacity-50`}>
                           Decline
                         </button>
                       </div>
@@ -533,7 +566,7 @@ export function AskAiDrawer({
               {t.executed ? (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
                   <p className="mb-1 text-xs font-semibold text-emerald-200">{t.undone ? "Undone" : t.executed.done.length ? "Done automatically" : "Could not apply"}</p>
-                  <p className="mb-2 text-xs text-slate-300">{t.executed.done.length ? t.executed.resultText : t.executed.failed[0]?.error ?? "Unknown error"}</p>
+                  <p className="mb-2 text-xs text-muted-foreground">{t.executed.done.length ? t.executed.resultText : t.executed.failed[0]?.error ?? "Unknown error"}</p>
                   {t.executed.done.length && !t.undone && t.executed.undoable !== false ? (
                     <button type="button" onClick={() => void undo(i)} className="rounded-md border border-emerald-500/40 px-3 py-1 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/10">
                       Undo
@@ -546,7 +579,7 @@ export function AskAiDrawer({
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                   <p className="mb-1 text-xs font-semibold text-amber-200">{t.proposalStatus === "confirmed" ? "Confirmed" : t.proposalStatus === "dismissed" ? "Dismissed" : t.proposalStatus === "failed" ? "Could not apply" : "Needs your OK"}</p>
                   {t.reasons?.length && t.proposalStatus === "pending" ? <p className="mb-2 text-[11px] text-amber-100/70">{t.reasons.join(" · ")}</p> : null}
-                  <ul className="mb-2 space-y-0.5 text-xs text-slate-300">
+                  <ul className="mb-2 space-y-0.5 text-xs text-muted-foreground">
                     {t.proposal.targets.map((x) => (
                       <li key={x.id}>• {x.label}</li>
                     ))}
@@ -556,7 +589,7 @@ export function AskAiDrawer({
                       <button type="button" onClick={() => void confirm(i)} className="rounded-md bg-amber-500 px-3 py-1 text-[11px] font-semibold text-[#0B0F19] hover:bg-amber-400">
                         Confirm
                       </button>
-                      <button type="button" onClick={() => patch(i, { proposalStatus: "dismissed" })} className={`rounded-md border ${border} px-3 py-1 text-[11px] text-slate-300 hover:bg-[var(--ai-accent-soft)]`}>
+                      <button type="button" onClick={() => patch(i, { proposalStatus: "dismissed" })} className={`rounded-md border ${border} px-3 py-1 text-[11px] text-muted-foreground hover:bg-[var(--ai-accent-soft)]`}>
                         Dismiss
                       </button>
                     </div>
@@ -565,7 +598,7 @@ export function AskAiDrawer({
                   ) : t.proposalStatus === "failed" ? (
                     <p className="text-[11px] font-medium text-rose-400"><ErrorText message={t.proposalResult ?? "Execute failed"} /></p>
                   ) : (
-                    <p className="text-[11px] text-slate-500">Dismissed.</p>
+                    <p className="text-[11px] text-muted-foreground">Dismissed.</p>
                   )}
                 </div>
               ) : null}
@@ -586,11 +619,11 @@ export function AskAiDrawer({
                         }`}
                       >
                         <div className="mb-1 flex items-center gap-1.5">
-                          <p className="text-xs font-semibold text-slate-100">{s.label}</p>
+                          <p className="text-xs font-semibold text-foreground">{s.label}</p>
                           {s.recommended ? <span className="rounded-full bg-[var(--ai-accent)] px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[var(--ai-accent-ink)] uppercase">Recommended</span> : null}
-                          {selected ? <span className="text-[11px] text-slate-200">✓ Selected</span> : null}
+                          {selected ? <span className="text-[11px] text-foreground">✓ Selected</span> : null}
                         </div>
-                        <p className="text-[11px] text-slate-400">{s.detail}</p>
+                        <p className="text-[11px] text-muted-foreground">{s.detail}</p>
                       </button>
                     );
                   })}
@@ -600,34 +633,39 @@ export function AskAiDrawer({
           ))}
 
           {busy ? (
-            <div className={`flex w-fit items-center gap-1 rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2.5`}>
+            <div className="flex items-end gap-2.5">
+              <HelixAvatar desk="inbox" state="thinking" size={48} decorative />
+              <div className={`flex w-fit items-center gap-1 rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2.5`}>
               {[0, 180, 360].map((d) => (
                 <span key={d} className="ask-ai-typing-dot size-1.5 rounded-full bg-[var(--ai-accent)]" style={{ animationDelay: `${d}ms` }} />
               ))}
+              </div>
             </div>
           ) : null}
           {error ? <p className="text-xs text-rose-400"><ErrorText message={error} /></p> : null}
           <div ref={bottomRef} />
+          </div>
         </div>
 
-        <div className={`space-y-2 border-t ${border} px-4 pt-3`}>
+        <div className={`space-y-2 border-t ${border} px-4 pt-3 sm:px-8`}>
+          <div className="mx-auto max-w-3xl space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {THEME.quick.map((q) => (
-              <button key={q} type="button" disabled={locked} onClick={() => void ask(q)} className={`rounded-full border ${border} px-2.5 py-1 text-[11px] text-slate-300 hover:bg-[var(--ai-accent-soft)] disabled:opacity-50`}>
+              <button key={q} type="button" disabled={locked} onClick={() => void ask(q)} className={`rounded-full border ${border} px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-[var(--ai-accent-soft)] disabled:opacity-50`}>
                 {q}
               </button>
             ))}
           </div>
 
           {attachment ? (
-            <div className={`flex items-center gap-2 rounded-md border ${border} bg-[var(--ai-panel)] px-2 py-1 text-[11px] text-slate-300`}>
+            <div className={`flex items-center gap-2 rounded-md border ${border} bg-[var(--ai-panel)] px-2 py-1 text-[11px] text-muted-foreground`}>
               📎 image attached
-              <button type="button" onClick={() => setAttachment(null)} className="text-slate-500 hover:text-slate-200">×</button>
+              <button type="button" onClick={() => setAttachment(null)} className="text-muted-foreground hover:text-foreground">×</button>
             </div>
           ) : null}
 
           <form onSubmit={onSubmit} className="flex items-center gap-2">
-            <label className={`flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border ${border} text-slate-400 hover:bg-[var(--ai-accent-soft)]`}>
+            <label className={`flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border ${border} text-muted-foreground hover:bg-[var(--ai-accent-soft)]`}>
               📎
               <input type="file" accept="image/*" className="hidden" onChange={(e) => void onAttach(e)} />
             </label>
@@ -636,21 +674,21 @@ export function AskAiDrawer({
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask Helix AI, or tell it what to do…"
               disabled={locked}
-              className={`h-9 w-full min-w-0 rounded-md border ${border} bg-[var(--ai-panel)] px-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-[color:var(--ai-accent)] focus:outline-none`}
+              className={`h-9 w-full min-w-0 rounded-md border ${border} bg-[var(--ai-panel)] px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-[color:var(--ai-accent)] focus:outline-none`}
             />
             <button type="submit" disabled={locked || (!question.trim() && !attachment)} className="shrink-0 rounded-md bg-[var(--ai-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--ai-accent-ink)] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
               Send
             </button>
           </form>
 
-          <p className="pb-3 text-[10px] text-slate-500">
+          <p className="pb-3 text-[10px] text-muted-foreground">
             Helix AI can make mistakes. Review the information before acting.
             {usage && usage.calls > 0
               ? ` Claude usage on this server (estimated): ${usage.calls} calls · ${(usage.inputTokens + usage.outputTokens).toLocaleString()} tokens · ~$${usage.estimatedUsd.toFixed(usage.estimatedUsd < 0.1 ? 3 : 2)}.`
               : ""}
           </p>
+          </div>
         </div>
-      </SheetContent>
-    </Sheet>
+    </div>
   );
 }

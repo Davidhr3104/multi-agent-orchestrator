@@ -1,17 +1,24 @@
 import type { DeskMode } from "@helix/core";
 import type { Channel, Post } from "../types";
-import { linkedInConfig, metaConfig, publishSwitchOn, type FetchLike, type LinkedInConfig, type MetaConfig } from "./config";
+import { blueskyConfig, linkedInConfig, metaConfig, publishSwitchOn, type BlueskyEnv, type FetchLike, type LinkedInConfig, type MetaConfig } from "./config";
+import { publishBluesky } from "./bluesky";
 import { publishLinkedIn } from "./linkedin";
 import { publishFacebook, publishInstagram, type PollOptions, type PublishResult } from "./meta-publish";
 
-export type PublishEnv = { live: boolean; deskMode: DeskMode; meta: MetaConfig | null; linkedin: LinkedInConfig | null };
+export type PublishEnv = {
+  live: boolean;
+  deskMode: DeskMode;
+  meta: MetaConfig | null;
+  linkedin: LinkedInConfig | null;
+  bluesky: BlueskyEnv | null;
+};
 
 export type PublishGate = { allowed: true } | { allowed: false; reason: string };
 
 export const TOKEN_ONLY: Channel[] = ["x", "tiktok"];
 
 export function publishEnv(deskMode: DeskMode): PublishEnv {
-  return { live: publishSwitchOn(), deskMode, meta: metaConfig(), linkedin: linkedInConfig() };
+  return { live: publishSwitchOn(), deskMode, meta: metaConfig(), linkedin: linkedInConfig(), bluesky: blueskyConfig() };
 }
 
 /** Every reason a post may not leave the desk. Publishing needs a person's approval on this exact post and the live switch. */
@@ -27,6 +34,7 @@ export function publishGate(post: Post, env: PublishEnv): PublishGate {
   }
   if (post.channel === "facebook" && !env.meta?.pageId) return { allowed: false, reason: "Facebook needs HELIX_META_ACCESS_TOKEN and HELIX_META_PAGE_ID." };
   if (post.channel === "linkedin" && !env.linkedin) return { allowed: false, reason: "LinkedIn needs HELIX_LINKEDIN_ACCESS_TOKEN and HELIX_LINKEDIN_ORGANIZATION_URN." };
+  if (post.channel === "bluesky" && !env.bluesky) return { allowed: false, reason: "Bluesky needs HELIX_BLUESKY_IDENTIFIER (or HELIX_BLUESKY_HANDLE) and HELIX_BLUESKY_APP_PASSWORD." };
   return { allowed: true };
 }
 
@@ -38,5 +46,6 @@ export async function sendToNetwork(post: Post, env: PublishEnv, fetchImpl: Fetc
   if (post.channel === "instagram" && env.meta) return publishInstagram(env.meta, input, fetchImpl, poll);
   if (post.channel === "facebook" && env.meta) return publishFacebook(env.meta, input, fetchImpl);
   if (post.channel === "linkedin" && env.linkedin) return publishLinkedIn(env.linkedin, input, fetchImpl);
+  if (post.channel === "bluesky" && env.bluesky) return publishBluesky(env.bluesky, input, fetchImpl);
   throw new Error("No publishing adapter for this channel.");
 }

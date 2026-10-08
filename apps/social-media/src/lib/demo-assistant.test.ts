@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildDemoReply } from "./demo-assistant";
-import { getBrand, listPosts, loadDemoCatalog } from "./store";
+import { getBrand, listAudienceComments, listPosts, loadDemoCatalog } from "./store";
 
 async function ask(q: string) {
-  return buildDemoReply(q, await listPosts(), await getBrand(), Date.now());
+  return buildDemoReply(q, await listPosts(), await getBrand(), Date.now(), await listAudienceComments());
 }
 
 beforeEach(async () => {
@@ -57,5 +57,22 @@ describe("social demo assistant", () => {
   it("does not mistake 'the queue' for a submit command", async () => {
     const r = await ask("What's in the approval queue?");
     expect(r.command).toBeUndefined();
+  });
+
+  it("answers the next post from now, not past slots", async () => {
+    const posts = await listPosts();
+    const times = posts.map((p) => Date.parse(p.scheduledFor));
+    const brand = await getBrand();
+    const next = buildDemoReply("Which post is scheduled next?", posts, brand, Math.min(...times) - 1_000, []);
+    expect(next.answer).toMatch(/^Next post:/);
+    const gone = buildDemoReply("Which post is scheduled next?", posts, brand, Math.max(...times) + 1_000, []);
+    expect(gone.answer).toMatch(/Nothing is scheduled after now/);
+  });
+
+  it("names the post with the most interested comments and cites them", async () => {
+    const { answer } = await ask("what post brought the most leads this month?");
+    expect(answer).toMatch(/\/posts\/seed-ig-harvest-drop/);
+    expect(answer).toMatch(/invented demo comment/);
+    expect(answer).toMatch(/2/);
   });
 });

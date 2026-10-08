@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { StoredLead } from "@helix/core";
+import { AskAiDrawer, AskAiWorkspace } from "@/components/ask-ai-drawer";
 import { CommandPalette, ShortcutsHelp } from "@/components/command-palette";
 import { listWorkspaces, readCurrentWorkspace, writeCurrentWorkspace } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
@@ -338,7 +339,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ) : null}
       {sidebar}
 
-      <div className="flex min-h-full min-w-0 flex-col md:ml-72">
+      <div className="relative flex min-h-dvh min-w-0 flex-col md:ml-72">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-outline-variant/20 bg-surface/90 px-4 backdrop-blur-md sm:px-6">
           <button
             type="button"
@@ -400,6 +401,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <OrgSessionBadge />
 
+          <AskAiDrawer />
+
           <button
             type="button"
             disabled={ingestBusy}
@@ -412,6 +415,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <div className="min-w-0 flex-1 overflow-x-clip">{children}</div>
+        <AskAiWorkspace />
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

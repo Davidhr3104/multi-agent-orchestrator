@@ -1,5 +1,8 @@
 import type { ActionProposal } from "@helix/core";
 import type { EmailThread } from "@/lib/types";
+import { CHANNEL_LABEL, SOURCES } from "@/lib/automations/catalog";
+import { parseAutomationRequest } from "@/lib/automations/parse";
+import { clock12 } from "@/lib/automations/service";
 
 /**
  * Deterministic stand-in for Claude, used only on the demo desk when no ANTHROPIC_API_KEY is set.
@@ -71,6 +74,27 @@ function explain(t: EmailThread): string {
   return `${who(t)} — "${t.subject}"\nCategory ${t.category.replace("_", " ")}, urgency ${t.urgencyScore}, confidence ${t.aiConfidence}%. Routed to ${t.routeTo}.\nWhy: ${t.reasoning}${t.draftReply ? `\nDraft reply: "${t.draftReply}"` : ""}`;
 }
 
+/** "Send me a summary every day at 9pm on Slack" becomes a proposal the person confirms. A missing time is asked for, never guessed. */
+function automationRequest(question: string): DemoReply | null {
+  const parsed = parseAutomationRequest(question);
+  if (!parsed) return null;
+  if (!parsed.time) return { answer: 'What time should I send it? For example: "every day at 9pm".' };
+  const id = `auto-${Math.random().toString(36).slice(2, 8)}`;
+  const name = `${SOURCES[parsed.source].label} → ${CHANNEL_LABEL[parsed.channel]}`;
+  const note = parsed.channelWasDefault ? " You did not name a channel, so it stays inside Helix." : "";
+  const say = `I'll set up "${name}": every day at ${clock12(parsed.time)}.${note}`;
+  return {
+    answer: say,
+    command: true,
+    proposal: {
+      action: "create_automation",
+      summary: say,
+      targets: [{ id, label: name }],
+      params: { source: parsed.source, channel: parsed.channel, time: parsed.time, ...(parsed.to ? { to: parsed.to } : {}) },
+    },
+  };
+}
+
 const unknown = (): DemoReply => ({ answer: "I couldn't find an email matching that in your inbox." });
 
 function command(q: string, threads: EmailThread[]): DemoReply | null {
@@ -99,6 +123,9 @@ const HELP =
 
 export function buildDemoReply(question: string, threads: EmailThread[]): DemoReply {
   const q = question.trim().toLowerCase();
+  // A routine does not depend on what is in the inbox today, so it is handled before the empty-inbox shortcut.
+  const routine = automationRequest(question);
+  if (routine) return routine;
   if (threads.length === 0) return { answer: "Your inbox is empty." };
 
   const cmd = command(q, threads);

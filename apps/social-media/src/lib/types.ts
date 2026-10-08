@@ -1,4 +1,4 @@
-export type Channel = "instagram" | "linkedin" | "x" | "tiktok" | "facebook";
+export type Channel = "instagram" | "linkedin" | "x" | "tiktok" | "facebook" | "bluesky";
 
 /**
  * draft          AI or a teammate wrote it; not yet sent for sign-off
@@ -19,6 +19,17 @@ export type Comment = {
   role: DeskRole;
   body: string;
   at: string;
+};
+
+/** Public comment on a published post. Kind is rule-based, not taste. HITL when unsure. */
+export type AudienceComment = {
+  id: string;
+  postId: string;
+  text: string;
+  kind: "lead" | "complaint" | "spam" | "unsure";
+  at: string;
+  demo: boolean;
+  handedToLeads: boolean;
 };
 
 /** Caption before a rewrite or a manual edit, so the team can see what changed. */
@@ -63,7 +74,7 @@ export type Post = {
   /** Set only after the network API answered with a post id. */
   publication?: Publication;
   /** Real posts whose computed results this AI draft started from. */
-  inspiredBy?: { network: "instagram" | "facebook"; id: string; permalink: string | null }[];
+  inspiredBy?: { network: "instagram" | "facebook" | "linkedin" | "bluesky"; id: string; permalink: string | null }[];
 };
 
 export type Publication = { network: Channel; externalId: string; permalink: string | null; at: string; by: string };

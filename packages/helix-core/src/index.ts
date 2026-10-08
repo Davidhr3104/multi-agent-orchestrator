@@ -33,6 +33,7 @@ export {
   keysPostResponse,
   onSecretsChanged,
   KEYS_COMMERCE,
+  KEYS_DATA,
   KEYS_INBOX,
   KEYS_LEADS,
   KEYS_LEGAL,

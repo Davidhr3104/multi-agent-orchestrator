@@ -13,6 +13,7 @@ export const CHANNEL_RULES: Record<Channel, ChannelRule> = {
   x: { label: "X", hardMax: 280, idealMin: 40, idealMax: 240, tagsMin: 0, tagsMax: 2 },
   tiktok: { label: "TikTok", hardMax: 2200, idealMin: 20, idealMax: 150, tagsMin: 2, tagsMax: 5 },
   facebook: { label: "Facebook", hardMax: 63206, idealMin: 40, idealMax: 400, tagsMin: 0, tagsMax: 3 },
+  bluesky: { label: "Bluesky", hardMax: 300, idealMin: 40, idealMax: 280, tagsMin: 0, tagsMax: 3 },
 };
 
 const CTA = /\b(link in bio|shop|order|book|join|sign up|subscribe|visit|try|grab|reserve|comment|reply|tell us|dm us|learn more|read more|save this|share)\b/i;

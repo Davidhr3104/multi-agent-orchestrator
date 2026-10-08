@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { linkedInConfig } from "./config";
+import { blueskyConfig, linkedInConfig } from "./config";
+import { blueskyPostText, publishBluesky } from "./bluesky";
 import { escapeLittleText, linkedInPostPayload, publishLinkedIn } from "./linkedin";
 import { publishEnv, publishGate } from "./publish";
 import { json, mockFetch, saveEnv } from "./test-helpers";
@@ -140,5 +141,35 @@ describe("LinkedIn Posts API", () => {
   it("is not configured without an organization URN", () => {
     delete process.env.HELIX_LINKEDIN_ORGANIZATION_URN;
     expect(linkedInConfig()).toBeNull();
+  });
+});
+
+describe("Bluesky AT Protocol", () => {
+  beforeEach(() => {
+    process.env.HELIX_BLUESKY_IDENTIFIER = "lumen.bsky.social";
+    process.env.HELIX_BLUESKY_APP_PASSWORD = "app-pass";
+  });
+
+  it("caps text at 300 characters", () => {
+    expect(blueskyPostText({ caption: "Hi", hashtags: ["coffee"] })).toBe("Hi\n\n#coffee");
+  });
+
+  it("creates a session then a post record", async () => {
+    const { fetch, calls } = mockFetch(
+      (c) => (c.url.endsWith("com.atproto.server.createSession") ? json({ did: "did:plc:1", accessJwt: "jwt" }) : undefined),
+      (c) => (c.url.endsWith("com.atproto.repo.createRecord") ? json({ uri: "at://did:plc:1/app.bsky.feed.post/abc" }) : undefined),
+    );
+    const result = await publishBluesky(blueskyConfig()!, { caption: "Huila is in", hashtags: ["coffee"], media: [] }, fetch);
+    expect(result.externalId).toBe("at://did:plc:1/app.bsky.feed.post/abc");
+    expect(result.permalink).toContain("lumen.bsky.social/post/abc");
+    expect(calls[0].body).toContain("app-pass");
+    expect(JSON.parse(calls[1].body).record.text).toContain("Huila is in");
+  });
+
+  it("blocks Bluesky without an app password", () => {
+    process.env.HELIX_SOCIAL_PUBLISH = "live";
+    delete process.env.HELIX_BLUESKY_APP_PASSWORD;
+    const gate = publishGate(post({ channel: "bluesky" }), publishEnv("live"));
+    expect(gate).toMatchObject({ allowed: false, reason: expect.stringMatching(/BLUESKY/) });
   });
 });

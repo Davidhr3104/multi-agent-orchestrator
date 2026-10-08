@@ -5,6 +5,7 @@ const TOKEN_ENV: Record<Channel, string> = {
   instagram: "HELIX_META_ACCESS_TOKEN",
   facebook: "HELIX_META_ACCESS_TOKEN",
   linkedin: "HELIX_LINKEDIN_ACCESS_TOKEN",
+  bluesky: "HELIX_BLUESKY_APP_PASSWORD",
   x: "HELIX_X_ACCESS_TOKEN",
   tiktok: "HELIX_TIKTOK_ACCESS_TOKEN",
 };
@@ -13,6 +14,7 @@ const EXPIRES_ENV: Record<Channel, string> = {
   instagram: "HELIX_META_TOKEN_EXPIRES",
   facebook: "HELIX_META_TOKEN_EXPIRES",
   linkedin: "HELIX_LINKEDIN_TOKEN_EXPIRES",
+  bluesky: "HELIX_BLUESKY_TOKEN_EXPIRES",
   x: "HELIX_X_TOKEN_EXPIRES",
   tiktok: "HELIX_TIKTOK_TOKEN_EXPIRES",
 };
@@ -24,6 +26,7 @@ const ADAPTER: Record<Channel, AdapterKind> = {
   instagram: "read_and_publish",
   facebook: "read_and_publish",
   linkedin: "publish",
+  bluesky: "publish",
   x: "token_only",
   tiktok: "token_only",
 };
@@ -32,6 +35,7 @@ const EXTRA_ENV: Record<Channel, { name: string; optional?: boolean }[]> = {
   instagram: [{ name: "HELIX_META_IG_USER_ID" }],
   facebook: [{ name: "HELIX_META_PAGE_ID" }, { name: "HELIX_META_PAGE_ACCESS_TOKEN", optional: true }],
   linkedin: [{ name: "HELIX_LINKEDIN_ORGANIZATION_URN" }],
+  bluesky: [{ name: "HELIX_BLUESKY_IDENTIFIER" }, { name: "HELIX_BLUESKY_HANDLE", optional: true }],
   x: [],
   tiktok: [],
 };

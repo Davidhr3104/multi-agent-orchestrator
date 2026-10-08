@@ -3,7 +3,8 @@ import { requireOperator } from "@helix/core/operator";
 import { applyRiskPolicy } from "@/lib/ai-desk";
 import { buildDemoReply } from "@/lib/demo-assistant";
 import { postLabel } from "@/lib/format";
-import { currentDeskMode, getBrand, listPosts } from "@/lib/store";
+import { leadsByPost, monthWindow } from "@/lib/leads-from-comments";
+import { currentDeskMode, getBrand, listAudienceComments, listPosts } from "@/lib/store";
 
 export const runtime = "nodejs";
 
@@ -22,15 +23,17 @@ For any other question, answer normally in plain text; do not emit a json block.
 const SYSTEM_PROMPT = `You are Ask AI inside Helix for Social Media, a content-calendar desk for a brand's social team.
 
 How the app works:
-- Posts are planned per channel (Instagram, LinkedIn, X, TikTok, Facebook) on a calendar, with a status: draft, needs review, changes requested, approved.
+- Posts are planned per channel (Instagram, LinkedIn, Bluesky, X, TikTok, Facebook) on a calendar, with a status: draft, needs review, changes requested, approved.
 - Each post gets a readiness score 0-100 from length for its channel, hashtag count, call to action, brand voice (avoid list) and visual brief. It checks form, not taste.
 - A person approves every post. Approval records a sign-off. A post goes out only when a person presses Publish on that approved post and the operator enabled live publishing; you can never publish.
 
-Rules: answer only from the desk snapshot below and never invent posts, dates, scores or engagement numbers (planned posts have none; real account results live on the Analytics page). When you mention a post, write it as a markdown link: [label](/posts/<post id>).`;
+Rules: answer only from the desk snapshot below and never invent posts, dates, scores, leads or engagement numbers. Interested-comment counts are listed with cites; if the snapshot has none, say so. When you mention a post, write it as a markdown link: [label](/posts/<post id>).`;
 
 async function snapshot(): Promise<string> {
-  const [posts, brand] = await Promise.all([listPosts(), getBrand()]);
+  const [posts, brand, audience] = await Promise.all([listPosts(), getBrand(), listAudienceComments()]);
   if (posts.length === 0) return "The desk has no posts.";
+  const { from, to } = monthWindow();
+  const leads = leadsByPost(posts, audience, from, to);
   return [
     `Brand: ${brand.name} ${brand.handle}. Voice: ${brand.voice.join(", ") || "not set"}. Avoid: ${brand.avoid.join(", ") || "nothing listed"}.`,
     `Today: ${new Date().toISOString()}`,
@@ -39,6 +42,10 @@ async function snapshot(): Promise<string> {
       (p) =>
         `- ${postLabel(p)} [id: ${p.id}] ${p.scheduledFor}, status ${p.status}, readiness ${p.readiness.score} (${p.readiness.ready ? "ready" : "not ready"}: ${p.readiness.summary}) caption: "${p.caption}" hashtags: ${p.hashtags.map((t) => `#${t}`).join(" ") || "none"}`
     ),
+    `Interested comments this month (rule-classified, not invented):`,
+    leads.length
+      ? leads.map((row) => `- ${row.leads} leads on /posts/${row.postId} cites: ${row.comments.map((c) => `"${c.text}"${c.demo ? " [invented demo]" : ""}`).join("; ")}`).join("\n")
+      : "- none",
   ].join("\n");
 }
 
@@ -61,8 +68,8 @@ export async function POST(req: Request) {
         demo: true,
       });
     }
-    const [posts, brand] = await Promise.all([listPosts(), getBrand()]);
-    const reply = buildDemoReply(last.content, posts, brand, Date.now());
+    const [posts, brand, audience] = await Promise.all([listPosts(), getBrand(), listAudienceComments()]);
+    const reply = buildDemoReply(last.content, posts, brand, Date.now(), audience);
     return Response.json({ ...(await applyRiskPolicy(req, reply)), engine: "fallback", demo: true });
   }
 

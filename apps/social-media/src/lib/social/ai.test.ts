@@ -69,7 +69,7 @@ describe("weekly report", () => {
     const { fetch, calls } = claudeReply("A steady week: 3 posts and 200 interactions.");
     const report = await writeWeeklyReport(snap, BRAND, { fetchImpl: fetch, now: NOW });
     expect(report.engine).toBe("claude");
-    expect(JSON.parse(calls[0].body).model).toBe("claude-sonnet-4-20250514");
+    expect(JSON.parse(calls[0].body).model).toBe("claude-sonnet-4-6");
     expect(aiUsageTotals()).toMatchObject({ calls: 1, inputTokens: 1000, outputTokens: 200 });
     expect(aiUsageTotals().estUsd).toBeCloseTo(estimateUsd(1000, 200));
     expect(estimateUsd(1_000_000, 0)).toBe(3);

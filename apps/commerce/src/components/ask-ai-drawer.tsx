@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { X } from "lucide-react";
+import { HelixAvatar, HelixWelcome, useHelixAvatarState } from "@helix/ui";
 
 type Attachment = { type: "image"; data: string; mediaType: string };
 type Engine = "claude" | "fallback";
@@ -332,26 +333,46 @@ export function AskAiDrawer({
     void ask(question);
   }
 
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
+
+  // the face follows the latest reply: speaking, then done; unsure while that reply waits for a human OK
+  const lastAssistantIdx = turns.reduce((acc, t, i) => (t.role === "user" ? acc : i), -1);
+  const lastAssistant = lastAssistantIdx >= 0 ? turns[lastAssistantIdx] : undefined;
+  const needsHuman = Boolean(
+    (lastAssistant?.proposal && lastAssistant.proposalStatus === "pending")
+  );
+  // a finished task (confirmed, applied or approved) keeps the done face until the next request
+  const taskDone = Boolean(
+    (lastAssistant?.proposal && lastAssistant.proposalStatus === "confirmed") ||
+      (lastAssistant?.executed && lastAssistant.executed.done.length > 0 && !lastAssistant.undone)
+  );
+  const avatarState = useHelixAvatarState(busy, Boolean(error), needsHuman, taskDone);
+  if (!open) return null;
+
   const status = busy ? "Listening" : isDemo ? "Demo workspace" : engine === "fallback" ? "Limited Mode" : "Online & Ready";
   const border = "border-[color:var(--ai-border)]";
   const locked = busy || runningDemo;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false} disablePointerDismissal>
-      <SheetContent
-        side="right"
-        showOverlay={false}
-        style={THEME.vars}
-        className={`flex h-full w-full min-h-0 flex-col overflow-hidden border-l ${border} bg-[var(--ai-bg)] sm:max-w-md`}
-      >
-        <SheetHeader className={`border-b ${border} pb-3`}>
-          <div className="flex items-center justify-between gap-2 pr-8">
+    <div
+      className="absolute inset-0 z-50 flex min-h-0 flex-col overflow-hidden bg-[var(--ai-bg)]"
+      style={THEME.vars}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ask Helix AI"
+    >
+        <header className={`border-b ${border} px-4 py-3 sm:px-6`}>
+          <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={THEME.icon} alt="" className="h-full w-full object-contain" />
-              </div>
-              <SheetTitle className="truncate whitespace-nowrap text-slate-100">Ask Helix AI</SheetTitle>
+              <HelixAvatar desk="commerce" state={avatarState} size={52} decorative />
+              <h2 className="truncate whitespace-nowrap text-sm font-semibold text-slate-100">Ask Helix AI</h2>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {isDemo ? (
@@ -371,13 +392,21 @@ export function AskAiDrawer({
               >
                 🕘
               </button>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-md border ${border} px-2.5 py-1 text-[11px] font-medium text-slate-200 hover:bg-[var(--ai-accent-soft)]`}
+              >
+                <X className="size-3.5" />
+                Close
+              </button>
             </div>
           </div>
           <p className="flex items-center gap-1 text-[11px] font-medium text-[var(--ai-accent)]">
             <span className="inline-block size-1.5 rounded-full bg-[var(--ai-accent)]" />
             {status}
           </p>
-        </SheetHeader>
+        </header>
 
         {historyOpen ? (
           <div className={`thin-scrollbar max-h-56 space-y-1 overflow-y-auto border-b ${border} px-4 py-3`}>
@@ -396,18 +425,28 @@ export function AskAiDrawer({
 
         <div className="thin-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto px-4">
           {turns.length === 0 ? (
-            <div className="space-y-3 pt-4">
+            <HelixWelcome desk="commerce" title="What should we check in your store?">
               <p className="text-sm text-slate-500">{THEME.emptyHint}</p>
               {isDemo ? (
                 <button type="button" onClick={() => void runDemo()} disabled={runningDemo} className="flex items-center gap-1.5 rounded-lg border border-[color:var(--ai-accent)] bg-[var(--ai-accent-soft)] px-3 py-2 text-xs font-semibold text-slate-100 transition hover:brightness-125 disabled:opacity-60">
                   <span aria-hidden>▶</span> Watch Helix work
                 </button>
               ) : null}
-            </div>
+            </HelixWelcome>
           ) : null}
 
           {turns.map((t, i) => (
-            <div key={i} className="space-y-2">
+            <div key={i} className={t.role === "user" ? "space-y-2" : "relative space-y-2 pl-16"}>
+              {t.role !== "user" ? (
+                <HelixAvatar
+                  desk="commerce"
+                  state={i === lastAssistantIdx && !busy ? avatarState : "idle"}
+                  animated={i === lastAssistantIdx && !busy}
+                  size={52}
+                  decorative
+                  className="absolute top-0.5 left-0"
+                />
+              ) : null}
               <div
                 className={
                   t.role === "user"
@@ -489,10 +528,13 @@ export function AskAiDrawer({
           ))}
 
           {busy ? (
-            <div className={`flex w-fit items-center gap-1 rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2.5`}>
+            <div className="flex items-end gap-2.5">
+              <HelixAvatar desk="commerce" state="thinking" size={48} decorative />
+              <div className={`flex w-fit items-center gap-1 rounded-lg border ${border} bg-[var(--ai-panel)] px-3 py-2.5`}>
               {[0, 180, 360].map((d) => (
                 <span key={d} className="ask-ai-typing-dot size-1.5 rounded-full bg-[var(--ai-accent)]" style={{ animationDelay: `${d}ms` }} />
               ))}
+              </div>
             </div>
           ) : null}
           {error ? <p className="text-xs text-rose-400">{error}</p> : null}
@@ -534,7 +576,6 @@ export function AskAiDrawer({
 
           <p className="pb-3 text-[11px] text-slate-500">Helix AI can make mistakes. Review the information before acting.</p>
         </div>
-      </SheetContent>
-    </Sheet>
+    </div>
   );
 }

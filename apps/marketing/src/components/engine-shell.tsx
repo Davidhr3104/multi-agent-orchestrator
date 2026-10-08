@@ -441,7 +441,7 @@ export function EngineShell({
       ) : null}
       {sidebar}
 
-      <div className="pl-0 md:pl-72">
+      <div className="relative min-h-screen pl-0 md:pl-72">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 bg-surface-container-low/80 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <button

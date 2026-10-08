@@ -162,6 +162,10 @@ export function DashboardPanorama({
               className="mt-3 flex min-h-11 max-w-3xl items-center gap-2 rounded-xl border border-[#3b4261] bg-[#07090e] px-3"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (!prompt.trim()) {
+                  window.dispatchEvent(new CustomEvent("helix:ask", { detail: "" }));
+                  return;
+                }
                 ask(prompt);
               }}
             >
@@ -188,7 +192,7 @@ export function DashboardPanorama({
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent("helix:ask", { detail: "" }))}
             aria-label="Open Ask Helix AI assistant"
-            className="group relative hidden shrink-0 rounded-xl transition-transform hover:scale-[1.02] lg:block"
+            className="group relative mx-auto shrink-0 cursor-pointer rounded-xl transition-transform hover:scale-[1.02] lg:mx-0"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/ask-ai/ask-ai-visual.png" alt="" className="h-44 w-auto rounded-xl object-contain" />

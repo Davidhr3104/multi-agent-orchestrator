@@ -13,6 +13,7 @@ const HOUR: Record<Channel, Record<Pillar, number>> = {
   x: { product: 9, behind_the_scenes: 12, education: 12, community: 17, promo: 9 },
   tiktok: { product: 19, behind_the_scenes: 18, education: 19, community: 21, promo: 19 },
   facebook: { product: 13, behind_the_scenes: 10, education: 11, community: 13, promo: 12 },
+  bluesky: { product: 10, behind_the_scenes: 11, education: 12, community: 17, promo: 11 },
 };
 
 export type SlotSuggestion = { iso: string; reason: string; hour: number };

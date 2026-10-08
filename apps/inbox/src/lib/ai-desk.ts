@@ -3,9 +3,10 @@ import { operatorActor, requireOperator } from "@helix/core/operator";
 import { inboxActions, type InboxCtx } from "@/lib/ai-actions";
 import { jsonWithDeskCookie, patchFromThread, readDeskCookie, upsertDeskPatch } from "@/lib/desk-state-cookie";
 import { applyDeskPatches, currentDeskMode, getMessage } from "@/lib/store";
+import { automationAccess, withAutomationCookie } from "@/lib/automations/storage";
 
 export function aiCtx(req: Request): InboxCtx {
-  return { actor: `Helix AI · approved by ${operatorActor(req)}`, touched: new Set(), heuristicOnly: !mayUseClaude(req) };
+  return { actor: `Helix AI · approved by ${operatorActor(req)}`, touched: new Set(), heuristicOnly: !mayUseClaude(req), automations: automationAccess(req) };
 }
 
 /**
@@ -43,7 +44,9 @@ export async function respondWithDeskCookie(req: Request, ctx: InboxCtx, payload
     const m = await getMessage(id);
     if (m) state = upsertDeskPatch(state, id, patchFromThread(m));
   }
-  return jsonWithDeskCookie(payload, state, { status });
+  const res = jsonWithDeskCookie(payload, state, { status });
+  // Routines created in chat on a demo desk live in their own cookie; write it when this request changed them.
+  return ctx.automations ? withAutomationCookie(res, ctx.automations) : res;
 }
 
 type Reply = { answer: string; proposal?: ActionProposal; command?: boolean } & Record<string, unknown>;

@@ -1,7 +1,8 @@
 import type { ActionProposal } from "@helix/core";
 import { channelLabel, formatSlot, postLabel, STATUS_LABEL } from "./format";
+import { leadsByPost, monthWindow } from "./leads-from-comments";
 import type { ScoredPost } from "./store";
-import type { Brand, Channel } from "./types";
+import type { AudienceComment, Brand, Channel } from "./types";
 import { startOfZonedDay, zoneParts, zonedTime } from "./tz";
 
 /**
@@ -23,6 +24,7 @@ const CHANNEL_WORDS: [RegExp, Channel][] = [
   [/\b(twitter|x post|on x|tweet)\b/, "x"],
   [/\btiktok\b/, "tiktok"],
   [/\b(facebook|fb)\b/, "facebook"],
+  [/\b(bluesky|bsky)\b/, "bluesky"],
 ];
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
@@ -68,9 +70,18 @@ function overlap(p: ScoredPost, words: Set<string>) {
   return [...new Set(tokens(`${p.caption} ${p.hashtags.join(" ")}`))].filter((t) => words.has(t)).length;
 }
 
+function inNextWeek(posts: ScoredPost[], now: number) {
+  return posts
+    .filter((p) => {
+      const t = Date.parse(p.scheduledFor);
+      return t >= now && t < now + 7 * DAY;
+    })
+    .sort((a, b) => Date.parse(a.scheduledFor) - Date.parse(b.scheduledFor));
+}
+
 function summary(posts: ScoredPost[], brand: Brand, now: number): string {
   const by = (s: ScoredPost["status"]) => posts.filter((p) => p.status === s);
-  const week = posts.filter((p) => Date.parse(p.scheduledFor) - now < 7 * DAY);
+  const week = inNextWeek(posts, now);
   const queue = by("needs_review");
   const readyQueue = queue.filter((p) => p.readiness.ready);
   return [
@@ -98,9 +109,18 @@ function problems(posts: ScoredPost[]): string {
 }
 
 function nextWeek(posts: ScoredPost[], now: number): string {
-  const wk = posts.filter((p) => Date.parse(p.scheduledFor) - now < 7 * DAY);
+  const wk = inNextWeek(posts, now);
   if (wk.length === 0) return "Nothing is scheduled in the next 7 days.";
   return `Next 7 days:\n${wk.map((p) => `• ${formatSlot(p.scheduledFor)} — ${lk(p)} (${STATUS_LABEL[p.status].toLowerCase()})`).join("\n")}`;
+}
+
+function nextPost(posts: ScoredPost[], now: number): string {
+  const upcoming = [...posts]
+    .filter((p) => Date.parse(p.scheduledFor) >= now)
+    .sort((a, b) => Date.parse(a.scheduledFor) - Date.parse(b.scheduledFor));
+  if (!upcoming[0]) return "Nothing is scheduled after now.";
+  const p = upcoming[0];
+  return `Next post: ${formatSlot(p.scheduledFor)} — ${lk(p)} (${STATUS_LABEL[p.status].toLowerCase()}).`;
 }
 
 function explain(p: ScoredPost): string {
@@ -134,10 +154,28 @@ const proposal = (action: string, summary: string, targets: ScoredPost[], params
 const HELP =
   'I can summarize the calendar, list what\'s waiting for review, flag posts that aren\'t ready, and explain any post\'s readiness score. I can also send a post back, move it, add a note or queue it for approval — and I\'ll ask you before approving anything. Try: "What needs review?" or "Explain the Instagram post today".';
 
-export function buildDemoReply(question: string, posts: ScoredPost[], brand: Brand, now: number): DemoReply {
+export function buildDemoReply(question: string, posts: ScoredPost[], brand: Brand, now: number, audience: AudienceComment[] = []): DemoReply {
   const q = question.trim().toLowerCase();
   if (posts.length === 0) return { answer: "There are no posts on this desk yet." };
   const post = findPost(q, posts, now);
+
+  if (/\b(leads?|most leads|brought the most)\b/.test(q)) {
+    const { from, to } = monthWindow(new Date(now));
+    const ranked = leadsByPost(posts, audience, from, to);
+    if (ranked.length === 0) {
+      return { answer: "No interested comments are recorded this month, so I can't name a post that brought leads." };
+    }
+    const top = ranked[0];
+    const cite = top.comments
+      .slice(0, 3)
+      .map((c) => `• "${c.text}" (${c.demo ? "invented demo comment" : "desk comment"})`)
+      .join("\n");
+    const link = posts.find((p) => p.id === top.postId);
+    const label = link ? lk(link) : top.postId;
+    return {
+      answer: `${label} brought the most interested comments this month: ${top.leads}.\nCite:\n${cite}\nHelix does not invent lead counts. These are classified comments on that post.`,
+    };
+  }
 
   if (/\bapprove\b/.test(q)) {
     if (/\b(ready ones|all ready|ready posts|everything ready|all the ready)\b/.test(q)) {
@@ -189,6 +227,7 @@ export function buildDemoReply(question: string, posts: ScoredPost[], brand: Bra
   if (post && /why|explain|score|ready|what about|tell me|check/.test(q)) return { answer: explain(post) };
   if (/need(s)? review|waiting|queue|approval|to approve|pending/.test(q)) return { answer: queueList(posts) };
   if (/not ready|blocked|problem|issue|fix|wrong|weak/.test(q)) return { answer: problems(posts) };
+  if (/which post is (scheduled )?next|next post|scheduled next|what('s| is) next\b/.test(q)) return { answer: nextPost(posts, now) };
   if (/this week|next 7|next week|upcoming|schedule|calendar/.test(q)) return { answer: nextWeek(posts, now) };
   if (/summar|overview|status|how.*(doing|going|looking)/.test(q)) return { answer: summary(posts, brand, now) };
   if (post) return { answer: explain(post) };

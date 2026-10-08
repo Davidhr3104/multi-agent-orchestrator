@@ -338,12 +338,18 @@ export async function supabaseGetPreferences(workspaceId: string): Promise<UserP
   const rawRules = r.custom_rules;
   let customRules: UserPreferences["customRules"] = [];
   let templates: UserPreferences["templates"] = [];
+  let automations: UserPreferences["automations"];
+  let automationRuns: UserPreferences["automationRuns"];
+  let automationTimezone: UserPreferences["automationTimezone"];
   if (Array.isArray(rawRules)) {
     customRules = rawRules as UserPreferences["customRules"];
   } else if (rawRules && typeof rawRules === "object") {
-    const bag = rawRules as { rules?: unknown; templates?: unknown };
+    const bag = rawRules as { rules?: unknown; templates?: unknown; automations?: unknown; automationRuns?: unknown; automationTimezone?: unknown };
     if (Array.isArray(bag.rules)) customRules = bag.rules as UserPreferences["customRules"];
     if (Array.isArray(bag.templates)) templates = bag.templates as UserPreferences["templates"];
+    if (Array.isArray(bag.automations)) automations = bag.automations as UserPreferences["automations"];
+    if (Array.isArray(bag.automationRuns)) automationRuns = bag.automationRuns as UserPreferences["automationRuns"];
+    if (typeof bag.automationTimezone === "string") automationTimezone = bag.automationTimezone;
   }
 
   return {
@@ -355,6 +361,9 @@ export async function supabaseGetPreferences(workspaceId: string): Promise<UserP
     theme: r.theme === "light" ? "light" : "dark",
     customRules,
     templates,
+    automations,
+    automationRuns,
+    automationTimezone,
   };
 }
 
@@ -369,7 +378,13 @@ export async function supabaseUpsertPreferences(prefs: UserPreferences): Promise
       default_tone: prefs.defaultTone,
       vip_senders: prefs.vipSenders,
       theme: prefs.theme,
-      custom_rules: { rules: prefs.customRules, templates: prefs.templates },
+      custom_rules: {
+        rules: prefs.customRules,
+        templates: prefs.templates,
+        automations: prefs.automations ?? [],
+        automationRuns: prefs.automationRuns ?? [],
+        automationTimezone: prefs.automationTimezone ?? null,
+      },
     },
     { onConflict: "id" }
   );

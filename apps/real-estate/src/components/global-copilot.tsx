@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Sparkles } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Sparkles } from "lucide-react";
+import { MorphPanel } from "@helix/ui";
 import { AskAiDrawer } from "@/components/ask-ai-drawer";
 import { cn } from "@/lib/utils";
 
@@ -13,8 +15,13 @@ export function openCopilot(question?: string) {
 }
 
 export function GlobalCopilot() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [initial, setInitial] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -53,27 +60,22 @@ export function AskHelixButton({ question }: { question: string }) {
 
 /** Top-bar search: whatever is typed goes to Helix AI, which answers from the desk and links the records. */
 export function HeaderSearch() {
-  const [q, setQ] = useState("");
   return (
-    <form
-      role="search"
-      onSubmit={(e) => {
-        e.preventDefault();
-        openCopilot(q);
-        setQ("");
-      }}
-      className="relative w-full max-w-xl"
-    >
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
+    <div className="w-full max-w-xl">
+      <MorphPanel
+        title="Ask Helix for Real Estate"
+        logoSrc="/logo-icon.png"
+        avatarDesk="real-estate"
+        accent="#c9a24b"
+        accentInk="#0f131e"
         placeholder="Ask Helix or search buyers, listings, showings…"
-        aria-label="Ask Helix or search the desk"
-        className="h-10 w-full rounded-lg bg-card pr-16 pl-10 text-sm text-foreground shadow-[inset_0_1px_2px_rgba(0,0,0,0.25)] transition outline-none placeholder:text-muted-foreground/80 focus:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60"
+        chips={[
+          { label: "Hottest buyers", question: "Who are the hottest buyers right now?" },
+          { label: "Stale listings", question: "Which listings are going stale?" },
+        ]}
+        onAsk={(q) => openCopilot(q)}
       />
-      <kbd className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded bg-muted px-1.5 py-px font-mono text-[10px] text-muted-foreground">Ctrl K</kbd>
-    </form>
+    </div>
   );
 }
 
