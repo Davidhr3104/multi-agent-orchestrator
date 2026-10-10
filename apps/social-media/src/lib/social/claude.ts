@@ -1,7 +1,8 @@
 import { getSecret } from "@helix/core";
+import { HELIX_CLAUDE_SONNET } from "@helix/core/models";
 import type { FetchLike } from "./config";
 
-export const CLAUDE_MODEL = "claude-sonnet-4-6";
+export const CLAUDE_MODEL = HELIX_CLAUDE_SONNET;
 
 /** ESTIMATE. Anthropic list price for Claude Sonnet 4 in USD per million input tokens. Not read from a bill. */
 export const EST_INPUT_USD_PER_MTOK = 3;

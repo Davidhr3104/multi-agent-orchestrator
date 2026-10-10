@@ -53,6 +53,7 @@ export function DashboardPanorama({
       .then((response) => response.json())
       .then((data: { profile?: { model?: string } }) => {
         const known: Record<string, string> = {
+          "claude-sonnet-4-6": "Claude Sonnet 4",
           "claude-sonnet-4-20250514": "Claude Sonnet 4",
           "claude-3-5-sonnet-latest": "Claude 3.5 Sonnet",
           "claude-3-5-haiku-latest": "Claude 3.5 Haiku",

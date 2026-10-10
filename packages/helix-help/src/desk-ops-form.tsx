@@ -73,6 +73,7 @@ export function DeskOpsForm() {
     setUnlocked(true);
     setConfigured(true);
     setUnlockMessage("Operator session unlocked on this browser.");
+    window.dispatchEvent(new CustomEvent("helix:operator-unlocked"));
   }
 
   const label = status == null
@@ -127,7 +128,7 @@ export function DeskOpsForm() {
               ? unlocked
                 ? "HITL and CRM writes are unlocked in this browser."
                 : "Operator key is set. Unlock here before Confirm / Approve / Send to CRM."
-              : "No operator key yet — HITL stays open on this laptop. Paste HELIX_OPERATOR_KEY above, save, then unlock."}
+              : "No operator key in the server environment — settings stay read-only. Set HELIX_OPERATOR_KEY, then unlock here."}
           </p>
         </div>
         <input

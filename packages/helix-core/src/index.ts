@@ -15,6 +15,14 @@ export {
   type ClaudeUsage,
 } from "./claude-usage";
 export { cronAuthResponse } from "./cron-auth";
+export { HELIX_CLAUDE_SONNET } from "./models";
+export {
+  redactDeskStatus,
+  settingsDeskWriteDenied,
+  settingsPrivileged,
+  settingsWriteDenied,
+  type SettingsAuthOptions,
+} from "./settings-auth";
 export {
   askAi,
   askAiWithProposal,

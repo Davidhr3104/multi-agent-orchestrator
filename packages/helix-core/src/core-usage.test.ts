@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { resumeAgent, runAgent, type AgentModel, type AgentTool, type ModelTurn, type RiskDecision } from "./agent";
 import { anthropicAgentModel, toAnthropicMessages } from "./agent-anthropic";
 import { askAi } from "./ask-ai";
-import { completeWithClaude, completeWithClaudeDetailed } from "./claude";
+import { completeWithClaude, completeWithClaudeDetailed, DEFAULT_CLAUDE_MODEL } from "./claude";
 import { estimateClaudeCostUsd, onClaudeUsage, type ClaudeUsage } from "./claude-usage";
 import { cronAuthResponse } from "./cron-auth";
 import { resetSecretsCache } from "./secrets";
@@ -35,7 +35,8 @@ describe("Claude usage reporting", () => {
     const off = onClaudeUsage((u) => seen.push(u));
     const out = await completeWithClaudeDetailed("q", { feature: "test" });
     off();
-    expect(out).toEqual({ text: "hi", usage: { model: "claude-sonnet-4-20250514", inputTokens: 120, outputTokens: 30, feature: "test" } });
+    expect(out).toEqual({ text: "hi", usage: { model: DEFAULT_CLAUDE_MODEL, inputTokens: 120, outputTokens: 30, feature: "test" } });
+    expect(DEFAULT_CLAUDE_MODEL).toBe("claude-sonnet-4-6");
     expect(seen).toHaveLength(1);
   });
 

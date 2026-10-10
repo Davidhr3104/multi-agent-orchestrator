@@ -51,7 +51,7 @@ export const KEYS_SHARED: SecretField[] = [
   {
     name: "HELIX_OPERATOR_KEY",
     label: "Operator key",
-    hint: "Locks HITL and CRM writes. Leave empty for local-only. Unlock in Settings after saving.",
+    hint: "Locks settings writes, HITL, and CRM writes. Set this in the server environment (each Vercel project), then unlock in Settings. Without it, settings stay read-only.",
   },
 ];
 

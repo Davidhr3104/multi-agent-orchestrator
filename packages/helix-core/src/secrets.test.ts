@@ -26,20 +26,23 @@ describe("secrets", () => {
     expect(masked).not.toMatch(/oper|key1|2/);
   });
 
-  it("the public status response never carries a character of a stored secret", async () => {
+  it("the public status response never carries a character of a stored secret or which keys are set", async () => {
     setSecrets({ ANTHROPIC_API_KEY: "sk-ant-LEAKCHECK-9876543210" });
     const res = await keysGetResponse([{ name: "ANTHROPIC_API_KEY", label: "Claude", hint: "" }]);
     const text = await res.text();
-    expect(text).toContain('"configured":true');
+    expect(res.status).toBe(200);
+    expect(text).toContain('"configured":false');
+    expect(text).toContain('"readOnly":true');
+    expect(text).not.toContain('"configured":true');
     expect(text).not.toMatch(/sk-a|LEAKCHECK|3210/);
   });
 
-  it("refuses to save keys on a hosted deployment that has no operator key (fails closed)", async () => {
+  it("refuses to save keys when no operator key is configured, including off Vercel", async () => {
     const prevVercel = process.env.VERCEL;
-    process.env.VERCEL = "1";
+    delete process.env.VERCEL;
     setSecrets({ HELIX_OPERATOR_KEY: "" });
     try {
-      const req = new Request("https://x.test/api/settings/keys", {
+      const req = new Request("http://localhost/api/settings/keys", {
         method: "POST",
         body: JSON.stringify({ ANTHROPIC_API_KEY: "sk-ant-attacker" }),
       });
@@ -49,23 +52,6 @@ describe("secrets", () => {
     } finally {
       if (prevVercel === undefined) delete process.env.VERCEL;
       else process.env.VERCEL = prevVercel;
-    }
-  });
-
-  it("still saves keys locally (no VERCEL) when the operator key is unset", async () => {
-    const prevVercel = process.env.VERCEL;
-    delete process.env.VERCEL;
-    setSecrets({ HELIX_OPERATOR_KEY: "" });
-    try {
-      const req = new Request("http://localhost/api/settings/keys", {
-        method: "POST",
-        body: JSON.stringify({ ANTHROPIC_API_KEY: "sk-ant-local-ok" }),
-      });
-      const res = await keysPostResponse(req, [{ name: "ANTHROPIC_API_KEY", label: "Claude", hint: "" }]);
-      expect(res.status).toBe(200);
-      expect(getSecret("ANTHROPIC_API_KEY")).toBe("sk-ant-local-ok");
-    } finally {
-      if (prevVercel !== undefined) process.env.VERCEL = prevVercel;
     }
   });
 

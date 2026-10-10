@@ -1,4 +1,4 @@
-import { getSecret } from "@helix/core";
+import { getSecret, settingsPrivileged } from "@helix/core";
 import { requireOperator } from "@helix/core/operator";
 import { isClaudeKeySet } from "@/lib/claude-metered";
 import { parseProfile } from "@/lib/client-profile";
@@ -11,13 +11,14 @@ import { isSupabaseConfigured } from "@/lib/supabase-desk";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-export async function GET() {
+export async function GET(req: Request) {
   const desk = await deskStatus();
+  const privileged = settingsPrivileged(req);
   return Response.json({
-    configured: isSamConfigured(),
-    claudeConfigured: isClaudeKeySet(),
-    cronConfigured: Boolean(getSecret("CRON_SECRET")),
-    persisted: isSupabaseConfigured(),
+    configured: privileged && isSamConfigured(),
+    claudeConfigured: privileged && isClaudeKeySet(),
+    cronConfigured: privileged && Boolean(getSecret("CRON_SECRET")),
+    persisted: privileged && isSupabaseConfigured(),
     deskMode: desk.mode,
     suggested: samFiltersFromProfile(parseProfile(getClientProfile())),
     procurementTypes: SAM_PROCUREMENT_TYPES,

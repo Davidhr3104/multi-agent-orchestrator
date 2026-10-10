@@ -1,7 +1,8 @@
 import { readClaudeUsage, reportClaudeUsage, type ClaudeUsage } from "./claude-usage";
+import { HELIX_CLAUDE_SONNET } from "./models";
 import { getSecret } from "./secrets";
 
-export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514";
+export const DEFAULT_CLAUDE_MODEL = HELIX_CLAUDE_SONNET;
 
 export function isClaudeConfigured(): boolean {
   return Boolean(getSecret("ANTHROPIC_API_KEY"));

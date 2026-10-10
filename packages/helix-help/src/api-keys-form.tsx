@@ -21,18 +21,23 @@ export function ApiKeysForm({ initialFields = [] }: { initialFields?: KeyField[]
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [persist, setPersist] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/settings/keys");
-    const data = (await res.json()) as { keys?: KeyRow[]; persist?: string };
+    const data = (await res.json()) as { keys?: KeyRow[]; persist?: string | null; readOnly?: boolean };
     setKeys(data.keys ?? []);
     setPersist(data.persist ?? "");
+    setReadOnly(Boolean(data.readOnly));
     setDraft({});
   }
 
   useEffect(() => {
     void load();
+    const onUnlock = () => void load();
+    window.addEventListener("helix:operator-unlocked", onUnlock);
+    return () => window.removeEventListener("helix:operator-unlocked", onUnlock);
   }, []);
 
   async function save(e: FormEvent) {
@@ -46,7 +51,8 @@ export function ApiKeysForm({ initialFields = [] }: { initialFields?: KeyField[]
     });
     setSaving(false);
     if (!res.ok) {
-      setMessage("Could not save keys.");
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setMessage(data?.error ?? "Could not save keys.");
       return;
     }
     const data = (await res.json()) as { keys?: KeyRow[]; persist?: string };
@@ -64,6 +70,7 @@ export function ApiKeysForm({ initialFields = [] }: { initialFields?: KeyField[]
           Paste keys here instead of editing <span className="font-mono">.env</span>. They stay on the
           server. Empty fields keep the current value. Production on Vercel still needs the same keys in
           the project settings if the instance is cold.
+          {readOnly ? " This demo is read-only until you unlock with the operator key." : ""}
           {persist ? ` Store: ${persist}.` : ""}
         </p>
       </div>
@@ -96,7 +103,7 @@ export function ApiKeysForm({ initialFields = [] }: { initialFields?: KeyField[]
       {message ? <p className="text-xs opacity-80">{message}</p> : null}
       <button
         className="rounded-lg border border-current/20 px-4 py-2 text-sm font-medium"
-        disabled={saving}
+        disabled={saving || readOnly}
         type="submit"
       >
         {saving ? "Saving…" : "Save API keys"}

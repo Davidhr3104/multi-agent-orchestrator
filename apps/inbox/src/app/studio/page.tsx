@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { INBOX_MODELS, type InboxModelId, type InboxPersona } from "@/lib/agent-profile";
 
 export default function StudioPage() {
-  const [model, setModel] = useState<InboxModelId>("claude-sonnet-4-20250514");
+  const [model, setModel] = useState<InboxModelId>(INBOX_MODELS[0].id);
   const [prompt, setPrompt] = useState("");
   const [persona, setPersona] = useState<InboxPersona>("executive");
   const [followUpHours, setFollowUpHours] = useState(48);
