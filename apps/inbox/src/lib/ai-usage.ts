@@ -1,4 +1,5 @@
 import { getSecret } from "@helix/core";
+import { HELIX_CLAUDE_SONNET } from "@helix/core/models";
 
 /**
  * Token + cost ledger for every Claude call the Inbox desk makes itself.
@@ -7,9 +8,10 @@ import { getSecret } from "@helix/core";
  * process only, so a cold start or a different serverless instance (e.g. the cron) starts at zero.
  */
 
-export const INBOX_CLAUDE_MODEL = "claude-sonnet-4-20250514";
+export const INBOX_CLAUDE_MODEL = HELIX_CLAUDE_SONNET;
 
 export const ESTIMATED_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
+  [HELIX_CLAUDE_SONNET]: { input: 3, output: 15 },
   "claude-sonnet-4-20250514": { input: 3, output: 15 },
   "claude-3-5-sonnet-latest": { input: 3, output: 15 },
   "claude-3-5-haiku-latest": { input: 0.8, output: 4 },

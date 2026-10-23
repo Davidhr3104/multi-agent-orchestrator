@@ -1,11 +1,10 @@
-import { requireOperator } from "@helix/core/operator";
-import { deskWriteDenied } from "@/lib/ai-desk";
+import { redactDeskStatus, settingsDeskWriteDenied, settingsPrivileged } from "@helix/core";
 import { clearDesk, deskStatus, loadDemoCatalog } from "@/lib/store";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  return Response.json(await deskStatus());
+export async function GET(req: Request) {
+  return Response.json(redactDeskStatus(await deskStatus(), settingsPrivileged(req)));
 }
 
 export async function POST(req: Request) {
@@ -15,9 +14,9 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "JSON required." }, { status: 400 });
   }
+  const denied = settingsDeskWriteDenied(req, body.action);
+  if (denied) return denied;
   if (body.action === "demo") {
-    const denied = deskWriteDenied(req);
-    if (denied) return denied;
     try {
       return Response.json(await loadDemoCatalog());
     } catch (err) {
@@ -25,9 +24,6 @@ export async function POST(req: Request) {
     }
   }
   if (body.action === "empty") {
-    // Leaving the demo flips the shared desk to live for every visitor, so it always needs the operator.
-    const denied = requireOperator(req);
-    if (denied) return denied;
     return Response.json(await clearDesk());
   }
   return Response.json({ error: "action must be demo or empty." }, { status: 400 });

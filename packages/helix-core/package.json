@@ -12,7 +12,8 @@
     "./inbox/business-days": "./src/inbox/business-days.ts",
     "./inbox/eml": "./src/inbox/eml.ts",
     "./inbox/followup": "./src/inbox/followup.ts",
-    "./automations": "./src/automations/index.ts"
+    "./automations": "./src/automations/index.ts",
+    "./models": "./src/models.ts"
   },
   "scripts": {
     "test": "vitest run"

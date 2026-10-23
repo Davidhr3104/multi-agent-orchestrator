@@ -1,5 +1,6 @@
 import { getBrain, setBrain, type BrainAutomations, type BrainGates } from "@/lib/brain";
-import type { ScoreThresholds } from "@helix/core";
+import { leadsSettingsAuth } from "@/lib/settings-session";
+import { settingsWriteDenied, type ScoreThresholds } from "@helix/core";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,8 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const denied = settingsWriteDenied(req, await leadsSettingsAuth());
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await req.json();

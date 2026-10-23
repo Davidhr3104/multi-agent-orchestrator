@@ -317,7 +317,8 @@ export function SettingsKeysDesk() {
     });
     setSaving(false);
     if (!res.ok) {
-      flash(res.status === 401 ? LOCKED_FLASH : "Could not save keys.");
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      flash(res.status === 401 || res.status === 403 ? (data?.error ?? LOCKED_FLASH) : "Could not save keys.");
       return;
     }
     const data = (await res.json()) as { keys?: KeyRow[]; persist?: string };
@@ -406,6 +407,8 @@ export function SettingsKeysDesk() {
     setOpKey("");
     setOperator({ configured: true, unlocked: true });
     flash("Operator session unlocked.");
+    void loadKeys();
+    void loadRuntime();
   }
 
   function copyText(text: string) {

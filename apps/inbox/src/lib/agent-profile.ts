@@ -1,5 +1,7 @@
+import { HELIX_CLAUDE_SONNET } from "@helix/core/models";
+
 export const INBOX_MODELS = [
-  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+  { id: HELIX_CLAUDE_SONNET, label: "Claude Sonnet 4" },
   { id: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet" },
   { id: "claude-3-5-haiku-latest", label: "Claude 3.5 Haiku" },
 ] as const;
@@ -18,7 +20,7 @@ type Profile = {
 };
 
 let profile: Profile = {
-  model: "claude-sonnet-4-20250514",
+  model: HELIX_CLAUDE_SONNET,
   prompt: "",
   persona: "executive",
   followUpHours: 48,

@@ -1,4 +1,4 @@
-import { parseMarketingWindow, windowBounds } from "@helix/core";
+import { parseMarketingWindow, settingsPrivileged, windowBounds } from "@helix/core";
 import { requireOperator } from "@helix/core/operator";
 import { AD_SOURCES, getAllSourceStatus, isSourceConfigured, syncAdSource, type AdSource } from "@/lib/ad-sources";
 import { isMetaAdsReadConfigured } from "@/lib/meta-ads";
@@ -7,14 +7,21 @@ import { getSnapshot, upsertSourceSpend } from "@/lib/store";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function GET() {
-  const sources = getAllSourceStatus();
+export async function GET(req: Request) {
+  const privileged = settingsPrivileged(req);
+  const sources = privileged
+    ? getAllSourceStatus()
+    : {
+        meta: { source: "meta" as const, configured: false, verified: false, missing: [], lastAttemptAt: null, lastOkAt: null, lastError: null, lastRows: null },
+        google: { source: "google" as const, configured: false, verified: false, missing: [], lastAttemptAt: null, lastOkAt: null, lastError: null, lastRows: null },
+        tiktok: { source: "tiktok" as const, configured: false, verified: false, missing: [], lastAttemptAt: null, lastOkAt: null, lastError: null, lastRows: null },
+      };
   return Response.json({
     metaConfigured: sources.meta.configured,
     googleConfigured: sources.google.configured,
     tiktokConfigured: sources.tiktok.configured,
     sources,
-    writesEnabled: isMetaAdsReadConfigured(),
+    writesEnabled: privileged && isMetaAdsReadConfigured(),
     note: "Sync is read-only on every platform. Pause/scale writes only to Meta, only after a person confirms, and only when the campaign_id is numeric and the token has ads_management. Google Ads and TikTok are never written to.",
   });
 }

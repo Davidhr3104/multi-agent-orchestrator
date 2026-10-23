@@ -1,3 +1,4 @@
+import { settingsWriteDenied } from "@helix/core";
 import { getClientProfile, setClientProfile } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -7,6 +8,8 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const denied = settingsWriteDenied(req);
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await req.json();

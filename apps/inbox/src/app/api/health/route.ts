@@ -1,4 +1,4 @@
-import { getSecret } from "@helix/core";
+import { getSecret, settingsPrivileged } from "@helix/core";
 import { isGoogleOAuthConfigured } from "@/lib/gmail-oauth";
 import { supabaseListEmailAccounts } from "@/lib/supabase-desk";
 import { isSlackConfigured } from "@/lib/slack";
@@ -10,19 +10,22 @@ import { summarizeAiUsage } from "@/lib/ai-usage";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const accounts = await supabaseListEmailAccounts(DEFAULT_WORKSPACE_ID);
+export async function GET(req: Request) {
+  const privileged = settingsPrivileged(req);
+  const accounts = privileged ? await supabaseListEmailAccounts(DEFAULT_WORKSPACE_ID) : [];
   const gmailConnected = accounts.some((a) => a.isConnected && a.accessToken);
+  const microsoft = privileged ? microsoftStatus() : { configured: false, connectedEmail: null };
+  const twilio = privileged ? twilioStatus() : { configured: false, from: null };
   return Response.json({
-    claude: Boolean(getSecret("ANTHROPIC_API_KEY")),
+    claude: privileged && Boolean(getSecret("ANTHROPIC_API_KEY")),
     gmailConnected,
-    oauthConfigured: isGoogleOAuthConfigured(),
-    slack: isSlackConfigured(),
-    teams: Boolean(getSecret("TEAMS_WEBHOOK_URL")),
+    oauthConfigured: privileged && isGoogleOAuthConfigured(),
+    slack: privileged && isSlackConfigured(),
+    teams: privileged && Boolean(getSecret("TEAMS_WEBHOOK_URL")),
     model: getAgentProfile().model,
-    microsoft: microsoftStatus(),
-    twilio: twilioStatus(),
-    cron: { secretConfigured: Boolean(getSecret("CRON_SECRET")) },
+    microsoft,
+    twilio,
+    cron: { secretConfigured: privileged && Boolean(getSecret("CRON_SECRET")) },
     aiUsage: summarizeAiUsage(),
   });
 }

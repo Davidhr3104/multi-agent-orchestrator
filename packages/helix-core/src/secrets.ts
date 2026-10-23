@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { SecretField } from "./secret-fields";
+import type { SettingsAuthOptions } from "./settings-auth";
 export type { SecretField };
 export {
   KEYS_COMMERCE,
@@ -174,22 +175,46 @@ export function listSecretStatus(fields: SecretField[]): SecretStatus[] {
   });
 }
 
-export async function keysGetResponse(fields: SecretField[]): Promise<Response> {
+/**
+ * Public reads list the field catalog the settings form renders, with every
+ * `configured` flag forced off. A privileged caller (operator credential or
+ * app session) sees which keys are actually set. The masked value is still
+ * only "••••" — never a fragment of the secret.
+ */
+export async function keysGetResponse(
+  fields: SecretField[],
+  req?: Request,
+  opts?: SettingsAuthOptions
+): Promise<Response> {
+  const { settingsPrivileged } = await import("./settings-auth");
+  const reveal = Boolean(req && settingsPrivileged(req, opts));
+  const keys = listSecretStatus(fields).map((row) =>
+    reveal
+      ? row
+      : {
+          name: row.name,
+          label: row.label,
+          hint: row.hint,
+          ...(row.stub ? { stub: row.stub } : {}),
+          configured: false,
+          masked: null,
+        }
+  );
   return Response.json({
-    persist: secretsPersistKind(),
-    keys: listSecretStatus(fields),
+    persist: reveal ? secretsPersistKind() : null,
+    readOnly: !reveal,
+    keys,
   });
 }
 
-export async function keysPostResponse(req: Request, fields: SecretField[]): Promise<Response> {
-  // requireOperator() lets everything through when no operator key is set, which is right
-  // for a local desk but not for a hosted one: there, saving keys must fail closed.
-  if (process.env.VERCEL && !getSecret("HELIX_OPERATOR_KEY")) {
-    return Response.json(
-      { error: "Set HELIX_OPERATOR_KEY on this deployment before saving keys from the app." },
-      { status: 403 }
-    );
-  }
+export async function keysPostResponse(
+  req: Request,
+  fields: SecretField[],
+  opts?: SettingsAuthOptions
+): Promise<Response> {
+  const { settingsWriteDenied } = await import("./settings-auth");
+  const denied = settingsWriteDenied(req, opts);
+  if (denied) return denied;
   const allowed = new Set(fields.map((f) => f.name));
   let body: Record<string, unknown> = {};
   try {
@@ -203,7 +228,7 @@ export async function keysPostResponse(req: Request, fields: SecretField[]): Pro
     patch[name] = raw;
   }
   setSecrets(patch);
-  return keysGetResponse(fields);
+  return keysGetResponse(fields, req, opts);
 }
 
 export function isGhlConfigured(): boolean {
