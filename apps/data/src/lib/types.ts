@@ -21,6 +21,8 @@ export type ImportContract = {
   name: string;
   version: number;
   fields: ImportField[];
+  /** Fields that identify a row. A later row repeating the key of an earlier one is rejected. */
+  key?: string[];
   maxRows: number;
 };
 

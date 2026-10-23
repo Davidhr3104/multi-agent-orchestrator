@@ -199,6 +199,10 @@ Cada app es un proyecto de Vercel distinto y la demo es de un solo inquilino. Lo
 
 ## 4. Helix Data
 
+> **Actualización 2026-10-22:** esta sección se escribió como diseño, pero `apps/data` ya existe: parseo `.xlsx`/`.csv`, perfilado, reglas deterministas, diff celda a celda con aprobación, exportación de copia nueva y **dry-run** de publicación contra contratos (Leads, Marketing, Commerce, Real Estate). **Lo que sigue sin existir:** publicar de verdad a otra app (C2), mapeo con IA (C3) y Google Sheets (C4).
+>
+> Mejoras de esta fecha: las reglas ya no reescriben teléfonos ni emails fuera de columnas que los declaran; los duplicados se detectan por **fila completa** y por **email/teléfono normalizado** (antes se marcaba cada valor repetido de cualquier columna); el contrato valida **tipos** (email, teléfono, dinero, fecha, número) y rechaza filas con la misma **clave** (`key` por contrato); las fechas ambiguas se resuelven en la review eligiendo **MDY o DMY** (la persona decide; queda registrado quién y cuándo).
+
 ### 4.1 Qué es
 
 Escritorio para hojas Excel y Google Sheets y **centro de la familia**: recibe archivos desordenados, los perfila, los limpia con trazabilidad y los **publica a otros Helix** (Leads, Marketing, Commerce, Real Estate, Legal, Inbox, Social). También recibe datos de vuelta (leads, reportes, auditoría) y los deja en una hoja.

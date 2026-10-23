@@ -1,5 +1,13 @@
-import type { ColumnMapping, ImportContract, SheetGrid } from "@/lib/types";
+import type { ColumnMapping, ImportContract, ImportFieldType, SheetGrid } from "@/lib/types";
 import { headerKey } from "@/lib/utils";
+import {
+  formatMoney,
+  isAmbiguousDate,
+  looksLikeEmail,
+  looksLikeNumber,
+  parseUnambiguousIsoDate,
+  toE164ish,
+} from "@/lib/rules";
 
 export const IMPORT_CONTRACTS: ImportContract[] = [
   {
@@ -7,6 +15,7 @@ export const IMPORT_CONTRACTS: ImportContract[] = [
     name: "Helix for Leads intake",
     version: 1,
     maxRows: 5000,
+    key: ["email"],
     fields: [
       { name: "name", type: "text", required: true },
       { name: "email", type: "email", required: true },
@@ -23,6 +32,7 @@ export const IMPORT_CONTRACTS: ImportContract[] = [
     name: "Helix for Marketing spend",
     version: 1,
     maxRows: 5000,
+    key: ["campaign_id", "date"],
     fields: [
       { name: "campaign_id", type: "text", required: true },
       { name: "name", type: "text", required: false },
@@ -39,6 +49,7 @@ export const IMPORT_CONTRACTS: ImportContract[] = [
     name: "Helix for Commerce catalog",
     version: 1,
     maxRows: 5000,
+    key: ["sku"],
     fields: [
       { name: "sku", type: "text", required: true },
       { name: "name", type: "text", required: true },
@@ -51,6 +62,7 @@ export const IMPORT_CONTRACTS: ImportContract[] = [
     name: "Helix for Real Estate listings",
     version: 1,
     maxRows: 5000,
+    key: ["title", "address"],
     fields: [
       { name: "title", type: "text", required: true },
       { name: "price", type: "money", required: true },
@@ -138,6 +150,11 @@ export function validateAgainstContract(
   mapping.forEach((m, i) => {
     if (m.field) colForField.set(m.field, i);
   });
+  // Row-identity check only runs when every key field is mapped; otherwise we can't tell
+  // a duplicate from, say, the same campaign on a different day.
+  const keyFields = contract.key && contract.key.every((f) => colForField.has(f)) ? contract.key : null;
+  const seenKeys = new Map<string, number>();
+
   return grid.rows.map((row, rowIndex) => {
     const payload: Record<string, string> = {};
     const reasons: string[] = [];
@@ -145,10 +162,42 @@ export function validateAgainstContract(
       const idx = colForField.get(field.name);
       const value = idx === undefined ? "" : String(row[idx] ?? "").trim();
       if (field.required && !value) reasons.push(`Missing required ${field.name}.`);
-      if (value) payload[field.name] = value;
+      if (value) {
+        payload[field.name] = value;
+        const problem = fieldTypeProblem(field.type, value);
+        if (problem) reasons.push(`${field.name}: ${problem}`);
+      }
+    }
+    if (keyFields && reasons.length === 0) {
+      const parts = keyFields.map((f) => (payload[f] ?? "").toLowerCase());
+      if (parts.every(Boolean)) {
+        const key = parts.join("\u0001");
+        const first = seenKeys.get(key);
+        if (first === undefined) seenKeys.set(key, rowIndex);
+        else reasons.push(`Duplicate of row ${first + 2} (same ${keyFields.join(" + ")}).`);
+      }
     }
     return { rowIndex, accepted: reasons.length === 0, reasons, payload };
   });
+}
+
+/** Why a value does not fit its contract field type, or null if it does. Never repairs. */
+export function fieldTypeProblem(type: ImportFieldType, value: string): string | null {
+  switch (type) {
+    case "email":
+      return looksLikeEmail(value) ? null : `“${value}” is not a valid email.`;
+    case "phone":
+      return toE164ish(value) === value ? null : `“${value}” is not E.164 (e.g. +15551234567).`;
+    case "money":
+      return formatMoney(value) !== null ? null : `“${value}” is not an amount.`;
+    case "date":
+      if (isAmbiguousDate(value)) return `“${value}” is ambiguous (MDY or DMY). Resolve it in review.`;
+      return parseUnambiguousIsoDate(value) === value ? null : `“${value}” is not an ISO date (YYYY-MM-DD).`;
+    case "number":
+      return looksLikeNumber(value) ? null : `“${value}” is not a number.`;
+    default:
+      return null;
+  }
 }
 
 export function publicationIdempotencyKey(versionHash: string, app: string, contractVersion: number): string {

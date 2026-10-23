@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageFrame, DemoMark } from "@/components/desk-kit";
+import { ambiguousDateCandidates, type DateReading } from "@/lib/rules";
 import type { DatasetBundle, Decision, ProposedChange } from "@/lib/types";
 
 export default function ReviewPage() {
@@ -11,6 +12,7 @@ export default function ReviewPage() {
   const [bundle, setBundle] = useState<DatasetBundle | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch(`/api/datasets/${id}`);
@@ -31,14 +33,19 @@ export default function ReviewPage() {
   const hitl = pending.filter((p) => p.decision?.status === "pending");
   const autos = pending.filter((p) => p.decision?.status === "auto_approved" || p.decision?.status === "approved");
 
-  async function act(status: "approved" | "rejected", ids: string[]) {
+  async function act(status: "approved" | "rejected", ids: string[], readings?: Record<string, DateReading>) {
     if (!ids.length) return;
     setBusy(true);
-    await fetch(`/api/datasets/${id}/approve`, {
+    setError(null);
+    const res = await fetch(`/api/datasets/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ changeIds: ids, status }),
+      body: JSON.stringify({ changeIds: ids, status, readings }),
     });
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(d.error ?? "The decision could not be saved.");
+    }
     setChecked(new Set());
     await load();
     setBusy(false);
@@ -82,11 +89,19 @@ export default function ReviewPage() {
         <p className="self-center text-xs text-muted-foreground">Export always writes a new file. Undo = discard the copy.</p>
       </div>
 
+      {error ? (
+        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium">
+          {error}
+        </p>
+      ) : null}
+
       <DiffTable
         title="HITL — confirm these"
         rows={hitl}
         checked={checked}
         setChecked={setChecked}
+        busy={busy}
+        onReadDate={(changeId, reading) => void act("approved", [changeId], { [changeId]: reading })}
         amber
       />
       <DiffTable title="Auto-approved deterministic rules" rows={autos} checked={checked} setChecked={setChecked} />
@@ -111,12 +126,16 @@ function DiffTable({
   rows,
   checked,
   setChecked,
+  busy,
+  onReadDate,
   amber,
 }: {
   title: string;
   rows: { change: ProposedChange; decision?: Decision }[];
   checked: Set<string>;
   setChecked: (s: Set<string>) => void;
+  busy?: boolean;
+  onReadDate?: (changeId: string, reading: DateReading) => void;
   amber?: boolean;
 }) {
   return (
@@ -137,10 +156,15 @@ function DiffTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ change, decision }) => (
+          {rows.map(({ change, decision }) => {
+            const readings =
+              decision?.status === "pending" && change.ruleId === "date_ambiguous" && onReadDate
+                ? ambiguousDateCandidates(change.before)
+                : null;
+            return (
             <tr key={change.id} className="border-t border-border">
               <td className="py-2">
-                {decision?.status === "pending" ? (
+                {decision?.status === "pending" && !readings ? (
                   <input
                     type="checkbox"
                     checked={checked.has(change.id)}
@@ -155,14 +179,33 @@ function DiffTable({
               </td>
               <td className="py-2 font-mono">{change.cellRef}</td>
               <td className="py-2 font-mono text-destructive">{change.before || "∅"}</td>
-              <td className="py-2 font-mono text-teal">{change.after}</td>
+              <td className="py-2 font-mono text-teal">
+                {readings ? (
+                  <span className="flex flex-wrap gap-1">
+                    {(["mdy", "dmy"] as const).map((reading) => (
+                      <button
+                        key={reading}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onReadDate?.(change.id, reading)}
+                        className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted disabled:opacity-50"
+                      >
+                        Read as {reading.toUpperCase()} → {readings[reading]}
+                      </button>
+                    ))}
+                  </span>
+                ) : (
+                  change.after
+                )}
+              </td>
               <td className="py-2">{change.ruleId}</td>
               <td className="py-2">{change.origin}</td>
               <td className="py-2">{Math.round(change.confidence * 100)}%</td>
               <td className="py-2">{decision?.decidedBy || "—"}</td>
               <td className="py-2">{decision?.decidedAt ? decision.decidedAt.slice(0, 19) : "—"}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </section>

@@ -1,5 +1,6 @@
 import type { ColumnProfile, ImportFieldType, Issue, SheetGrid } from "@/lib/types";
 import { looksLikeEmail, looksLikeMoney, looksLikeNumber, looksLikePhone, parseUnambiguousIsoDate } from "@/lib/rules";
+import { headerKey } from "@/lib/utils";
 
 export function profileGrid(versionId: string, grid: SheetGrid): { profiles: ColumnProfile[]; issues: Issue[] } {
   const issues: Issue[] = [];
@@ -38,25 +39,6 @@ export function profileGrid(versionId: string, grid: SheetGrid): { profiles: Col
         message: `Column “${column}” mixes ${[...typeSet].join(", ")}.`,
       });
     }
-    const seen = new Map<string, number>();
-    values.forEach((v, rowIndex) => {
-      const key = v.trim().toLowerCase();
-      if (!key) return;
-      const first = seen.get(key);
-      if (first === undefined) {
-        seen.set(key, rowIndex);
-        return;
-      }
-      issues.push({
-        id: `${versionId}:dupe:${columnIndex}:${rowIndex}`,
-        versionId,
-        column,
-        rowIndex,
-        ruleId: "exact_duplicate",
-        severity: "warn",
-        message: `Exact duplicate of row ${first + 2} in “${column}”.`,
-      });
-    });
     markNumericOutliers(versionId, column, columnIndex, values, issues);
     return {
       versionId,
@@ -71,10 +53,85 @@ export function profileGrid(versionId: string, grid: SheetGrid): { profiles: Col
       issueCount: 0,
     };
   });
+  issues.push(...findDuplicateRows(versionId, grid));
   for (const p of profiles) {
     p.issueCount = issues.filter((i) => i.column === p.column).length;
   }
   return { profiles, issues };
+}
+
+export const ALL_COLUMNS = "(all columns)";
+
+function isEmailHeader(header: string): boolean {
+  return headerKey(header).includes("email");
+}
+
+function isPhoneHeader(header: string): boolean {
+  const key = headerKey(header);
+  return key.includes("phone") || key.includes("mobile") || key === "tel" || key.includes("telephone");
+}
+
+/**
+ * Row-level duplicates. Flags the *later* row and points at the first one. Nothing is deleted:
+ * these are issues for a person to decide on.
+ *  - exact_duplicate: every cell matches after trim / lowercase / collapsed whitespace.
+ *  - duplicate_key:   same normalized email or phone, even if other cells differ.
+ */
+export function findDuplicateRows(versionId: string, grid: SheetGrid): Issue[] {
+  const issues: Issue[] = [];
+  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+  const exactSeen = new Map<string, number>();
+  const exactDupes = new Set<number>();
+
+  grid.rows.forEach((row, rowIndex) => {
+    const cells = grid.headers.map((_, i) => norm(row[i] ?? ""));
+    if (cells.every((c) => c === "")) return;
+    const key = cells.join("\u0001");
+    const first = exactSeen.get(key);
+    if (first === undefined) {
+      exactSeen.set(key, rowIndex);
+      return;
+    }
+    exactDupes.add(rowIndex);
+    issues.push({
+      id: `${versionId}:dupe:${rowIndex}`,
+      versionId,
+      column: ALL_COLUMNS,
+      rowIndex,
+      ruleId: "exact_duplicate",
+      severity: "warn",
+      message: `Row ${rowIndex + 2} is an exact duplicate of row ${first + 2}.`,
+    });
+  });
+
+  grid.headers.forEach((header, columnIndex) => {
+    const email = isEmailHeader(header);
+    if (!email && !isPhoneHeader(header)) return;
+    const seen = new Map<string, number>();
+    grid.rows.forEach((row, rowIndex) => {
+      const raw = (row[columnIndex] ?? "").trim();
+      if (!raw) return;
+      const key = email ? raw.toLowerCase() : raw.replace(/\D/g, "").slice(-10);
+      // A value that isn't a plausible key can't be a duplicate of anything.
+      if (email ? !looksLikeEmail(key) : key.length < 10) return;
+      const first = seen.get(key);
+      if (first === undefined) {
+        seen.set(key, rowIndex);
+        return;
+      }
+      if (exactDupes.has(rowIndex)) return;
+      issues.push({
+        id: `${versionId}:dupekey:${columnIndex}:${rowIndex}`,
+        versionId,
+        column: header,
+        rowIndex,
+        ruleId: "duplicate_key",
+        severity: "warn",
+        message: `Row ${rowIndex + 2} repeats the ${email ? "email" : "phone"} of row ${first + 2} in “${header}”. Not removed — review.`,
+      });
+    });
+  });
+  return issues;
 }
 
 export function inferCellType(raw: string): ImportFieldType {

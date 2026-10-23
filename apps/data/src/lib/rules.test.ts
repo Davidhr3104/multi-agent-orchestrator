@@ -46,10 +46,10 @@ describe("money and phones", () => {
 });
 
 describe("profile", () => {
-  it("flags mixed types, completeness, and exact dupes", () => {
+  it("flags completeness and the same lead repeated under a normalized email", () => {
     const { profiles, issues } = profileGrid("v1", dirtyLeadsGrid());
     expect(profiles.find((p) => p.column === "Email")?.completeness).toBeGreaterThan(0.8);
-    expect(issues.some((i) => i.ruleId === "exact_duplicate")).toBe(true);
+    expect(issues.some((i) => i.ruleId === "duplicate_key" && i.column === "Email")).toBe(true);
   });
 });
 

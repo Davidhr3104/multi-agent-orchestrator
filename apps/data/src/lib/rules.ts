@@ -72,6 +72,22 @@ export function parseUnambiguousIsoDate(raw: string): string | null {
   return null;
 }
 
+/**
+ * The two readings of an ambiguous slash date. A person picks one; Helix never does.
+ * Returns null when the value is not ambiguous (or has no valid reading).
+ */
+export function ambiguousDateCandidates(raw: string): { mdy: string; dmy: string } | null {
+  if (!isAmbiguousDate(raw)) return null;
+  const slash = /^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/.exec(raw.trim());
+  if (!slash) return null;
+  const a = Number(slash[1]);
+  const b = Number(slash[2]);
+  let y = Number(slash[3]);
+  if (slash[3].length === 2) y += y >= 70 ? 1900 : 2000;
+  if (!validYmd(y, a, b) || !validYmd(y, b, a)) return null;
+  return { mdy: isoDate(y, a, b), dmy: isoDate(y, b, a) };
+}
+
 export function isAmbiguousDate(raw: string): boolean {
   const v = raw.trim();
   const slash = /^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/.exec(v);
@@ -186,7 +202,9 @@ export function proposeRules(versionId: string, grid: SheetGrid, extraIssues: Is
       }
       const working = trimmed;
 
-      if (key.includes("email") || looksLikeEmail(working) || /@/.test(working)) {
+      // Only email-labelled columns (or values that already are emails) are email-checked.
+      // A stray "@" in a free-text column (e.g. "call me @ 5pm") is not a broken email.
+      if (key.includes("email") || looksLikeEmail(working)) {
         if (working && !looksLikeEmail(working)) {
           issues.push({
             id: `${versionId}:email:${ref}`,
@@ -230,7 +248,9 @@ export function proposeRules(versionId: string, grid: SheetGrid, extraIssues: Is
         }
       }
 
-      if (key.includes("phone") || (looksLikePhone(working) && !looksLikeEmail(working))) {
+      // Phone rewriting is auto-approved, so it only applies to phone-labelled columns.
+      // A 10-digit order number or ID must never be turned into "+1…".
+      if (key.includes("phone") || key.includes("mobile") || key === "tel" || key.includes("telephone")) {
         const next = toE164ish(working);
         if (next && next !== working) {
           push({
@@ -359,6 +379,28 @@ export function proposeRules(versionId: string, grid: SheetGrid, extraIssues: Is
   });
 
   return { changes, issues };
+}
+
+export type DateReading = "mdy" | "dmy";
+
+/**
+ * A person resolves an ambiguous date by choosing a reading. Returns the updated change, or an
+ * error string when the change is not an ambiguous date. The reading is recorded in the evidence.
+ */
+export function resolveAmbiguousDate(
+  change: ProposedChange,
+  reading: DateReading,
+  actor: string
+): ProposedChange | string {
+  if (change.ruleId !== "date_ambiguous") return "Only ambiguous dates can be resolved this way.";
+  const candidates = ambiguousDateCandidates(change.before);
+  if (!candidates) return `“${change.before}” is not an ambiguous date.`;
+  return {
+    ...change,
+    after: candidates[reading],
+    confidence: 1,
+    evidence: `Read as ${reading.toUpperCase()} by ${actor}.`,
+  };
 }
 
 export function applyApproved(

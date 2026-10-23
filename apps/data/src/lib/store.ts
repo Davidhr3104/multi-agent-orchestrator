@@ -4,7 +4,7 @@ import type { DatasetBundle, DeskKpis, DeskMode, ImportContract, SheetGrid } fro
 import { DEFAULT_ORG_ID, DEMO_DATASET_ID } from "@/lib/types";
 import { sha256 } from "@/lib/hash";
 import { runPipeline } from "@/lib/pipeline";
-import { applyApproved } from "@/lib/rules";
+import { applyApproved, resolveAmbiguousDate, type DateReading } from "@/lib/rules";
 import { dirtyLeadsGrid, DEMO_META, DIRTY_LEADS_CSV } from "@/lib/demo";
 import { cloneGrid } from "@/lib/utils";
 import { contractFor, guessTargetApp, mapColumns, publicationIdempotencyKey, validateAgainstContract } from "@/lib/contracts";
@@ -201,11 +201,30 @@ export async function decide(
   changeIds: string[],
   status: "approved" | "rejected",
   actor: string,
-  visitorId: string
+  visitorId: string,
+  /** changeId → how to read an ambiguous date. Only valid with status "approved". */
+  readings: Record<string, DateReading> = {}
 ): Promise<DatasetBundle | string> {
   await ensureDesk();
   const bundle = await getBundle(datasetId, visitorId);
   if (!bundle) return "Dataset not found.";
+  const known = new Map(bundle.changes.map((c) => [c.id, c]));
+  const unknown = changeIds.filter((id) => !known.has(id));
+  if (unknown.length) return `Unknown change: ${unknown[0]}.`;
+  const readingIds = Object.keys(readings);
+  if (readingIds.length && status !== "approved") return "A date reading can only be approved, not rejected.";
+  for (const id of readingIds) if (!changeIds.includes(id)) return `Reading for ${id} is not in this decision.`;
+  if (status === "approved") {
+    // Approving an ambiguous date without choosing MDY or DMY would bless a value we never read.
+    const unresolved = changeIds.find((id) => known.get(id)?.ruleId === "date_ambiguous" && !readings[id]);
+    if (unresolved) return `Choose MDY or DMY for ${known.get(unresolved)!.cellRef}; ambiguous dates are never guessed.`;
+  }
+  for (const id of readingIds) {
+    const resolved = resolveAmbiguousDate(known.get(id)!, readings[id], actor);
+    if (typeof resolved === "string") return resolved;
+    bundle.changes = bundle.changes.map((c) => (c.id === id ? resolved : c));
+    if (resolved.issueId) bundle.issues = bundle.issues.filter((i) => i.id !== resolved.issueId);
+  }
   const now = new Date().toISOString();
   bundle.decisions = bundle.decisions.map((d) =>
     changeIds.includes(d.changeId) ? { ...d, status, decidedBy: actor, decidedAt: now } : d

@@ -8,6 +8,7 @@ const WHY_LABEL: Record<string, string> = {
   email_syntax: "Unverified email",
   phone_e164: "Broken phone",
   exact_duplicate: "Exact duplicate row",
+  duplicate_key: "Repeated email or phone",
   date_iso: "Invalid or unverified date",
   mixed_types: "Mixed column types",
   outlier: "Marked outlier",
